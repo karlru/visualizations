@@ -30,20 +30,22 @@ The document intentionally does **not** pin versions. Use the latest stable rele
 | 2D rendering | **Canvas 2D** | ACO graph, pheromone trails, ants, probability fans |
 | 3D rendering | **Three.js**, lazy-loaded | RANDU point cloud, planes, orbit camera, guided tour |
 | Overlays and charts | **DOM + SVG** | Annotations, labels, metrics, charts, accessible text |
-| Chart primitives | **d3-scale, d3-shape, and small d3 color modules** | Scales, paths, palette interpolation, and geometry without full D3 DOM rendering |
+| Chart primitives | **d3-scale, d3-shape, d3-color** | Scales, paths, palette interpolation, and geometry without full D3 DOM rendering |
 | Math | **KaTeX at build time** | Static, high-quality formulas with no runtime math library |
 | Code highlighting | **Shiki at build time** | Static, themed pseudocode with no runtime highlighter |
 | Styling | **CSS custom properties + scoped styles** | Design tokens and bespoke layout without utility-class noise |
 | State | **Svelte runes + engine state + URL state** | Local UI state, simulation state, shareable state |
 | Package manager | **pnpm** | Fast, strict, reproducible installs |
-| Lint and format | **Biome** | One fast tool for linting and formatting |
+| Lint and format | **Biome + `astro check`** | One fast tool for TypeScript/JS/CSS; Astro/Svelte markup is covered by the framework checker because Biome's HTML support is experimental |
 | Unit tests | **Vitest** | Fast tests for engines, math, and URL state |
 | End-to-end tests | **Playwright** | Browser tests, accessibility, visual regression, viewport matrix |
 | Accessibility testing | **axe-core via Playwright** | Automated WCAG checks in CI |
-| Performance testing | **Lighthouse CI + bundle-size checks** | Budget enforcement |
+| Performance testing | **Lighthouse CI + `web-vitals` + bundle-size checks** | LCP/CLS/TBT, INP, and budget enforcement |
+| OG images | **astro-og-canvas** | Build-time social images with local fonts |
+| RSS | **@astrojs/rss** | Static feed for both stories |
 | Hosting | **Cloudflare Workers static assets** | Free static hosting, global CDN, custom domain, SSL |
 | Deployment | **GitHub Actions + Wrangler** | Reproducible CI and production deploys |
-| Analytics | **Cloudflare Web Analytics (optional)** | Cookie-less, privacy-friendly traffic metrics |
+| Analytics | **None in release 1** | No beacon, no privacy disclosure complexity; revisit later |
 
 ## 3. Detailed decisions
 
@@ -248,31 +250,42 @@ There is no global state library. The state has three distinct homes:
 
 1. **Simulation state** lives inside the engine. It is updated by a fixed-timestep loop and exposed through snapshots and metrics.
 2. **UI state** lives in Svelte runes: active chapter, playing/paused, speed, article mode, quality tier.
-3. **Shareable state** lives in the URL: story slug, chapter, seed, parameters.
+3. **Shareable state** lives in the URL: story slug, chapter fragment, seed, structural parameters.
 
 This separation prevents a UI store from becoming a second, inconsistent copy of the simulation. URL state is serialized and parsed by a small, unit-tested module.
 
+Structural parameter changes restart the run at iteration 0 with the same seed; presentation changes apply immediately. The URL therefore encodes the run's starting state, not a mid-run frame. The full rules are in `docs/requirements.md` §2.6.1.
+
 **Alternatives:** Redux, Zustand, and similar stores are unnecessary for a single-page story with a local engine. They would add indirection without solving a real problem.
 
-### 3.15 Web Workers: available, not mandatory
+### 3.15 Web Workers and bulk generation
 
-The engines are written so they can run in a Worker, but the initial ACO and RANDU workloads are light enough to run on the main thread. The plan is:
+The engines are written so they can run in a Worker. The ACO and default RANDU workloads run on the main thread with a fixed timestep. Two cases are predictably too expensive for a synchronous main-thread path:
+
+- RANDU BigInt generation at up to 100,000 triples with a non-power-of-two modulus.
+- The ACO worst case of 150 cities × 200 ants at 4× speed.
+
+The plan is:
 
 1. Implement on the main thread with a fixed timestep.
 2. Measure frame time and long tasks.
-3. Move an engine to a Worker only if it exceeds the frame budget.
-4. If a Worker is added, use a small typed message protocol and transferable arrays. Avoid `SharedArrayBuffer`, which would require cross-origin isolation headers.
+3. Use a Worker or chunked async generation for the RANDU BigInt path, with a busy state.
+4. Cap ACO iterations per frame and degrade quality rather than block.
+5. If a Worker is added, use a small typed message protocol and transferable arrays. Avoid `SharedArrayBuffer`, which would require cross-origin isolation headers.
 
-**Why not start with Workers:** They add lifecycle, serialization, and debugging complexity. They are a performance tool, not an architectural requirement.
+**Why not start every engine in a Worker:** they add lifecycle, serialization, and debugging complexity. They are a performance tool, not an architectural requirement. The BigInt bulk path is the exception because it is predictably over budget.
 
 ### 3.16 Testing and quality tools
 
 - **Vitest** for pure logic: ACO invariants, LCG exactness, plane detection, URL parsing, deterministic seeds, and property-based tests with `fast-check`.
 - **Playwright** for browser behavior: scroll chapters, controls, sharing, article mode, reduced motion, no-JavaScript reading, viewport matrix, and WebGL smoke tests.
 - **axe-core** for automated accessibility checks.
-- **Lighthouse CI** for performance, accessibility, best-practices, and SEO budgets.
-- **Visual regression** with fixed seeds, frozen simulation time, and fixed scroll positions.
-- **Biome** for linting and formatting. One tool, fast feedback, minimal configuration.
+- **Lighthouse CI** for performance, accessibility, best-practices, and SEO budgets, with desktop and mobile presets.
+- **`web-vitals`** in Playwright for the INP harness; Lighthouse lab does not report INP.
+- **Visual regression** with fixed seeds, frozen simulation time, fixed scroll positions, disabled Lenis, and `document.fonts.ready`; it runs in CI with artifact upload.
+- **Biome** for TypeScript, JavaScript, and CSS. Astro/Svelte markup support is experimental and requires `html.experimentalFullSupportEnabled`; `astro check` covers the framework templates. This combination is the documented lint story.
+
+The full verification strategy is in `docs/requirements.md` §1.4 and §6, and the concrete commands are in `docs/implementation-plan.md` Appendices A and C.
 
 ### 3.17 Cloudflare Workers static assets
 
@@ -281,8 +294,9 @@ The engines are written so they can run in a Worker, but the initial ACO and RAN
 - The build output is a directory of static files. Cloudflare serves those files directly from its global network.
 - Static asset requests are not charged on the free plan; the site does not need a Worker script or any paid service.
 - Custom domains and SSL certificates are available on the free plan.
-- A `_headers` file can set security and caching headers for static assets.
-- It is the deployment path recommended by Astro's current documentation.
+- A `_headers` file can set security and caching headers for static assets. It applies to the assets-only deployment; if a Worker script is added later, headers must be set in the Worker response instead.
+- `assets.html_handling: "drop-trailing-slash"` is required so that `/stories` and `/stories/<slug>` are served without a redirect. Astro's `trailingSlash` setting, internal links, canonicals, the sitemap, and the link checker must all use the same non-trailing-slash convention.
+- Astro's sitemap integration emits `sitemap-index.xml` and `sitemap-0.xml`, not `sitemap.xml`.
 - GitHub Actions can build and deploy with Wrangler using an API token.
 
 **Why not the alternatives**
@@ -299,22 +313,25 @@ The engines are written so they can run in a Worker, but the initial ACO and RAN
 
 ### 3.18 GitHub Actions and Wrangler
 
-- CI runs lint, type-check, unit tests, end-to-end tests, accessibility checks, and the production build.
+- CI runs lint, type-check, unit tests, end-to-end tests, accessibility checks, visual regression, bundle checks, and the production build.
+- Playwright CI installs Chromium, Firefox, and WebKit. Current Safari, iOS Safari, and Android Chrome are checked manually on real devices.
 - Deployment runs only from the main branch after all checks pass.
 - Secrets are stored in GitHub Actions secrets: `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`.
 - Preview deployments are optional; if added, they must not share production state or analytics.
-- The build is reproducible: frozen lockfile, explicit package manager, and a single build command.
+- The build is reproducible: frozen lockfile, explicit package manager via `packageManager`, and a single build command.
 
 ### 3.19 Analytics and privacy
 
-Analytics are optional. If enabled, use Cloudflare Web Analytics:
+Release 1 ships **without analytics**. There is no beacon, no third-party script, and no consent banner.
+
+If analytics are added later, use Cloudflare Web Analytics:
 
 - Cookie-less.
 - No personal data.
 - No consent banner required.
 - Disclosed on the colophon or privacy page.
 
-No advertising, tracking pixels, session recording, or third-party embeds are included by default.
+No advertising, tracking pixels, session recording, or third-party embeds are included by default. `localStorage` is used only for reader preferences, stored on the device and not transmitted.
 
 ### 3.20 Fonts and typography
 
@@ -323,10 +340,10 @@ The design uses three self-hosted open-source families:
 | Role | Family | Why |
 |---|---|---|
 | Display | **Instrument Serif** | Editorial, high-contrast, distinctive at large sizes. |
-| Body | **Geist** or **Inter** | Neutral, highly legible, variable, excellent for long reading. |
+| Body | **Geist** | Neutral, highly legible, variable, excellent for long reading. |
 | Data/code | **JetBrains Mono** | Clear tabular figures and a technical voice for metrics and pseudocode. |
 
-Fonts are self-hosted, subset where practical, preloaded only when critical, and paired with metric-compatible fallbacks to reduce layout shift. No third-party font CDN is used.
+Fonts are self-hosted, subset with `subfont` or `fonttools`, preloaded only when critical, and paired with metric-compatible fallbacks to reduce layout shift. No third-party font CDN is used. `public/fonts/` is unhashed, so `_headers` gives it an explicit long-lived cache rule (for example one week with revalidation) rather than the immutable hashed-asset rule.
 
 ### 3.21 Design tokens
 
@@ -336,13 +353,64 @@ The visual system is intentionally small and token-driven:
 |---|---|---|
 | Paper | `#F2EFE6` | Page background |
 | Ink | `#141414` | Body text and rules |
-| Vermilion | `#E4572E` | Primary accent, highlights, pheromones |
+| Paper muted | `#5F5B54` | Secondary paper text; 5.87:1 on paper |
+| Accent on paper | `#B23A1A` | Links and small accent text; 5.20:1 on paper |
 | Stage | `#0B0C0E` | Visualization background |
-| Warm amber | `#FFB25E` | Ants, trails, warm data |
-| Cool accent | `#7CF5C4` | Best tour, comparison data |
-| Muted ink | `#6E6A62` | Secondary text and captions |
+| Stage ink | `#F2EFE6` | Stage text; 17.02:1 on stage |
+| Stage muted | `#9A948A` | Stage captions; 6.50:1 on stage |
+| Accent on stage | `#E4572E` | Stage highlights and pheromones; 5.31:1 on stage |
+| Focus | `#3A6EA5` | Focus ring; 4.62:1 on paper, 3.68:1 on stage |
+| Warm amber | `#FFB25E` | Ants, trails, warm data (graphics/large text) |
+| Cool accent | `#7CF5C4` | Best tour, comparison data (graphics/large text) |
+
+Vermilion `#E4572E` may be used for large text and non-text graphics on paper only where it meets the 3:1 large-text/graphics threshold; it is not the body-text or small-link color on paper. A Phase 0 unit test asserts every text/UI token pair on both backgrounds. The token values and contrast ratios above are normative.
 
 Motion uses long, calm easing curves in the 400–900 ms range with a strong ease-out; no bouncy springs for explanatory content. The stage starts as a framed paper inset and can expand to full-bleed for key acts. Canvas colors are read from a typed theme object that mirrors these tokens.
+
+### 3.22 Generator abstraction and RANDU math
+
+FR-RANDU-01 and FR-RANDU-09 require a common abstraction because PCG32 and xoshiro128** are not LCGs:
+
+```ts
+interface Generator {
+  readonly kind: 'lcg' | 'pcg32' | 'xoshiro128';
+  reset(seed: number): void;
+  nextUint32(): number;
+  nextFloat(): number; // [0, 1)
+  readonly period?: number;
+}
+```
+
+LCG presets expose `a`, `c`, and `m`. PCG32 uses a 64-bit state and increment; xoshiro128** uses four 32-bit words seeded by splitmix32. The advanced panel and URL schema expose generator-specific fields only.
+
+| Preset | `a` | `c` | `m` |
+|---|---|---|---|
+| RANDU | 65539 | 0 | 2³¹ |
+| MINSTD | 16807 | 0 | 2³¹−1 |
+| ANSI C | 1103515245 | 12345 | 2³¹ |
+| Numerical Recipes | 1664525 | 1013904223 | 2³² |
+
+Known-sequence tests use exact first-output fixtures plus a BigInt reference, including PCG32 and xoshiro128** seeding.
+
+The fast double-precision path is allowed only when `a × (m − 1) + c ≤ 2⁵³`. This is a per-`(a, m)` rule: RANDU, MINSTD, and Numerical Recipes are safe; **ANSI C is not** (≈ 2.37 × 10¹⁸ > 2⁵³) and needs `Math.imul`, split multiplication, or BigInt.
+
+RANDU is multiplicative (`c = 0`). Its period is **2²⁹ = 536,870,912** for an odd seed. Hull–Dobell applies to `c ≠ 0` and does not describe RANDU. The plane index is computed from integer state as `(9x − 6y + z) / 2³¹`; normalized floats are never divided by `2³¹`.
+
+The point-count control counts rendered triples and generates `triples + 2` outputs. `distinctPlaneCount` and `maxPlaneGap` are computed from data, not hardcoded. A 50,000-triple run with seed `1` yields exactly `{−5…9}`; small runs can yield fewer, and seed `2³⁰` is a fixed point with one plane. Even seeds are accepted with a warning, and the all-odd low-bit claim is conditional on an odd seed. The low-bit chapter uses a bit-plane strip or bit-period table, not a flat parity strip.
+
+### 3.23 Article-first rendering and static figures
+
+The static HTML default is the article layout. The stage is an enhancement inserted after hydration. With JavaScript disabled, there is no empty stage; `<Predict>` is built on `<details>/<summary>`; all prose, formulas, and static figures remain visible.
+
+A build-time `scripts/build-figures.mjs` imports the engines with fixed seeds and writes the ACO best-tour figure and the RANDU 2D projections. These figures are referenced by MDX, so article and no-JS modes have real figures rather than client-only canvases.
+
+### 3.24 Licensing, analytics, and operations
+
+- Code is MIT; original prose is CC BY 4.0. GSAP is credited under its standard license; fonts and libraries keep their own licenses.
+- Release 1 has no analytics beacon and no tracking cookies. `localStorage` stores reader preferences only.
+- CSP uses Astro's generated scripts/styles with a documented hash/nonce or conservative fallback; `frame-ancestors 'none'`; consider HSTS.
+- Rollback is redeploying the previous tagged commit or `wrangler rollback`.
+- `_headers` applies to static assets; if a Worker response is added later, headers must be set in the Worker.
 
 ## 4. How the pieces fit
 
@@ -378,37 +446,58 @@ Astro build
 Both renderers implement the same small interface:
 
 ```ts
-interface StageRenderer {
+interface StageRenderer<P, S> {
   mount(container: HTMLElement): Promise<void>;
   resize(width: number, height: number, dpr: number): void;
   setScene(scene: SceneState): void;
-  setParams(params: unknown): void;
+  setParams(params: P): void;
   setPaused(paused: boolean): void;
   dispose(): void;
+}
+
+type CameraState =
+  | { kind: '2d'; panX: number; panY: number; zoom: number }
+  | { kind: '3d'; position: Vec3; target: Vec3; up: Vec3; fov: number };
+
+interface ChapterSpec {
+  id: string;
+  title: string;
+  scene: string;
+  params?: Record<string, unknown>;
+  pseudocodeLine?: number;
+  annotations?: string[];
+  reducedMotionSteps?: number;
+  tourAct?: number;
 }
 ```
 
 - `Canvas2DRenderer` owns a 2D camera, layers, and drawing.
 - `ThreeRenderer` owns a Three.js scene, orbit controls, and label projection.
 - The story controller does not know which renderer is active.
+- `setParams` is generic, not `unknown`; renderers may expose optional label-registration and camera-query hooks.
 - The 3D adapter is dynamically imported only when a story requests it.
-- The stage island is client-only (or every browser API is guarded inside `onMount`), so the static build never evaluates canvas or WebGL code.
+- The stage is an enhancement over the server-rendered article layout; the static build never evaluates canvas or WebGL code.
+- A fake-3D contract test in Step 1.1 exercises async mount, a 3D camera pose, and label registration before Phase 4.
+
+The story controller passes typed params and a discriminated camera state; `unknown` is not used at the renderer boundary.
 
 ### 4.4 Scroll semantics
 
-- Chapter entry sets parameters, seeds or resets if needed, eases the camera, and starts the scene.
-- Chapter progress interpolates deterministic values only: camera pose, layer opacity, parameter morphs.
+- Chapter entry sets parameters, resets the run deterministically, eases the camera, and starts the scene.
+- Chapter progress interpolates deterministic presentation values only: camera pose, layer opacity, and reveal progress.
+- Scroll never morphs engine parameters. A structural change restarts the run at iteration 0; a presentation change applies immediately.
 - Chapter exit settles into a coherent state; stochastic runs are never rewound by scrolling upward.
 - Scenes that must scrub exactly (for example, a single tour construction) use a precomputed deterministic keyframe sequence; arbitrary stochastic runs are not precomputed.
 - The lab runs freely with no scroll coupling.
+- The guided tour owns the camera while playing; scroll scrubbing is suspended, pointer grab pauses the tour, and resume returns to the scripted timeline.
 - Reduced motion replaces animation with static keyframes and step controls.
 
-This avoids the common failure mode where simulation time is tied directly to scroll position, causing skipped states, rewinds, and jank.
+This avoids the common failure mode where simulation time is tied directly to scroll position, causing skipped states, rewinds, and jank. The state and URL rules are in `docs/requirements.md` §2.6.1.
 
 ### 4.5 Performance strategy
 
-- One `requestAnimationFrame` loop per active story.
-- Pause when the stage is offscreen or the tab is hidden.
+- One driver: GSAP ticker → fixed-timestep clock → engine → renderer. Lenis and ScrollTrigger update scroll only.
+- Pause rendering and simulation when the stage is offscreen or the tab is hidden.
 - Cap device pixel ratio; expose a quality tier.
 - Use `setDrawRange` for progressive point reveals.
 - Reuse typed arrays and GPU buffers; do not allocate per frame.
@@ -416,7 +505,9 @@ This avoids the common failure mode where simulation time is tied directly to sc
 - Lazy-load Three.js only for the 3D story.
 - Self-host and subset fonts.
 - Avoid shadows, post-processing, and per-frame allocations in 3D.
-- Dispose geometries, materials, textures, listeners, and WebGL contexts on navigation.
+- Dispose geometries, materials, textures, listeners, tour tweens, and WebGL contexts on navigation.
+- Run RANDU BigInt bulk generation in a Worker or in chunks; cap ACO iterations per frame at the worst-case workload.
+- Measure p95 frame time, not an average; the budgets are in `docs/requirements.md` §2.8.
 
 ### 4.6 3D rendering patterns for future stories
 
@@ -439,13 +530,16 @@ Shared helpers:
 
 Rules for every 3D story:
 
+- Detect **WebGL2**; current Three requires WebGL2. If it is unavailable, render the fallback.
 - Lazy-load Three.js; never include it in a 2D page bundle.
 - Use one WebGL context at a time and dispose it on navigation.
 - Use DOM labels instead of in-canvas text.
 - Provide a 2D projection, a textual summary, and a data table as the accessibility fallback.
 - Avoid shadows and post-processing unless a story proves they are necessary.
-- Clip transparent planes and volumes to their domain to limit overdraw.
+- Clip transparent planes and volumes to their domain to limit overdraw. For RANDU, use Six local clipping planes for the unit cube or pre-clip the geometry; do not rely on a visual approximation.
 - Test on a real mid-tier mobile device; cap DPR and point counts by quality tier.
+- On coarse pointers, keep vertical page scroll native. One-finger orbit uses horizontal drag or an explicit Orbit mode; two-finger zoom has button alternatives.
+- Handle iOS Safari viewport resizing with `100dvh`/`visualViewport` and debounced `ScrollTrigger.refresh()`.
 
 ## 5. Alternatives considered as a group
 
@@ -480,13 +574,17 @@ Rules for every 3D story:
 |---|---|---|
 | Scroll jank on low-end devices | Poor reading experience | Fixed timestep, quality tiers, DPR cap, pause offscreen, avoid layout reads in RAF |
 | 3D performance on mobile | Dropped frames | Lazy load, point-count limits, no post-processing, cap DPR, test on real devices |
-| Transparent 3D planes cause overdraw | Fill-rate cost | Clip planes to the cube, keep opacity low, limit plane count to 15 |
-| GSAP lifecycle leaks with view transitions | Duplicate animations | One story island, `gsap.context()`, explicit cleanup, navigation stress tests |
+| Transparent 3D planes cause overdraw | Fill-rate cost | Six local clipping planes to the cube, low opacity, limit plane count to 15 |
+| GSAP lifecycle leaks with view transitions | Duplicate animations | Remount the story island on slug change, `gsap.context()`, explicit cleanup, navigation stress tests |
+| State/URL non-reproducibility | Broken share links and tests | Structural changes reset the run; URL stores starting state; chapter reset is deterministic |
+| BigInt generation blocks the UI | Frozen page | Worker or chunked generation with a busy state at 100,000 triples |
+| Mobile gesture conflict | Reader cannot scroll | Vertical scroll stays native; explicit Orbit mode; button alternatives |
+| Token contrast failure | Accessibility defect | Phase 0 contrast test; separate stage/paper text and accent tokens |
 | Bundle growth | Slow first load | Per-story code splitting, lazy Three.js, budget checks in CI |
 | Accessibility regressions | Exclusion and legal risk | axe in CI, keyboard tests, reduced-motion tests, manual screen-reader pass |
 | Content correctness | Loss of trust | Unit-tested invariants, cited sources, review checklist |
 | Over-abstraction | Slow development | Build only the interfaces needed by the two initial stories; generalize after a third use case |
-| WebGL unavailability | Broken 3D story | 2D projection fallback, textual summary, data table, retry UI |
+| WebGL2 unavailability | Broken 3D story | 2D projection fallback, textual summary, data table, retry UI |
 
 ## 8. What we deliberately do not use
 

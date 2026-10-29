@@ -19,7 +19,7 @@ The first release contains exactly two stories:
 
 | Story | Topic | Visual mode |
 |---|---|---|
-| **The Colony That Solved the Traveling Salesman** | Ant Colony Optimization on a TSP | 2D canvas |
+| **The Colony That Finds a Short Route** | Ant Colony Optimization on a TSP | 2D canvas |
 | **Fifteen Planes: How RANDU Broke Randomness** | Linear congruential generators, RANDU, and the 3D lattice failure | 3D WebGL |
 
 Both are described in detail in [`docs/stories.md`](docs/stories.md). Everything else is a future addition to the backlog.
@@ -101,38 +101,13 @@ The three systems are deliberately separate:
 │  ├─ technology.md
 │  ├─ implementation-plan.md
 │  └─ stories.md
-├─ astro.config.mjs
-├─ wrangler.jsonc
-├─ package.json
 ├─ public/
-│  ├─ fonts/
-│  ├─ og/
-│  └─ _headers
-├─ src/
-│  ├─ pages/
-│  ├─ content/stories/
-│  ├─ layouts/
-│  ├─ components/
-│  │  ├─ story/
-│  │  ├─ controls/
-│  │  └─ ui/
-│  ├─ engines/
-│  │  ├─ core/
-│  │  ├─ aco/
-│  │  └─ randu/
-│  ├─ render/
-│  │  ├─ canvas2d/
-│  │  └─ three/
-│  ├─ stories/
-│  ├─ lib/
-│  └─ styles/
 ├─ scripts/
-│  ├─ check-links.mjs
-│  └─ check-bundle-size.mjs
+├─ src/
 └─ tests/
-   ├─ unit/
-   └─ e2e/
 ```
+
+The detailed, canonical tree is in [`docs/implementation-plan.md`](docs/implementation-plan.md) §3. This README intentionally shows only the top-level shape so the two trees cannot drift.
 
 ## Local development
 
@@ -141,11 +116,14 @@ The project is documented but not yet scaffolded. Once the implementation plan h
 ```bash
 pnpm install
 pnpm dev          # local development server
-pnpm build        # type-check and build the static site
+pnpm build        # build static figures, type-check, and build the static site
 pnpm preview      # preview the production build locally
-pnpm lint         # lint and format checks
+pnpm lint         # Biome plus Astro/Svelte checks
 pnpm test         # unit tests
 pnpm test:e2e     # end-to-end and accessibility tests
+pnpm test:visual  # visual regression screenshots
+pnpm check:links  # internal link check
+pnpm check:bundle # initial and route-total bundle budgets
 pnpm deploy       # build and deploy to Cloudflare
 ```
 
@@ -153,13 +131,15 @@ Prerequisites: the current Node LTS release, pnpm, and a Cloudflare account for 
 
 ## Deployment
 
-The site is fully static. Cloudflare Workers static assets serve the build output directly; requests for static assets are not charged on the free plan. There is no server, database, or API to operate.
+The site is fully static. Cloudflare Workers static assets serve the build output directly; requests for static assets are not charged on the free plan. There is no server, database, or API to operate. The deployment uses `drop-trailing-slash` routing so `/stories` and `/stories/<slug>` are served without a redirect.
 
 Deployment is automated from the main branch with GitHub Actions and Wrangler. Preview deployments are optional. The exact setup is described in [`docs/implementation-plan.md`](docs/implementation-plan.md).
 
+Release 1 has no analytics beacon and no tracking cookies. Reader preferences are stored locally in `localStorage` and are not transmitted.
+
 ## Status
 
-- Documentation: complete for the initial two-story release.
+- Documentation: implementation-ready for the initial two-story release.
 - Implementation: not started.
 - Scope: ant colony optimization and LCG/RANDU only. Additional stories are listed in the backlog but are not part of the first release.
 
@@ -169,4 +149,4 @@ Every story follows the same shell and the same definition of done. The authorin
 
 ## License
 
-To be decided before public launch. The planned split is a permissive license for code and a Creative Commons license for original prose. Third-party fonts and libraries keep their own licenses; credits will be listed on the colophon page.
+Code is licensed under the MIT License. Original prose and illustrations are licensed under Creative Commons Attribution 4.0 International (CC BY 4.0). Third-party fonts and libraries keep their own licenses; credits are listed on the colophon page. GSAP is used under its standard license and is credited on the colophon.

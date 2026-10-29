@@ -20,9 +20,9 @@ Every story has:
 | **Title** | The public title. |
 | **Slug** | The URL segment under `/stories/`. |
 | **Dek** | One sentence that promises the argument. |
-| **Category** | Optimization, Randomness, Graphs, Emergence, Physics, or Generative. |
-| **Visual mode** | `2d`, `3d`, or `mixed`. |
-| **Difficulty** | Introductory, intermediate, or advanced. |
+| **Category** | Optimization, Randomness, Graphs, Emergence, Physics, Generative, or Data. |
+| **Visual mode** | `2d`, `3d`, or `mixed`; a 3D story also declares its fallback (`2d`). |
+| **Difficulty** | Introductory, intermediate, or advanced; an optional note may describe a range. |
 | **Prerequisites** | Concepts the reader should know. |
 | **Learning objectives** | Three to eight concrete things the reader should be able to explain afterward. |
 | **Chapters** | The narrative beats, each with a scene and a visual state. |
@@ -61,11 +61,12 @@ The rule is **one idea per screen**. If a chapter needs two ideas, split it.
 
 | Field | Value |
 |---|---|
-| **Title** | The Colony That Solved the Traveling Salesman |
+| **Title** | The Colony That Finds a Short Route |
 | **Slug** | `ant-colony-optimization` |
 | **Category** | Optimization |
-| **Visual mode** | 2D |
-| **Difficulty** | Introductory to intermediate |
+| **Visual mode** | `2d` |
+| **Difficulty** | Intermediate |
+| **Difficulty note** | Starts at introductory level; assumes basic graphs and probability |
 | **Length** | Long-form, ten chapters including the lab |
 | **Prerequisites** | Basic graphs, distance, and probability |
 | **Status** | Initial release |
@@ -93,7 +94,7 @@ By the end, the reader should be able to:
 | 2 | **The problem** | Cities connected by faint edges; a candidate tour is drawn | The goal is a short tour that visits every city once and returns. |
 | 3 | **One ant's choice** | Zoom to a focal city; probability fan over allowed next cities | An ant chooses probabilistically, biased by pheromone and distance. |
 | 4 | **The probability rule** | Formula overlay; probability fan updates as `α` and `β` change | `τ^α` rewards experience; `η^β` rewards short edges. |
-| 5 | **Leaving a trace** | Completed tours; pheromone deposits appear on used edges | Shorter tours deposit more pheromone per unit length; the shared trail is stigmergy. |
+| 5 | **Leaving a trace** | Completed tours; pheromone deposits appear on used edges | Each ant deposits `Q/L_k` on every edge it used, so shorter tours deposit more per edge; the shared trail is stigmergy. |
 | 6 | **Forgetting** | Pheromone fades on unused edges; the map changes | Evaporation prevents stale paths from dominating forever. |
 | 7 | **Emergence** | Pull back; the best tour emerges; convergence chart appears | A short tour becomes a visible, reinforced path. |
 | 8 | **Tuning the colony** | Preset comparison: balanced, greedy, stagnant, forgetful | Parameters trade exploration against exploitation. |
@@ -105,24 +106,26 @@ By the end, the reader should be able to:
 - **City graph:** nodes and faint candidate edges.
 - **Pheromone trails:** edge width and opacity proportional to pheromone, on a readable scale.
 - **Ants:** moving dots with short trails, interpolated along chosen edges.
-- **Best tour:** a distinct accent path with its length.
-- **Probability fan:** arcs or bars showing the focal ant's next-city probabilities.
+- **Best tour:** a distinct accent path with its length, plus a pattern or weight difference so it does not rely on color alone.
+- **Probability fan:** arcs or bars showing the focal ant's top N next-city probabilities (default N = 8) plus an explicit "other (Σ)" bucket, with a textual ranked alternative.
 - **Convergence chart:** best and mean tour length over iterations.
 - **Annotations:** DOM labels anchored to cities and edges.
-- **HUD:** iteration, best length, mean length, diversity/entropy, colony size.
+- **HUD:** iteration, best length, mean length, normalized diversity/entropy, colony size.
 
 ### 2.5 Parameters and presets
 
 | Parameter | Range | Default |
 |---|---|---|
-| Cities | 8–150 | 30 |
-| Ants | 4–200 | 40 |
+| Cities | 2–150 | 30 |
+| Ants | 1–200 | 40 |
 | `α` (pheromone weight) | 0–5 | 1 |
 | `β` (distance weight) | 0–10 | 2 |
 | `ρ` (evaporation) | 0–1 | 0.5 |
-| `Q` (deposit constant) | fixed or 0.1–10 | 1 |
+| `Q` (deposit constant) | fixed at 1 in release 1 | 1 |
 | Speed | 0.5×, 1×, 2×, 4× | 1× |
 | Seed | integer | 42 |
+
+`Q` is an internal constant in release 1; it is not a lab control and is not encoded separately in the URL. Structural parameter changes restart the run at iteration 0; see `docs/requirements.md` §2.6.1.
 
 | Preset | Intent | Values |
 |---|---|---|
@@ -136,8 +139,17 @@ By the end, the reader should be able to:
 - Best tour length.
 - Mean tour length.
 - Iteration number.
-- Diversity or entropy of the pheromone distribution.
+- Normalized diversity/entropy of the pheromone distribution.
 - Optional: improvement since the previous iteration, and the number of distinct tours.
+
+The diversity metric is normalized Shannon entropy over the per-edge pheromone mass:
+
+```text
+p_e = τ_e / Σ_f τ_f
+H = −Σ_e p_e · ln(p_e) / ln(E)
+```
+
+where `E` is the number of edges. `H` is in `[0, 1]`: uniform pheromone gives `1`, and all pheromone on one edge gives `0`. If the total pheromone is zero, `H` is `1` (maximally undifferentiated). The formula is unit-tested with known distributions.
 
 ### 2.7 Math and pseudocode
 
@@ -188,19 +200,20 @@ The story should use **Ant System** for transparency. It may mention Ant Colony 
 - All cities collinear.
 - `α = 0`: pheromone ignored; behavior becomes distance-greedy.
 - `β = 0`: distance ignored; behavior becomes pheromone-driven.
-- `ρ = 1`: full evaporation before deposit.
+- `ρ = 1`: full evaporation before deposit; unused edges may reach zero. The engine keeps values non-negative and finite; the renderer maps zero to a minimum visible width.
 - Very high `α` or very low `ρ`: stagnation.
 - Fewer ants than cities: still valid; ants choose among unvisited cities.
-- A city dragged onto another city: distance zero; clamp the distance and keep the engine finite.
+- A city dragged onto another city: distance zero; clamp the distance and keep the engine finite. Any city edit pauses the run, restarts it at iteration 0, and invalidates best/mean history.
 - All transition weights zero: choose uniformly among the allowed cities instead of dividing by zero.
+- A city edit is local to the session and is not included in a share URL; the UI says so.
 
 ### 2.9 Accessibility fallback
 
-- Article mode includes the full explanation, formulas, and a static best-tour figure.
+- Article mode includes the full explanation, formulas, and a static best-tour figure generated at build time.
 - A text summary states the current best tour length and iteration.
 - Metrics are exposed in a polite live region at a low frequency.
 - Layer meaning is not encoded by color alone; the best tour uses a distinct pattern/weight.
-- The probability fan has a textual alternative: a ranked list of next-city probabilities.
+- The probability fan has a required textual alternative: a ranked list of next-city probabilities, including the "other" bucket.
 - Reduced motion replaces ant animation with discrete iteration steps.
 
 ### 2.10 Acceptance criteria
@@ -224,10 +237,10 @@ The story should use **Ant System** for transparency. It may mention Ant Colony 
 
 ### 2.11 References
 
-- Dorigo, M., Maniezzo, V., & Colorni, A. (1996). *Ant System: Optimization by a colony of cooperating agents.* IEEE Transactions on Systems, Man, and Cybernetics.
-- Dorigo, M., & Stützle, T. (2004). *Ant Colony Optimization.* MIT Press.
-- Stützle, T., & Hoos, H. H. (2000). *MAX–MIN Ant System.* Future Generation Computer Systems.
-- TSPLIB and the traveling salesman problem literature for benchmark context.
+- Dorigo, M., Maniezzo, V., & Colorni, A. (1996). *Ant System: Optimization by a colony of cooperating agents.* IEEE Transactions on Systems, Man, and Cybernetics, 26(1), 29–41. https://doi.org/10.1109/3477.484436
+- Dorigo, M., & Stützle, T. (2004). *Ant Colony Optimization.* MIT Press. https://mitpress.mit.edu/9780262042192/ant-colony-optimization/
+- Stützle, T., & Hoos, H. H. (2000). *MAX–MIN Ant System.* Future Generation Computer Systems, 16(8), 889–914. https://doi.org/10.1016/S0167-739X(00)00043-1
+- TSPLIB benchmark library: https://comopt.ifi.uni-heidelberg.de/software/TSPLIB95/
 
 ## 3. Initial story: LCG / RANDU
 
@@ -238,7 +251,8 @@ The story should use **Ant System** for transparency. It may mention Ant Colony 
 | **Title** | Fifteen Planes: How RANDU Broke Randomness |
 | **Slug** | `randu-lcg` |
 | **Category** | Randomness |
-| **Visual mode** | 3D with 2D fallback |
+| **Visual mode** | `3d` |
+| **Fallback** | `2d` projection plus text and data table |
 | **Difficulty** | Intermediate |
 | **Length** | Long-form, ten chapters including the lab |
 | **Prerequisites** | Modular arithmetic, basic probability, comfort with 3D plots |
@@ -265,7 +279,7 @@ By the end, the reader should be able to:
 | 1 | **The generator that looked fine** | 1D strip of RANDU outputs | A sequence can look random without being random. |
 | 2 | **The machine** | LCG formula and parameter panel; one-step animation | `x_{n+1} = (a·x_n + c) mod m` is simple and deterministic. |
 | 3 | **Choosing parameters** | Preset selector; parameter changes; RANDU history note; period and full-period notes | Not every `a`, `c`, `m` is a good choice; RANDU's multiplier was chosen for speed on early hardware. |
-| 4 | **The lowest bit** | 1D parity strip or histogram | With an odd seed, every RANDU output is odd. |
+| 4 | **The lowest bit** | Bit-plane strip over 64–128 outputs, or a table of bit periods | With an odd seed, bit 0 is constant and higher bits have short periods. |
 | 5 | **Two dimensions** | 2D scatter of consecutive pairs | Lattice lines appear under inspection; 3D makes the failure unmistakable. |
 | 6 | **Three dimensions** | 3D point cloud of consecutive triples; orbit | The structure becomes sheets, not a cloud. |
 | 7 | **Fifteen planes** | Edge-on camera; 15 planes fade in | Every triple lies on one of 15 parallel planes. |
@@ -288,10 +302,12 @@ u_n = x_n / m
 a = 65539
 c = 0
 m = 2^31
-seed must be odd
+seed is odd in the canonical preset
 ```
 
 `65539 = 2^16 + 3`, which could be implemented with a shift and an add on early hardware. That speed advantage is part of why the multiplier was chosen.
+
+RANDU is multiplicative (`c = 0`), so its period is **2²⁹ = 536,870,912** for an odd seed. The state space is `2³¹`, but only odd states are reachable from an odd seed.
 
 **Full-period conditions (for `c ≠ 0`, Hull–Dobell):**
 
@@ -301,7 +317,7 @@ a − 1 is divisible by every prime factor of m
 a − 1 is divisible by 4 if m is divisible by 4
 ```
 
-For `m = 2^k`, this reduces to `c` odd and `a ≡ 1 (mod 4)`. A full period is necessary but not sufficient for good statistical behavior; RANDU has a long period and still fails in three dimensions.
+For `m = 2^k`, this reduces to `c` odd and `a ≡ 1 (mod 4)`. A full period is necessary but not sufficient for good statistical behavior. These conditions do not describe RANDU, because RANDU has `c = 0`; its period is 2²⁹ and still fails in three dimensions.
 
 **Derivation:**
 
@@ -319,9 +335,13 @@ Normalize to `[0, 1)`. Every triple `(u_n, u_{n+1}, u_{n+2})` lies on a plane:
 
 That is 15 parallel planes with normal `(9, −6, 1)` and spacing `1/√118 ≈ 0.092` in the unit cube.
 
+The exact implementation checks the relation on integer states: `9x_n − 6x_{n+1} + x_{n+2}` is an exact multiple of `2^31`. Never divide normalized floats by `2^31`.
+
 **Low-bit failure:**
 
-With an odd seed, every RANDU output is odd, so `x_n mod 2 = 1` for every `n`.
+With an odd seed, every RANDU output is odd, so `x_n mod 2 = 1` for every `n`. The story shows this as a constant bit 0 plus the short periods of bits 1–5, not as a flat parity strip.
+
+An even seed is accepted with a warning: it shortens the period, and some even seeds are degenerate. Seed `2³⁰` is a fixed point and produces one plane, not fifteen. The all-odd claim is conditional on an odd seed.
 
 **Comparison:**
 
@@ -344,16 +364,22 @@ Use a modern seeded PRNG such as `xoshiro128**` or PCG32. Generate the same numb
 
 ### 3.6 Guided animation
 
-The guided tour is automatic on chapter entry and interruptible at any time.
+The guided tour is a single six-act sequence spanning chapters 6–9. Entering a chapter seeks to the corresponding act; replay restarts the current act. It is automatic on chapter entry and interruptible at any time.
 
 | Act | Visual | Camera |
 |---|---|---|
 | 1 | Points appear progressively | Slow orbit around the cube |
 | 2 | Planes fade in | 3/4 view |
-| 3 | The sheets become lines | Tween to the plane-normal / edge-on view |
+| 3 | The sheets become lines | Tween to the edge-on view, perpendicular to the plane normal |
 | 4 | Points colored by plane | Return to 3/4 view |
 | 5 | Comparison cloud fades in | Same 3/4 view |
 | 6 | Free exploration | Orbit controls enabled |
+
+Camera pose definitions:
+
+- **Plane normal:** `(9, −6, 1)`. Looking along this vector shows the planes face-on.
+- **Edge-on:** perpendicular to the normal, for example `(6, 9, 0)`. Looking along this vector shows the planes as lines.
+- **3/4, top, front:** standard views used for orientation and comparison.
 
 Controls: pause/resume, replay, skip, resume after interaction, and step-by-step under reduced motion.
 
@@ -362,15 +388,19 @@ Controls: pause/resume, replay, skip, resume after interaction, and step-by-step
 | Parameter | Range / values | Default |
 |---|---|---|
 | Preset | RANDU, MINSTD, ANSI C, Numerical Recipes, PCG32, `xoshiro128**` | RANDU |
-| `a` | integer ≥ 1 | 65539 |
-| `c` | integer ≥ 0 | 0 |
-| `m` | integer ≥ 2 | 2^31 |
-| Seed | integer; RANDU requires odd | 1 |
-| Point count | 1,000–100,000 | 50,000 |
+| `a` | integer 1–`m−1`; LCG presets only | 65539 |
+| `c` | integer 0–`m−1`; LCG presets only | 0 |
+| `m` | integer 2–2⁵³; LCG presets only | 2^31 |
+| Seed | integer; even seeds accepted with a warning | 1 |
+| Point count | 0–100,000 rendered triples | 50,000 |
 | Planes | on/off | on |
 | Color by plane | on/off | on |
 | Auto-rotate | on/off | on until interaction |
 | Comparison | off/on | off |
+
+The advanced panel shows `a/c/m` only for LCG presets. PCG32 and xoshiro128** expose their own seed/state controls internally and do not pretend to be LCGs. Fewer than 3 triples shows an explanatory empty state.
+
+The exact preset constants, seeding schemes, and first-output fixtures are in `docs/technology.md` §3.22.
 
 **Preset notes:**
 
@@ -383,35 +413,36 @@ Controls: pause/resume, replay, skip, resume after interaction, and step-by-step
 
 ### 3.8 Metrics
 
-- Point count.
-- Distinct plane count.
-- Maximum plane gap.
-- Low-bit result.
+- Point count (rendered triples).
+- Distinct plane count (computed from the data; not hardcoded).
+- Maximum plane gap: the largest difference between consecutive occupied plane indices, reported in `k` units and optionally as physical spacing `1/√118`.
+- Low-bit result (conditional on odd seed).
 - Period for known presets or small moduli.
 - Sample triples with their plane index.
 - Optional: a note that arbitrary-parameter 3D spectral testing is not performed in the first release.
+- The metrics match unit tests at a fixed seed and run length; they do not claim 15 occupied planes when the data shows fewer.
 
 ### 3.9 Edge cases
 
-- Even seed for RANDU: warn and force the nearest odd seed, or reject with a clear message.
-- `m < 2`: validation error.
-- `a < 1`: validation error.
-- Fewer than three points: no triples; show an explanatory message.
-- `m` not a power of two: use exact integer arithmetic.
+- Even seed for RANDU: accept with a warning that the period is shortened and the all-odd claim does not apply. Do not rewrite the seed. Seed `2³⁰` is a documented degenerate case (one plane).
+- `m < 2`: validation error or clamp with a notice.
+- `a < 1`: validation error or clamp with a notice.
+- Fewer than 3 triples: no triples; show an explanatory empty state.
+- `m` not a power of two: use exact integer arithmetic; use the fast path only when `a × (m − 1) + c ≤ 2^53`.
 - Very large `a` or `m`: validate against the safe numeric range or use BigInt.
 - `a = 0` or `a = 1`: short or trivial sequences; show a warning.
 - `c ≠ 0`: the lattice relation changes; do not display the RANDU-specific 15-plane claim.
-- WebGL unavailable: show the 2D fallback.
+- WebGL2 unavailable: show the 2D fallback.
 
 ### 3.10 Accessibility fallback
 
-- A 2D top projection and an edge-on projection.
+- A 2D top projection and an edge-on projection, generated at build time for article/no-JS mode and available interactively when the stage is enhanced.
 - A text summary: point count, distinct planes, maximum gap, and whether the low bit is constant.
 - A sample data table of triples and plane indices.
-- Camera preset buttons so orbiting is not required.
-- A pause control for the guided tour.
+- Camera preset buttons and zoom buttons so orbiting is not required.
+- A pause control for the guided tour and camera motion.
 - No dependence on color alone: planes are also visible as geometry, and the table encodes the plane index numerically.
-- With JavaScript disabled, the prose, formulas, and static figures remain readable.
+- With JavaScript disabled, the prose, formulas, and static figures remain readable; no empty stage is shown.
 
 ### 3.11 Acceptance criteria
 
@@ -424,9 +455,9 @@ Controls: pause/resume, replay, skip, resume after interaction, and step-by-step
 - [ ] All presets apply and regenerate the cloud.
 - [ ] Advanced `a`, `c`, `m`, seed, and point-count controls work.
 - [ ] The comparison PRNG produces a visibly uniform cloud.
-- [ ] The metrics match the unit tests.
-- [ ] The low-bit failure is demonstrated.
-- [ ] The 2D fallback, summary, and data table work without WebGL.
+- [ ] The metrics match unit tests at a fixed seed and run length; the plane count is computed, not hardcoded.
+- [ ] The low-bit failure is demonstrated with a bit-plane strip or table, and the even-seed warning is shown.
+- [ ] The 2D fallback, summary, and data table work without WebGL2.
 - [ ] Reduced motion and article mode work.
 - [ ] Applications and limitations sections are present.
 - [ ] Key terms are defined in a glossary or inline.
@@ -437,12 +468,12 @@ Controls: pause/resume, replay, skip, resume after interaction, and step-by-step
 
 ### 3.12 References
 
-- Marsaglia, G. (1968). *Random numbers fall mainly in the planes.* Proceedings of the National Academy of Sciences.
-- IBM Scientific Subroutine Package documentation for RANDU.
-- Knuth, D. E. *The Art of Computer Programming, Volume 2: Seminumerical Algorithms.*
-- O'Neill, M. E. *PCG: A Family of Simple Fast Space-Efficient Statistically Good Algorithms for Random Number Generation.*
-- Blackman, D., & Vigna, S. *xoshiro / xoroshiro generators.*
-- L'Ecuyer, P. *Random number generation* chapters in simulation handbooks.
+- Marsaglia, G. (1968). *Random numbers fall mainly in the planes.* Proceedings of the National Academy of Sciences, 61(1), 25–28. https://doi.org/10.1073/pnas.61.1.25
+- IBM Scientific Subroutine Package (1968). *System/360 Scientific Subroutine Package, Version III, Programmer's Manual.* IBM. (RANDU documentation; cite the specific manual edition used.)
+- Knuth, D. E. *The Art of Computer Programming, Volume 2: Seminumerical Algorithms.* Addison-Wesley. https://www-cs-faculty.stanford.edu/~knuth/taocp.html
+- O'Neill, M. E. *PCG: A Family of Simple Fast Space-Efficient Statistically Good Algorithms for Random Number Generation.* https://www.pcg-random.org/pdf/hmc-cs-2014-0905.pdf
+- Blackman, D., & Vigna, S. *xoshiro / xoroshiro generators.* https://prng.di.unimi.it/
+- L'Ecuyer, P. *Random number generation* chapters in simulation handbooks. (Cite the specific handbook chapter and edition used.)
 
 ## 4. Future story backlog
 
@@ -493,7 +524,7 @@ Before a story is considered done:
 - [ ] The limitations section is honest.
 - [ ] The applications section is specific.
 - [ ] The lab is genuinely explorable.
-- [ ] The share URL restores the state.
+- [ ] The share URL restores the starting state, and any excluded local state (such as ACO map edits) is disclosed.
 - [ ] The article mode is complete.
 - [ ] The reduced-motion mode is complete.
 - [ ] The no-JavaScript reading path works.

@@ -20,7 +20,7 @@ The plan intentionally contains no time estimates and no pinned dependency versi
 
 - **Language:** TypeScript, strict mode.
 - **Package manager:** pnpm.
-- **Formatting and linting:** Biome.
+- **Formatting and linting:** Biome for TS/JS/CSS plus `astro check` for Astro/Svelte markup. Biome's HTML support is experimental.
 - **Unit tests:** Vitest.
 - **Browser tests:** Playwright.
 - **File naming:** kebab-case for files, PascalCase for components, camelCase for functions and variables.
@@ -87,7 +87,9 @@ git --version
 │  └─ favicon.svg
 ├─ scripts/
 │  ├─ check-links.mjs
-│  └─ check-bundle-size.mjs
+│  ├─ check-bundle-size.mjs
+│  ├─ check-citations.mjs
+│  └─ build-figures.mjs
 ├─ src/
 │  ├─ pages/
 │  │  ├─ index.astro
@@ -181,10 +183,8 @@ git --version
 │  │     └─ annotations.ts
 │  ├─ lib/
 │  │  ├─ seo.ts
-│  │  ├─ format.ts
 │  │  ├─ clipboard.ts
 │  │  ├─ persistence.ts
-│  │  ├─ quality.ts
 │  │  └─ scroll-director.ts
 │  └─ styles/
 │     ├─ tokens.css
@@ -193,13 +193,17 @@ git --version
 │     └─ three.css
 └─ tests/
    ├─ unit/
+   │  ├─ smoke.test.ts
+   │  ├─ tokens.test.ts
    │  ├─ rng.test.ts
    │  ├─ clock.test.ts
    │  ├─ url-state.test.ts
    │  ├─ aco.test.ts
    │  ├─ randu.test.ts
+   │  ├─ import-boundaries.test.ts
    │  └─ content-schema.test.ts
    └─ e2e/
+      ├─ smoke.spec.ts
       ├─ site.spec.ts
       ├─ story-runtime.spec.ts
       ├─ aco.spec.ts
@@ -219,21 +223,24 @@ git --version
 **Tasks**
 
 1. Initialize Git.
-2. Scaffold Astro in the current directory. Choose the minimal template, strict TypeScript, install dependencies, and do not initialize a nested Git repository.
-3. Confirm `src/pages/index.astro` renders.
-4. Add a `.gitignore` covering build output, dependencies, test artifacts, and local environment files.
-5. Make the first commit.
+2. Scaffold Astro in a temporary directory, then merge the generated files into the repository. The repository already contains `README.md` and `docs/`, and `create-astro` prompts or can overwrite the README when run in place.
+3. Choose the minimal template and install dependencies. Strict TypeScript is the default; current `create-astro` has no `--typescript` flag. Do not initialize a nested Git repository.
+4. Add a `packageManager` field to `package.json` for `pnpm/action-setup`.
+5. Confirm `src/pages/index.astro` renders.
+6. Add a `.gitignore` covering build output, dependencies, test artifacts, and local environment files.
+7. Make the first commit.
 
 **Commands**
 
 ```bash
 git init
-pnpm create astro@latest . --template minimal --typescript strict --install --no-git
+pnpm create astro@latest /tmp/algorithm-stories-scaffold --template minimal --install --no-git --no-ai
+cp -a /tmp/algorithm-stories-scaffold/. .
 pnpm install
 pnpm dev
 ```
 
-If the CLI prompts differ, choose: minimal template, strict TypeScript, install dependencies, no Git.
+Use a separate terminal for `pnpm dev`; it blocks the shell.
 
 **Files**
 
@@ -251,6 +258,8 @@ If the CLI prompts differ, choose: minimal template, strict TypeScript, install 
 - [ ] `src/engines/`, `src/render/`, `src/stories/`, and `docs/` exist or are created.
 - [ ] `git status` shows a clean repository after the first commit.
 - [ ] The lockfile is committed.
+- [ ] `package.json` has a `packageManager` field or the CI workflow passes an explicit pnpm version.
+- [ ] The existing `README.md` and `docs/` are preserved.
 
 ### Step 0.2 — Add Svelte, MDX, sitemap, and strict checks
 
@@ -260,7 +269,7 @@ If the CLI prompts differ, choose: minimal template, strict TypeScript, install 
 
 1. Add the Svelte, MDX, and sitemap integrations.
 2. Configure `output: 'static'`.
-3. Set the production `site` URL placeholder in `astro.config.mjs`.
+3. Set a provisional production `site` URL in `astro.config.mjs`; replace it with the deployed workers.dev URL at Step 0.6.
 4. Add `astro check` to the build script.
 5. Create a temporary Svelte island on the home page and a temporary MDX page to prove both work.
 6. Remove the temporary examples after verification.
@@ -285,7 +294,7 @@ pnpm exec astro check
 - [ ] An MDX page renders.
 - [ ] `pnpm exec astro check` passes.
 - [ ] `pnpm build` produces static HTML for all routes.
-- [ ] `sitemap.xml` is generated after a build.
+- [ ] `sitemap-index.xml` and its numbered sitemap file are generated after a build.
 - [ ] No framework adapter for server rendering is installed.
 
 ### Step 0.3 — Add tooling: Biome, Vitest, Playwright, axe, Lighthouse CI
@@ -294,20 +303,22 @@ pnpm exec astro check
 
 **Tasks**
 
-1. Initialize Biome and configure formatting and linting.
+1. Initialize Biome and configure formatting and linting for TypeScript, JavaScript, and CSS. Enable `html.experimentalFullSupportEnabled` for Astro/Svelte markup, and document that `astro check` is the framework-template check because Biome's HTML support is experimental.
 2. Add Vitest and a smoke unit test.
 3. Add Playwright and a smoke browser test; configure it to start a preview server for the built site.
 4. Add axe-core integration for Playwright.
-5. Add Lighthouse CI configuration.
+5. Add Lighthouse CI configuration with desktop and mobile presets.
 6. Add `fast-check` for property-based tests.
-7. Add package scripts for all verification commands.
+7. Create stub `scripts/check-bundle-size.mjs` and `scripts/build-figures.mjs` so the build and CI commands exist from Phase 0; fill in the real logic in Steps 3.2 and 7.2.
+8. Add package scripts for all verification commands, including `test:visual`.
+9. Add `web-vitals` for the INP harness.
 
 **Commands**
 
 ```bash
-pnpm add -D @biomejs/biome vitest @playwright/test @axe-core/playwright @lhci/cli fast-check wrangler
+pnpm add -D @biomejs/biome vitest @playwright/test @axe-core/playwright @lhci/cli fast-check wrangler web-vitals
 pnpm exec biome init
-pnpm exec playwright install --with-deps chromium
+pnpm exec playwright install --with-deps chromium firefox webkit
 ```
 
 **Files**
@@ -317,6 +328,8 @@ pnpm exec playwright install --with-deps chromium
 - `playwright.config.ts`
 - `lighthouserc.json`
 - `package.json`
+- `scripts/check-bundle-size.mjs`
+- `scripts/build-figures.mjs`
 - `tests/unit/smoke.test.ts`
 - `tests/e2e/smoke.spec.ts`
 
@@ -325,6 +338,9 @@ pnpm exec playwright install --with-deps chromium
 - [ ] `pnpm lint` passes.
 - [ ] `pnpm test` runs at least one unit test and passes.
 - [ ] `pnpm test:e2e` runs at least one Playwright test and passes.
+- [ ] `pnpm test:visual` runs at least one screenshot test or a documented placeholder.
+- [ ] `pnpm check:bundle` runs without a missing-file error.
+- [ ] `pnpm build` runs the figures stub without a missing-file error.
 - [ ] `pnpm exec lhci autorun` runs against a built preview and reports results.
 - [ ] CI can run all verification commands without interactive prompts.
 
@@ -334,12 +350,19 @@ pnpm exec playwright install --with-deps chromium
 
 **Tasks**
 
-1. Define tokens for color, typography, spacing, radii, shadows, z-index, and motion, using the starting values in `docs/technology.md` §3.21.
-2. Self-host the three font families in `public/fonts/` with appropriate weights and subsets.
+1. Define tokens for color, typography, spacing, radii, shadows, z-index, and motion, using the values in `docs/technology.md` §3.21.
+2. Self-host the three font families in `public/fonts/` with appropriate weights and subsets: Instrument Serif (display), Geist (body), JetBrains Mono (data/code). Subset with `subfont` or `fonttools`.
 3. Create `BaseLayout.astro` with the paper background, header, footer, skip link, and main landmark.
 4. Create `tokens.css`, `base.css`, and `story.css`.
 5. Add a typographic specimen page or section for visual review.
 6. Verify font loading does not cause visible layout shift.
+7. Add a unit test that every text/UI token pair meets its contrast threshold on both paper and stage.
+
+**Commands**
+
+```bash
+pnpm add -D subfont
+```
 
 **Files**
 
@@ -348,10 +371,12 @@ pnpm exec playwright install --with-deps chromium
 - `src/styles/story.css`
 - `src/layouts/BaseLayout.astro`
 - `public/fonts/*`
+- `tests/unit/tokens.test.ts`
 
 **Acceptance criteria**
 
 - [ ] All colors and spacing values used by components come from tokens.
+- [ ] Every text/UI token pair passes its contrast threshold on both backgrounds.
 - [ ] Fonts are self-hosted; no third-party font requests are made.
 - [ ] The base layout has a skip link that becomes visible on focus.
 - [ ] The header and footer are keyboard accessible.
@@ -367,9 +392,11 @@ pnpm exec playwright install --with-deps chromium
 1. Create `Seo.astro` with title, description, canonical, Open Graph, and social-card tags.
 2. Add a custom `404.astro`.
 3. Create `content.config.ts` with the story collection schema.
-4. Add required fields: title, dek, slug, category, difficulty, visual mode, learning objectives, prerequisites, references, and status.
-5. Create placeholder story entries for ACO and RANDU using the schema.
-6. Add a build-time validation test that a missing required field fails.
+4. Add required fields: title, dek, slug, category, difficulty, difficulty note (optional), visual mode, fallback (optional), learning objectives, prerequisites, references, and status.
+5. Use enums that match the content: category includes Optimization, Randomness, Graphs, Emergence, Physics, Generative, and Data; difficulty is introductory, intermediate, or advanced; visual mode is 2d, 3d, or mixed, with an optional 2d fallback for 3d.
+6. Create placeholder story entries for ACO and RANDU using the schema.
+7. Add a build-time validation test that a missing required field fails.
+8. Add a placeholder bidirectional chapter↔scene test that will be completed once scenes exist.
 
 **Files**
 
@@ -385,6 +412,8 @@ pnpm exec playwright install --with-deps chromium
 - [ ] Every route has a unique title and meta description.
 - [ ] `404.astro` returns a 404 status and links home and to `/stories`.
 - [ ] A story with a missing required field fails the build.
+- [ ] The schema accepts the ACO and RANDU metadata as written in `docs/stories.md`.
+- [ ] A placeholder bidirectional chapter↔scene test exists.
 - [ ] The placeholder stories appear in the content collection.
 - [ ] Canonical URLs are absolute and use the configured site URL.
 
@@ -394,13 +423,13 @@ pnpm exec playwright install --with-deps chromium
 
 **Tasks**
 
-1. Add `wrangler.jsonc` with the static assets directory and 404 handling.
-2. Add `public/_headers` with baseline security headers and immutable caching for hashed assets.
+1. Add `wrangler.jsonc` with the static assets directory, `html_handling: "drop-trailing-slash"`, and 404 handling.
+2. Add `public/_headers` with baseline security headers, immutable caching for hashed assets, and explicit cache rules for `/fonts/*` and `/og/*`.
 3. Add an internal link checker that fails on broken relative links.
-4. Create a GitHub Actions workflow that installs dependencies, lints, tests, builds, checks links, and deploys.
+4. Create a GitHub Actions workflow that installs dependencies, lints, tests, builds, checks links, checks bundles, and deploys.
 5. Store `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` as repository secrets.
 6. Deploy once manually to verify the account and permissions.
-7. Record the production URL in the repository documentation.
+7. Record the production workers.dev URL in the repository documentation and set Astro's `site` to it. Replace it with the custom domain at Step 8.3.
 
 **Files**
 
@@ -419,6 +448,7 @@ pnpm exec playwright install --with-deps chromium
   "compatibility_date": "<current-date>",
   "assets": {
     "directory": "./dist",
+    "html_handling": "drop-trailing-slash",
     "not_found_handling": "404-page"
   }
 }
@@ -435,16 +465,23 @@ pnpm exec playwright install --with-deps chromium
 
 /_astro/*
   Cache-Control: public, max-age=31536000, immutable
+
+/fonts/*
+  Cache-Control: public, max-age=604800, stale-while-revalidate=86400
+
+/og/*
+  Cache-Control: public, max-age=86400, stale-while-revalidate=86400
 ```
 
 **Acceptance criteria**
 
 - [ ] `pnpm build` completes without errors.
 - [ ] `pnpm exec wrangler deploy --dry-run` succeeds.
-- [ ] The production deployment returns 200 for `/` and `/stories`.
+- [ ] The production deployment returns 200 for `/` and `/stories` without a trailing-slash redirect.
+- [ ] `site` is set to the deployed workers.dev URL, not `example.com`.
 - [ ] The custom 404 is served for an unknown route.
 - [ ] `curl -I` shows the security headers.
-- [ ] Hashed assets show the immutable cache header.
+- [ ] Hashed assets show the immutable cache header; fonts and OG images show their explicit cache rules.
 - [ ] The GitHub Actions workflow succeeds from a clean checkout.
 - [ ] The link checker passes on the built output and fails on a deliberately broken internal link.
 - [ ] No Cloudflare paid service is required.
@@ -459,12 +496,13 @@ The story runtime is built once and used by both stories. It is tested with a hi
 
 **Tasks**
 
-1. Define `Engine<P, S>` with `reset`, `setParams`, `step`, `snapshot`, and `metrics`.
-2. Define `SceneState` with camera, visible layers, layer opacity, highlight targets, and reveal progress.
-3. Define `StageRenderer` with `mount`, `resize`, `setScene`, `setParams`, `setPaused`, and `dispose`.
+1. Define `Engine<P, S, M>` with `reset`, `setParams`, `step`, `snapshot`, and `metrics`.
+2. Define `SceneState` with a discriminated `CameraState` union (2D pan/zoom or 3D pose), visible layers, layer opacity, highlight targets, and reveal progress.
+3. Define `StageRenderer<P, S>` with async `mount`, `resize`, `setScene`, `setParams`, `setPaused`, and `dispose`.
 4. Define `StoryConfig` with slug, engine factory, defaults, presets, scenes, and URL parameter schema.
-5. Define `ChapterSpec` with id, title, and optional scene overrides.
+5. Define `ChapterSpec` with id, title, scene overrides, `pseudocodeLine`, `annotations`, `reducedMotionSteps`, and `tourAct`.
 6. Add an import-boundary lint rule or test that engines do not import UI or renderer code.
+7. Add a fake-3D contract test: async mount, a 3D camera pose, and label registration. This must pass before Phase 4.
 
 **Files**
 
@@ -479,6 +517,8 @@ The story runtime is built once and used by both stories. It is tested with a hi
 - [ ] A dummy engine and dummy renderer satisfy the interfaces.
 - [ ] Engines have no DOM, Svelte, Astro, or Three.js imports.
 - [ ] The scene state can describe both 2D and 3D scenes without renderer-specific fields.
+- [ ] `setParams` is generic; no `unknown` parameter type is used at the renderer boundary.
+- [ ] A fake 3D renderer passes the contract test with async mount, orbit pose, and label registration.
 - [ ] The story config can be imported without side effects.
 
 ### Step 1.2 — Seeded RNG and fixed-timestep clock
@@ -491,7 +531,7 @@ The story runtime is built once and used by both stories. It is tested with a hi
 2. Add a seed-to-state helper and a `randomInt`/`randomFloat` API.
 3. Implement a fixed-timestep accumulator with a maximum number of substeps.
 4. Add a speed multiplier and a pause flag.
-5. Add tests for determinism, range, and large time deltas.
+5. Add tests for determinism, range, large time deltas, and frame-rate independence (30/60/120 fps converge to the same state for the same elapsed time).
 
 **Files**
 
@@ -507,6 +547,7 @@ The story runtime is built once and used by both stories. It is tested with a hi
 - [ ] Floats are in `[0, 1)`; integers are within the requested bounds.
 - [ ] The clock never performs more than the configured maximum substeps per frame.
 - [ ] A long tab-away gap does not cause a simulation spiral.
+- [ ] The same elapsed simulation time at 30, 60, and 120 fps produces the same state within tolerance.
 - [ ] Pausing stops simulation advancement.
 - [ ] Unit tests cover all of the above.
 
@@ -517,12 +558,13 @@ The story runtime is built once and used by both stories. It is tested with a hi
 **Tasks**
 
 1. Integrate GSAP and ScrollTrigger.
-2. Integrate Lenis with ScrollTrigger, disabled on touch and reduced motion.
+2. Integrate Lenis with ScrollTrigger, disabled on touch, reduced motion, and test mode.
 3. Create `ScrollDirector` with `registerChapter`, `unregisterChapter`, `onEnter`, `onProgress`, `onExit`, and `refresh`.
 4. Ensure all triggers are scoped and reverted with `gsap.context()`.
 5. Add cleanup on `astro:before-swap` and component destroy.
 6. Add a development overlay showing the active chapter and progress (removed or dev-only in production).
 7. Verify native scroll, keyboard scrolling, and browser back/forward.
+8. Confirm the GSAP ticker is the single simulation driver; Lenis and ScrollTrigger only update scroll state.
 
 **Commands**
 
@@ -541,7 +583,8 @@ pnpm add gsap lenis
 - [ ] Scrolling updates the active chapter and progress.
 - [ ] The scrollbar remains visible and native.
 - [ ] PageDown, PageUp, Arrow keys, Home, and End work.
-- [ ] Lenis is disabled under reduced motion and on coarse pointers.
+- [ ] Lenis is disabled under reduced motion, on coarse pointers, and in test mode.
+- [ ] Only the GSAP ticker advances simulation time.
 - [ ] Navigating between stories does not leave duplicate triggers.
 - [ ] A stress test of ten navigations leaves no more than one set of active triggers.
 - [ ] No console errors occur.
@@ -558,7 +601,9 @@ pnpm add gsap lenis
 4. Implement a single RAF loop driven by the story controller.
 5. Add `IntersectionObserver` and `visibilitychange` pause behavior.
 6. Add layer primitives for lines, points, arcs, text-free shapes, and gradients.
-7. Dispose the canvas, observers, and RAF loop on destroy.
+7. Add the coarse-pointer touch rule: vertical page scroll stays native; one-finger horizontal drag or an explicit Orbit mode handles orbit; zoom buttons provide a single-pointer alternative.
+8. Handle iOS Safari viewport resizing with `100dvh`/`visualViewport` and debounced `ScrollTrigger.refresh()`.
+9. Dispose the canvas, observers, and RAF loop on destroy.
 
 **Files**
 
@@ -576,6 +621,8 @@ pnpm add gsap lenis
 - [ ] Resizing updates the drawing immediately.
 - [ ] The loop pauses when the stage leaves the viewport or the tab is hidden.
 - [ ] The loop resumes correctly.
+- [ ] On coarse pointers, vertical drag scrolls the page; orbit is explicit or horizontal-only.
+- [ ] iOS viewport resize does not break the pinned stage.
 - [ ] Destroying the component removes all observers and listeners.
 - [ ] No per-frame allocations occur in the steady-state draw path beyond documented buffers.
 
@@ -591,8 +638,8 @@ pnpm add gsap lenis
 4. Create `StageChrome.svelte` for play/pause, replay, speed, and settings.
 5. Implement chapter entry, progress, and exit semantics.
 6. Create a hidden development story page with at least four chapters and a simple moving object.
-7. Exclude the development page from the production build or mark it `noindex`, and remove it from the sitemap.
-8. Ensure deep links to a chapter activate the correct scene.
+7. Keep the development page in the production build with `noindex`, no navigation link, and an explicit sitemap exclusion. This lets Playwright test the built preview against the same artifact that ships.
+8. Ensure deep links to `#chapter-id` activate the correct scene after the pin offset is measured.
 
 **Files**
 
@@ -611,7 +658,8 @@ pnpm add gsap lenis
 - [ ] The progress rail reflects the active chapter.
 - [ ] The stage remains pinned during the narrative.
 - [ ] The page has a single stage element.
-- [ ] The development page is not linked from the production navigation, is not in the sitemap, and is removed or `noindex` in production.
+- [ ] The development page is not linked from the production navigation, is `noindex`, and is excluded from the sitemap.
+- [ ] The runtime E2E suite runs against the built preview, including the development page.
 
 ### Step 1.6 — Controls, keyboard support, and metrics
 
@@ -623,8 +671,9 @@ pnpm add gsap lenis
 2. Create `PresetPicker.svelte`, `Toggle.svelte`, and `SeedControl.svelte`.
 3. Create `Metrics.svelte` with polite live-region updates at a low frequency.
 4. Implement play/pause, replay chapter, and speed controls.
-5. Add keyboard shortcuts scoped to the stage: Space toggles play/pause, arrows step, Escape leaves stage focus.
+5. Add keyboard shortcuts scoped to a focusable stage region: Space toggles play/pause, arrows step, Escape leaves stage focus. Do not use `role="application"`.
 6. Add focus-visible styles and 44 px minimum touch targets.
+7. Add a documented shortcut list and `aria-roledescription` for the stage region.
 
 **Files**
 
@@ -648,12 +697,14 @@ pnpm add gsap lenis
 
 **Tasks**
 
-1. Detect `prefers-reduced-motion` and expose a manual motion toggle.
+1. Detect `prefers-reduced-motion` and expose a manual motion toggle that can only reduce motion further.
 2. Disable autoplay, scroll scrubbing, camera motion, and smooth scrolling under reduced motion.
 3. Provide step-forward and step-back controls for scenes.
-4. Implement article mode: hide the stage, keep all prose, figures, formulas, code, and citations.
-5. Persist the reader's choice if `localStorage` is available.
-6. Add a no-JavaScript layout check.
+4. Make the server-rendered default the article layout. The stage is an enhancement inserted after hydration.
+5. Implement article mode as the no-stage layout; with JavaScript disabled it is the only layout.
+6. Build `<Predict>` on `<details>/<summary>` so it works without JavaScript.
+7. Persist the reader's choice if `localStorage` is available.
+8. Add a no-JavaScript layout test that asserts prose, formulas, and figures are visible and no empty stage is present.
 
 **Files**
 
@@ -667,7 +718,8 @@ pnpm add gsap lenis
 - [ ] With reduced motion enabled, no animation starts automatically.
 - [ ] Step controls advance and reverse the scene.
 - [ ] Article mode hides the stage and shows all content.
-- [ ] Article mode works with JavaScript disabled.
+- [ ] With JavaScript disabled, the article layout renders with all prose, formulas, figures, and citations; no empty stage is present.
+- [ ] `<Predict>` reveals its explanation without JavaScript.
 - [ ] The choice persists across reloads when storage is available.
 - [ ] The story remains understandable in both modes.
 
@@ -678,12 +730,13 @@ pnpm add gsap lenis
 **Tasks**
 
 1. Create a typed URL-state module with serialize, parse, validate, and clamp.
-2. Define per-story parameter schemas and defaults.
-3. Update the URL with `replaceState` on parameter changes, debounced.
-4. Implement a share button that copies the canonical absolute URL.
-5. Restore chapter, seed, and parameters on load.
-6. Reject or clamp invalid values without crashing.
-7. Add unit tests and an E2E reload test.
+2. Define per-story parameter schemas and defaults, including generator identity for RANDU.
+3. Use the path for the story slug, the query for parameters/seed, and the `#chapter-id` fragment for the chapter. The fragment is canonical.
+4. Update the URL with `replaceState` on parameter and chapter changes, debounced. Do not add history entries.
+5. Implement a share button that copies the canonical absolute URL.
+6. Restore the starting state (chapter, seed, structural parameters) on load. City-map edits are not shared; the UI says so.
+7. Clamp or reject invalid values according to the validation table in `docs/requirements.md` §2.6.1.
+8. Add unit tests, a table-driven validation test, and an E2E reload test.
 
 **Files**
 
@@ -693,11 +746,12 @@ pnpm add gsap lenis
 
 **Acceptance criteria**
 
-- [ ] Serialize/parse round-trips for every parameter.
-- [ ] Invalid values fall back to safe defaults.
-- [ ] Reloading a shared URL restores the visible state.
+- [ ] Serialize/parse round-trips for every parameter, including the chapter fragment.
+- [ ] Invalid values follow the validation table and show a notice where required.
+- [ ] Reloading a shared URL restores the same starting state.
+- [ ] A share taken after a city edit restores the seeded map and the UI discloses that map edits are local.
 - [ ] The share button copies an absolute URL.
-- [ ] Repeated slider changes do not flood browser history.
+- [ ] Repeated slider and chapter changes do not flood browser history.
 - [ ] No secrets or personal data are encoded.
 
 ### Step 1.9 — Story runtime acceptance gate
@@ -715,6 +769,8 @@ pnpm add gsap lenis
 
 - [ ] All runtime requirements in `docs/requirements.md` pass on the development story.
 - [ ] The runtime works at 360 px and 1440 px widths.
+- [ ] Deep-link, forward-scroll, reverse-scroll, and reload converge on the same starting state at chapter entry.
+- [ ] The no-JS article layout renders without an empty stage.
 - [ ] No uncaught errors occur during the stress test.
 - [ ] The runtime can be reused by a new story by adding a config and an MDX file.
 
@@ -756,15 +812,17 @@ pnpm add gsap lenis
 
 **Tasks**
 
-1. Define parameters: city count, ant count, `α`, `β`, `ρ`, `Q`, speed, seed.
+1. Define parameters: city count, ant count, `α`, `β`, `ρ`, speed, seed. `Q` is fixed at `1` in release 1.
 2. Initialize pheromone to a small positive value.
 3. Construct one tour per ant using the probabilistic transition rule, falling back to a uniform choice when all weights are zero.
 4. Deposit pheromone proportional to inverse tour length.
-5. Evaporate and update pheromone.
-6. Track best tour, best length, mean length, iteration, and a diversity/entropy metric.
+5. Evaporate and update pheromone, allowing values to reach zero but never negative or non-finite.
+6. Track best tour, best length, mean length, iteration, and normalized pheromone entropy using the formula in `docs/stories.md` §2.6.
 7. Support `stepIteration()` for deterministic tests and `step(dt)` for the clock.
-8. Handle edge cases: `α = 0`, `β = 0`, `ρ = 1`, one ant, two cities, collinear cities.
-9. Expose a snapshot suitable for rendering without copying the entire graph every frame.
+8. Restart the run at iteration 0 when a structural parameter or the city set changes; invalidate best/mean history.
+9. Handle edge cases: `α = 0`, `β = 0`, `ρ = 1`, one ant, two cities, collinear cities.
+10. Expose a snapshot suitable for rendering without copying the entire graph every frame.
+11. Cap simulated iterations per frame at the worst-case workload.
 
 **Files**
 
@@ -777,10 +835,11 @@ pnpm add gsap lenis
 - [ ] The engine constructs valid tours.
 - [ ] Transition probabilities are normalized over the allowed set.
 - [ ] All-zero transition weights fall back to a uniform choice.
-- [ ] Pheromone remains positive and finite.
-- [ ] The best length never increases.
-- [ ] A fixed seed produces identical results.
-- [ ] Parameter changes apply without resetting the run unless the change requires a reset.
+- [ ] Pheromone remains non-negative and finite, including `ρ = 1`.
+- [ ] The best length never increases for a fixed city set since the last reset.
+- [ ] The entropy metric is normalized to `[0, 1]`.
+- [ ] A fixed run identity produces identical results.
+- [ ] Structural parameter changes restart at iteration 0; presentation changes do not.
 - [ ] Metrics are available at a low frequency.
 
 ### Step 2.3 — ACO correctness tests
@@ -848,15 +907,17 @@ pnpm add gsap lenis
 2. Draw pheromone intensity with alpha and width on a readable scale.
 3. Draw ants as moving dots with short trails.
 4. Draw the best tour in a distinct accent.
-5. Draw the probability fan for the focal ant.
+5. Draw the probability fan for the focal ant with the top N candidates (default N = 8) and an explicit "other (Σ)" bucket.
 6. Add a compact convergence chart as an SVG/DOM component, not as canvas text.
 7. Add layer toggles for debugging and for the lab.
 8. Ensure labels are DOM overlays, not canvas text.
+9. Ensure the best tour has a weight/pattern difference in addition to color.
+10. Add `scripts/build-figures.mjs` to generate the static ACO best-tour figure for article/no-JS mode by importing the engine with a fixed seed and writing an SVG.
 
 **Commands**
 
 ```bash
-pnpm add d3-scale d3-shape
+pnpm add d3-scale d3-shape d3-color
 ```
 
 **Files**
@@ -864,15 +925,18 @@ pnpm add d3-scale d3-shape
 - `src/render/canvas2d/layers/*`
 - `src/render/canvas2d/Canvas2DRenderer.ts`
 - `src/render/canvas2d/theme.ts`
+- `scripts/build-figures.mjs`
 
 **Acceptance criteria**
 
 - [ ] Cities, edges, pheromone, ants, best tour, and probability fan are visible.
+- [ ] The probability fan labels sum to 1 and the textual alternative lists the top candidates plus the "other" bucket.
 - [ ] Pheromone intensity is readable at early and late iterations.
 - [ ] The best tour is distinguishable without relying on color alone.
 - [ ] The convergence chart updates.
 - [ ] Layer toggles work.
 - [ ] The scene remains legible on a dark stage and at 360 px.
+- [ ] `scripts/build-figures.mjs` produces the static best-tour SVG used by article/no-JS mode.
 
 ### Step 3.3 — ACO story prose
 
@@ -887,6 +951,7 @@ pnpm add d3-scale d3-shape
 5. Add a limitations section and an applications section.
 6. Add a glossary or inline definitions.
 7. Verify every chapter is readable in article mode.
+8. Add `scripts/check-citations.mjs` to verify stable URLs/DOIs and report external link status; wire it into `check:citations`.
 
 **Files**
 
@@ -894,6 +959,7 @@ pnpm add d3-scale d3-shape
 - `src/components/ui/Callout.astro`
 - `src/components/ui/Predict.astro`
 - `src/components/ui/Figure.astro`
+- `scripts/check-citations.mjs`
 
 **Acceptance criteria**
 
@@ -903,6 +969,7 @@ pnpm add d3-scale d3-shape
 - [ ] Applications and limitations sections are present.
 - [ ] Key terms are defined in a glossary or inline.
 - [ ] At least three citations are present and resolve.
+- [ ] `pnpm check:citations` passes and reports external citation status.
 - [ ] Article mode contains the complete argument.
 - [ ] No chapter depends on animation alone to make sense.
 
@@ -946,14 +1013,15 @@ pnpm add katex remark-math rehype-katex
 
 **Tasks**
 
-1. Add controls for city count, ant count, `α`, `β`, `ρ`, speed, and seed.
-2. Add city dragging, adding, removing, and map reset.
+1. Add controls for city count, ant count, `α`, `β`, `ρ`, speed, and seed. Do not add a Q control; Q is fixed at 1.
+2. Add city dragging, adding, removing, and map reset. Each edit pauses, restarts at iteration 0, invalidates best/mean history, and shows the local-map notice.
 3. Add presets and a seed randomizer.
 4. Add play, pause, step, and restart.
-5. Add share URL.
+5. Add share URL and disclose that custom map edits are not included.
 6. Add a layer panel for pheromone, ants, best tour, and probability fan.
 7. Add a "compare" mode if the SHOULD requirement is implemented; otherwise document its deferral.
-8. Add a text summary of the current best tour and metrics.
+8. Add camera framing presets and zoom buttons for keyboard users.
+9. Add a text summary of the current best tour and metrics.
 
 **Files**
 
@@ -964,12 +1032,13 @@ pnpm add katex remark-math rehype-katex
 **Acceptance criteria**
 
 - [ ] Every documented control works.
-- [ ] Dragging a city updates distances, tours, and rendering.
-- [ ] Adding and removing cities keep the instance valid.
+- [ ] Dragging a city updates distances, tours, rendering, and restarts the run.
+- [ ] Adding and removing cities keep the instance valid and restart the run.
 - [ ] Reset restores a valid default map.
-- [ ] Share restores the same state.
-- [ ] The lab is usable by keyboard and touch.
+- [ ] Share restores the starting state and discloses that custom map edits are local.
+- [ ] The lab is usable by keyboard and touch; camera presets and zoom buttons work without dragging.
 - [ ] The text summary matches the visible best tour length.
+- [ ] The edge cases (1 ant, 2 cities, `α = 0`, `β = 0`, `ρ = 1`, collinear cities) are reachable in the lab or the test fixtures.
 
 ### Step 3.6 — ACO responsive and performance pass
 
@@ -978,20 +1047,21 @@ pnpm add katex remark-math rehype-katex
 **Tasks**
 
 1. Test at 320, 360, 390, 768, 1024, 1440, and 1920 px.
-2. Add a mobile stage layout that leaves room for controls and prose.
+2. Add a mobile stage layout that leaves room for controls and prose; use sticky rather than pinned below the small-screen threshold.
 3. Reduce city and ant counts at the low quality tier.
 4. Cap DPR and disable expensive effects on low-tier devices.
-5. Profile the story with a 30-city and a 100-city instance.
-6. Fix any long tasks or per-frame allocations.
-7. Add a frame-time harness.
+5. Profile the story with a 30-city and a 150-city × 200-ant worst-case instance.
+6. Fix any long tasks or per-frame allocations; cap iterations per frame.
+7. Add a frame-time harness that reports p95.
+8. Use the reference desktop and mobile definitions in `docs/requirements.md` §1.4.
 
 **Acceptance criteria**
 
 - [ ] No horizontal overflow at any supported width.
 - [ ] The stage and controls are usable at 360 px.
 - [ ] Touch dragging works without scrolling the page unintentionally.
-- [ ] The story averages at least 55 fps on the reference desktop and 45 fps on the reference mobile device.
-- [ ] No long task exceeds 200 ms during normal scrolling.
+- [ ] The story meets 55 fps p95 on the reference desktop and 45 fps p95 on the reference mobile device.
+- [ ] No long task exceeds 200 ms during the defined scroll and interaction workload, including the worst-case parameter set.
 - [ ] Quality tier changes take effect without a reload.
 
 ### Step 3.7 — ACO end-to-end and visual tests
@@ -1023,11 +1093,12 @@ pnpm add katex remark-math rehype-katex
 **Tasks**
 
 1. Install Three.js and its type definitions.
-2. Add a renderer factory keyed by story config.
-3. Dynamically import the Three.js renderer only when requested.
-4. Ensure the 2D story bundle does not include Three.js.
-5. Add a loading state and a failure state for the 3D chunk.
-6. Verify that the renderer contract is sufficient for both 2D and 3D scenes.
+2. Add a renderer factory keyed by a renderer id string in the story config.
+3. Dynamically import the Three.js renderer only when requested; story configs must never import renderers.
+4. Load story configs per slug with dynamic imports so the ACO route does not include the RANDU config or Three.js.
+5. Ensure the 2D story bundle does not include Three.js; add a build assertion that scans the ACO output for Three.
+6. Add a loading state and a failure state for the 3D chunk.
+7. Verify that the renderer contract is sufficient for both 2D and 3D scenes using the fake-3D test from Step 1.1.
 
 **Commands**
 
@@ -1049,6 +1120,8 @@ If the current Three.js release ships its own type declarations, skip the separa
 
 - [ ] The 2D story still works unchanged.
 - [ ] The 3D renderer loads only on the RANDU route.
+- [ ] Story configs do not import renderers; they only name renderer ids.
+- [ ] The build assertion confirms Three.js is absent from the ACO and shared bundles.
 - [ ] A failed chunk load shows a readable error and a retry action.
 - [ ] The build output confirms Three.js is in a separate chunk.
 - [ ] The renderer factory is unit-tested with fake renderers.
@@ -1091,16 +1164,17 @@ If the current Three.js release ships its own type declarations, skip the separa
 
 **Tasks**
 
-1. Implement a general LCG with `a`, `c`, `m`, and seed.
-2. Add a fast, exact path for `m = 2^31`.
-3. Add a BigInt reference path for arbitrary moduli.
+1. Define the `Generator` interface and implement LCG, PCG32, and xoshiro128** adapters.
+2. Implement the LCG with `a`, `c`, `m`, and seed, plus a fast exact path only when `a × (m − 1) + c ≤ 2^53`.
+3. Add a BigInt reference path for arbitrary moduli and for unsafe LCG presets such as ANSI C.
 4. Generate normalized values and consecutive triples.
-5. Compute the RANDU plane index exactly: `(9x − 6y + z) / 2^31`.
-6. Detect the 15 plane indices and compute the maximum gap.
-7. Implement the low-bit check.
-8. Implement a good seeded PRNG for comparison.
+5. Compute the RANDU plane index exactly from integer state: `(9x − 6y + z) / 2^31`.
+6. Detect occupied plane indices and compute the maximum gap from the data.
+7. Implement the low-bit check and the bit-plane data for the low-bit chapter.
+8. Implement PCG32 and xoshiro128** with their own seeding schemes and exact fixtures.
 9. Add presets: RANDU, MINSTD, ANSI C, Numerical Recipes, PCG32, `xoshiro128**`.
-10. Add validation for invalid parameters.
+10. Add validation for invalid parameters, including even seeds (accept with warning) and fewer than 3 triples.
+11. Document the RANDU period as 2²⁹ and remove any full-period claim for the multiplicative generator.
 
 **Files**
 
@@ -1113,12 +1187,15 @@ If the current Three.js release ships its own type declarations, skip the separa
 **Acceptance criteria**
 
 - [ ] The fast path matches the BigInt reference for at least 10,000 outputs.
+- [ ] The ANSI C preset uses the exact BigInt or `Math.imul` path; the fast-path predicate is per `(a, m)`.
 - [ ] All normalized values are in `[0, 1)`.
-- [ ] Every RANDU triple satisfies `9x − 6y + z = k × 2^31`.
-- [ ] A long run produces exactly 15 plane indices from −5 to 9.
-- [ ] With an odd seed, every output is odd.
-- [ ] The good PRNG does not satisfy the RANDU plane relation.
-- [ ] Invalid parameters produce a validation error, not a crash.
+- [ ] Every RANDU triple satisfies `9x − 6y + z = k × 2^31` when checked on integer state.
+- [ ] A 50,000-triple run with seed `1` produces exactly 15 plane indices from −5 to 9.
+- [ ] Small runs can produce fewer than 15 planes; seed `2^30` produces one plane.
+- [ ] With an odd seed, every output is odd; even seeds are accepted with a warning.
+- [ ] The comparison PRNG does not satisfy the RANDU plane relation.
+- [ ] The RANDU period is documented and tested as 2²⁹.
+- [ ] Invalid parameters produce a validation error or a clamp notice, not a crash.
 
 ### Step 4.4 — RANDU correctness tests
 
@@ -1126,14 +1203,15 @@ If the current Three.js release ships its own type declarations, skip the separa
 
 **Tasks**
 
-1. Add known-sequence tests for each preset.
-2. Add the BigInt reference comparison.
-3. Add plane relation and distinct-plane tests.
-4. Add low-bit tests.
+1. Add known-sequence tests for each preset using exact constants and first-output fixtures.
+2. Add the BigInt reference comparison, including ANSI C.
+3. Add plane relation and distinct-plane tests at fixed seed and run length.
+4. Add low-bit tests and the even-seed warning tests.
 5. Add normalization and range tests.
-6. Add a test for even-seed handling.
+6. Add a test for seed `2^30` producing one plane.
 7. Add a test for `m` not a power of two.
 8. Add a test that the comparison PRNG breaks the relation.
+9. Add a point-count test that confirms the control counts rendered triples.
 
 **Files**
 
@@ -1158,12 +1236,13 @@ If the current Three.js release ships its own type declarations, skip the separa
 2. Add color-by-plane with a sequential palette.
 3. Add progressive reveal via `setDrawRange`.
 4. Build the 15 plane meshes with the correct normal and offsets.
-5. Clip planes to the unit cube.
+5. Clip planes to the unit cube using six local clipping planes or pre-clipped geometry; do not approximate.
 6. Add a cube frame and axes with labels.
 7. Add point size, opacity, and plane opacity controls.
 8. Add a comparison cloud from the good PRNG.
 9. Add a 2D pairs view for the pre-3D chapter, showing consecutive values as a scatter plot.
-10. Add a 2D top/edge projection for the fallback.
+10. Add a 2D top/edge projection for the fallback, generated by `scripts/build-figures.mjs`.
+11. Detect WebGL2 and route to the fallback when it is unavailable.
 
 **Files**
 
@@ -1172,6 +1251,7 @@ If the current Three.js release ships its own type declarations, skip the separa
 - `src/render/three/layers/cube-frame.ts`
 - `src/render/three/layers/comparison-cloud.ts`
 - `src/render/three/theme.ts`
+- `scripts/build-figures.mjs`
 
 **Acceptance criteria**
 
@@ -1192,10 +1272,10 @@ If the current Three.js release ships its own type declarations, skip the separa
 **Tasks**
 
 1. Create `CameraDirector` with `scripted` and `free` modes.
-2. Define camera poses: 3/4, top, front, edge-on, plane-normal.
+2. Define camera poses: 3/4 `(1,1,1)`, top `(0,1,0)`, front `(0,0,1)`, edge-on `(6,9,0)` (perpendicular to the plane normal), and plane-normal `(9,−6,1)` (face-on).
 3. Create a GSAP timeline for point reveal, plane fade, camera moves, and comparison crossfade.
-4. Start the tour on chapter entry unless reduced motion is active.
-5. Pause the tour on pointer interaction and show a resume action.
+4. Start one six-act tour spanning chapters 6–9 on chapter entry unless reduced motion is active. Entering a chapter seeks to its act; replay restarts the current act.
+5. Pause the tour on pointer interaction and show a resume action; scroll scrubbing is suspended while the tour owns the camera.
 6. Add replay and pause controls.
 7. Highlight the plane equation when the camera reaches the edge-on view.
 8. On reduced motion, jump to the final state and provide step buttons.
@@ -1210,14 +1290,14 @@ If the current Three.js release ships its own type declarations, skip the separa
 
 **Acceptance criteria**
 
-- [ ] The tour plays automatically on chapter entry.
-- [ ] The camera reaches each documented pose.
-- [ ] Grabbing the camera pauses the tour.
+- [ ] The tour plays automatically on chapter entry and spans chapters 6–9.
+- [ ] The camera reaches each documented pose; edge-on shows the planes as lines and plane-normal shows them face-on.
+- [ ] Grabbing the camera pauses the tour and suspends scroll scrubbing.
 - [ ] Resume returns to the scripted tour.
-- [ ] Replay restarts the tour.
+- [ ] Replay restarts the current act.
 - [ ] The plane equation annotation appears at the edge-on pose.
 - [ ] Reduced motion skips the tour and shows a coherent final view.
-- [ ] No GSAP tweens remain after navigation.
+- [ ] No GSAP tour tweens remain after navigation.
 
 ### Step 5.3 — RANDU controls, presets, comparison, and metrics
 
@@ -1226,14 +1306,15 @@ If the current Three.js release ships its own type declarations, skip the separa
 **Tasks**
 
 1. Add the preset selector.
-2. Add advanced controls for `a`, `c`, `m`, seed, and point count.
+2. Add advanced controls for `a`, `c`, `m`, seed, and point count. Show `a/c/m` only for LCG presets.
 3. Add toggles for planes, color-by-plane, cube, axes, auto-rotate, and comparison.
-4. Hide or disable the RANDU-specific plane overlay and metrics unless the active parameters satisfy the RANDU relation (`a = 65539`, `c = 0`, `m = 2^31`).
-5. Add camera preset buttons.
-6. Add metrics: distinct planes, maximum gap, period for known presets, low-bit result, sample triples.
+4. Hide or disable the RANDU-specific plane overlay and 15-plane claim unless the active parameters satisfy the RANDU relation (`a = 65539`, `c = 0`, `m = 2^31`).
+5. Add camera preset buttons and zoom buttons.
+6. Add metrics: distinct planes, maximum gap, period for known presets, low-bit result, sample triples. Compute them from the data.
 7. Add regenerate and reset view.
-8. Add share URL.
-9. Debounce expensive regeneration and show a busy state.
+8. Add share URL and disclose that only the starting state is shared.
+9. Debounce expensive regeneration and show a busy state; run BigInt generation in a Worker or in chunks.
+10. Accept even seeds with a warning; show an explanatory empty state for fewer than 3 triples.
 
 **Files**
 
@@ -1244,13 +1325,15 @@ If the current Three.js release ships its own type declarations, skip the separa
 **Acceptance criteria**
 
 - [ ] All presets apply and regenerate the cloud.
-- [ ] Advanced controls accept valid values and reject invalid ones.
-- [ ] Metrics match unit-test values for RANDU.
+- [ ] Advanced controls accept valid values and reject or clamp invalid ones with a notice.
+- [ ] `a/c/m` are hidden for PCG32 and xoshiro128**.
+- [ ] Metrics match unit-test values for RANDU and are computed from the data.
 - [ ] Selecting a non-RANDU preset, or changing `a`, `c`, or `m` away from RANDU, hides or disables the RANDU-specific plane overlay and metrics.
 - [ ] Comparison toggles between RANDU and the good PRNG.
-- [ ] Camera presets work.
-- [ ] Share restores the same parameters and seed.
-- [ ] Regeneration does not freeze the UI for more than 200 ms at the default point count.
+- [ ] Camera presets and zoom buttons work.
+- [ ] Share restores the starting parameters and seed and discloses the share scope.
+- [ ] Even seeds show a warning; fewer than 3 triples shows an empty state.
+- [ ] Regeneration at the default point count does not freeze the UI for more than 200 ms; 100,000-triple BigInt generation stays off the main thread or chunked.
 
 ### Step 5.4 — RANDU story prose
 
@@ -1259,17 +1342,18 @@ If the current Three.js release ships its own type declarations, skip the separa
 **Tasks**
 
 1. Write the chapters listed in `docs/stories.md`.
-2. Include the LCG formula, RANDU parameters, and the derivation of the plane relation.
-3. Include the low-bit warm-up failure.
+2. Include the LCG formula, RANDU parameters, the period 2²⁹, the Hull–Dobell scope, and the derivation of the plane relation.
+3. Include the low-bit failure as a bit-plane strip or table, not a flat parity strip.
 4. Include the 2D pairs chapter before the 3D reveal.
-5. Include the history of RANDU and Marsaglia's observation.
+5. Include the history of RANDU and Marsaglia's observation, plus the even-seed warning and degenerate-seed note.
 6. Include modern PRNGs and testing.
 7. Include real-world applications and the distinction between simulation PRNGs and cryptographic RNGs.
 8. Include limitations and appropriate-use guidance.
 9. Add a glossary or inline definitions for key terms.
-10. Add at least one predict-then-reveal interaction.
-11. Add citations and further reading.
-12. Verify article mode.
+10. Add at least one predict-then-reveal interaction using `<details>`.
+11. Add citations with stable URLs/DOIs and further reading.
+12. Verify article mode includes static figures.
+13. Run `pnpm check:citations` for the RANDU references.
 
 **Files**
 
@@ -1282,8 +1366,10 @@ If the current Three.js release ships its own type declarations, skip the separa
 
 - [ ] All required chapters exist.
 - [ ] The derivation is mathematically correct.
+- [ ] The period is stated as 2²⁹ and Hull–Dobell is not applied to RANDU.
 - [ ] The 15-plane claim is demonstrated, not just asserted.
-- [ ] The low-bit failure is demonstrated.
+- [ ] The low-bit failure is demonstrated with a bit-plane view.
+- [ ] The even-seed warning and the degenerate seed `2³⁰` are explained.
 - [ ] The comparison with a good PRNG is clear.
 - [ ] Applications and limitations sections are present.
 - [ ] Key terms are defined in a glossary or inline.
@@ -1297,13 +1383,13 @@ If the current Three.js release ships its own type declarations, skip the separa
 
 **Tasks**
 
-1. Add a 2D top projection and an edge-on projection.
+1. Add a 2D top projection and an edge-on projection generated at build time for article/no-JS mode.
 2. Add a text summary of the current point cloud and plane structure.
 3. Add a sample data table of triples and plane indices.
-4. Add camera preset buttons and a pause control.
+4. Add camera preset buttons, zoom buttons, and a pause control.
 5. Ensure the canvas is hidden from assistive technology and the summary is exposed.
 6. Add keyboard access to all controls.
-7. Test with WebGL disabled and with reduced motion.
+7. Test with WebGL2 disabled, WebGL unavailable, and reduced motion.
 
 **Files**
 
@@ -1314,11 +1400,11 @@ If the current Three.js release ships its own type declarations, skip the separa
 
 **Acceptance criteria**
 
-- [ ] With WebGL disabled, the fallback projections, summary, and table are visible.
+- [ ] With WebGL2 disabled, the fallback projections, summary, and table are visible.
 - [ ] With reduced motion, no auto tour runs.
-- [ ] All controls are keyboard accessible.
+- [ ] All controls, including camera presets and zoom, are keyboard accessible.
 - [ ] The accessibility tree contains the summary, not the canvas pixels.
-- [ ] The page remains understandable with JavaScript disabled.
+- [ ] The page remains understandable with JavaScript disabled and the static figures are visible.
 
 ### Step 5.6 — RANDU responsive and performance pass
 
@@ -1329,18 +1415,19 @@ If the current Three.js release ships its own type declarations, skip the separa
 1. Test at 320, 360, 390, 768, 1024, 1440, and 1920 px.
 2. Reduce point count and DPR at the low quality tier.
 3. Disable antialiasing and expensive effects on low-tier devices.
-4. Ensure one-finger orbit and two-finger zoom work without page scroll interference.
-5. Profile the default 50,000-point scene and a 100,000-point scene.
+4. Keep vertical page scroll native on coarse pointers; use horizontal drag or an explicit Orbit mode, with zoom buttons as the single-pointer alternative.
+5. Profile the default 50,000-triple scene and a 100,000-triple scene, including the BigInt path.
 6. Fix per-frame allocations and unnecessary geometry rebuilds.
-7. Add a frame-time harness.
+7. Add a frame-time harness that reports p95.
 8. Verify context disposal on navigation.
+9. Use the reference desktop and mobile definitions in `docs/requirements.md` §1.4.
 
 **Acceptance criteria**
 
 - [ ] No horizontal overflow at supported widths.
-- [ ] Touch orbit and zoom work.
-- [ ] The story averages at least 55 fps on the reference desktop and 45 fps on the reference mobile device.
-- [ ] The default point count regenerates within 200 ms on the reference desktop.
+- [ ] Touch orbit and zoom work without trapping vertical page scroll.
+- [ ] The story meets 55 fps p95 on the reference desktop and 45 fps p95 on the reference mobile device.
+- [ ] The default point count regenerates within 200 ms on the reference desktop; 100,000 triples does not block the UI.
 - [ ] Quality tiers change point count and DPR.
 - [ ] No WebGL context leak after ten navigations.
 - [ ] The fallback remains available.
@@ -1352,16 +1439,18 @@ If the current Three.js release ships its own type declarations, skip the separa
 **Tasks**
 
 1. Add E2E tests for chapter navigation, tour, pause, resume, replay, presets, advanced controls, comparison, camera presets, share, article mode, and reduced motion.
-2. Add WebGL-disabled and context-loss tests.
-3. Add screenshot tests with fixed camera, fixed seed, and frozen time.
+2. Add WebGL2-disabled, WebGL-unavailable, and context-loss tests.
+3. Add screenshot tests with a fixed camera, fixed seed, frozen time, disabled Lenis, and fonts ready.
 4. Add an accessibility scan.
 5. Add a mobile project.
 6. Add a no-JavaScript reading test.
+7. In the 3D test, enable SwiftShader and assert `data-renderer="three"` so the test does not silently pass on the fallback.
 
 **Acceptance criteria**
 
 - [ ] The RANDU E2E suite passes.
 - [ ] Screenshots are stable across runs.
+- [ ] The 3D test asserts the Three renderer mounted and a WebGL2 context exists.
 - [ ] axe reports no serious or critical violations.
 - [ ] The fallback tests pass.
 - [ ] The mobile project passes.
@@ -1449,12 +1538,18 @@ If the current Three.js release ships its own type declarations, skip the separa
 
 **Tasks**
 
-1. Generate a static Open Graph image per story at build time.
+1. Generate a static Open Graph image per story at build time with `astro-og-canvas` and local TTF/OTF fonts.
 2. Add a default social image for non-story pages.
-3. Add JSON-LD for stories and the site.
-4. Add RSS for stories.
-5. Verify `sitemap.xml` includes all routes.
-6. Add `robots.txt`.
+3. Add `Article` JSON-LD for stories and `WebSite` JSON-LD for the site.
+4. Add RSS for stories with `@astrojs/rss`; both stories appear.
+5. Verify `sitemap-index.xml` includes all public routes and excludes `/dev/*`, the 404 page, and `/og/*`.
+6. Add `robots.txt` pointing to `/sitemap-index.xml`.
+
+**Commands**
+
+```bash
+pnpm add astro-og-canvas @astrojs/rss
+```
 
 **Files**
 
@@ -1467,9 +1562,9 @@ If the current Three.js release ships its own type declarations, skip the separa
 
 - [ ] Every page has Open Graph and social-card metadata.
 - [ ] Every story has a generated image that returns 200.
-- [ ] JSON-LD parses and validates.
-- [ ] `sitemap.xml` includes all public routes.
-- [ ] `robots.txt` points to the sitemap.
+- [ ] JSON-LD parses and validates as `Article`/`WebSite`.
+- [ ] `sitemap-index.xml` includes all public routes and excludes the dev page, 404, and OG images.
+- [ ] `robots.txt` points to `/sitemap-index.xml`.
 - [ ] The RSS feed contains both stories.
 
 ### Step 6.5 — Page transitions and final 404 polish
@@ -1479,10 +1574,11 @@ If the current Three.js release ships its own type declarations, skip the separa
 **Tasks**
 
 1. Enable progressive view transitions.
-2. Add cleanup hooks for GSAP, Lenis, renderers, and observers.
-3. Test navigation between the two stories repeatedly.
-4. Style the 404 page to match the site.
-5. Verify browser back/forward restores the correct scroll position.
+2. Add cleanup hooks for GSAP, Lenis, renderers, observers, and tour tweens.
+3. Remount the story island when the slug changes; do not reuse an engine instance across stories.
+4. Test navigation between the two stories repeatedly, in both directions.
+5. Style the 404 page to match the site.
+6. Verify browser back/forward restores the correct page and scroll position.
 
 **Acceptance criteria**
 
@@ -1501,15 +1597,16 @@ If the current Three.js release ships its own type declarations, skip the separa
 **Tasks**
 
 1. Run axe on every page and both stories.
-2. Perform a keyboard-only pass.
+2. Perform a keyboard-only pass, including camera presets and zoom.
 3. Perform a screen-reader smoke test with at least two screen readers.
-4. Check contrast for paper and dark-stage combinations.
-5. Check 200% zoom and 320 px reflow.
+4. Check contrast for paper and dark-stage combinations against the token contract.
+5. Check 200% zoom and 320 px reflow, including pinned-stage overlap.
 6. Check reduced motion and article mode.
 7. Check heading hierarchy, one `<h1>` per page, and meaningful link text.
 8. Check that live metrics do not spam announcements.
-9. Fix all serious and critical issues.
-10. Document any known limitations.
+9. Check non-text contrast, focus-not-obscured, and target size.
+10. Fix all serious and critical issues.
+11. Document any known limitations.
 
 **Acceptance criteria**
 
@@ -1527,23 +1624,24 @@ If the current Three.js release ships its own type declarations, skip the separa
 
 **Tasks**
 
-1. Run Lighthouse CI on the home page, stories index, and both stories.
-2. Create a bundle-size check with the explicit budgets from `docs/requirements.md` (200 KB for a 2D story, 450 KB for the 3D story, 300 KB for the Three.js chunk).
-3. Profile scrolling and interaction on the reference desktop and mobile device.
+1. Run Lighthouse CI on the home page, stories index, and both stories with desktop and mobile presets.
+2. Create a bundle-size check with the explicit budgets from `docs/requirements.md` §2.8: initial and route-total JS, gzip level 9, ACO 200 KB, RANDU 450 KB initial plus 300 KB Three, route-total 700 KB.
+3. Profile scrolling and interaction on the reference desktop and mobile device definitions.
 4. Inspect long tasks and layout shifts.
 5. Verify Three.js is absent from 2D pages.
 6. Verify fonts do not cause layout shift.
 7. Verify the production build contains no source maps or development-only code.
-8. Fix regressions.
-9. Record the baseline in the repository.
+8. Run the Playwright `web-vitals` INP harness with the scripted interactions.
+9. Fix regressions.
+10. Record the baseline in the repository.
 
 **Acceptance criteria**
 
 - [ ] Lighthouse Performance ≥ 90 desktop and ≥ 80 mobile for story pages.
-- [ ] LCP ≤ 2.5 s, CLS ≤ 0.1, INP ≤ 200 ms.
-- [ ] Bundle budgets pass.
-- [ ] No long tasks over 200 ms during normal use.
-- [ ] Frame-rate targets pass.
+- [ ] LCP ≤ 2.5 s and CLS ≤ 0.1 in Lighthouse; INP ≤ 200 ms in the Playwright web-vitals harness.
+- [ ] Initial and route-total bundle budgets pass.
+- [ ] No long tasks over 200 ms during the defined workload.
+- [ ] Frame-rate p95 targets pass.
 - [ ] Three.js loads only on the RANDU page.
 - [ ] No source maps are present in the production output.
 
@@ -1553,18 +1651,20 @@ If the current Three.js release ships its own type declarations, skip the separa
 
 **Tasks**
 
-1. Test current and previous major versions of Chrome, Edge, Firefox, and Safari.
-2. Test current iOS Safari and Android Chrome.
-3. Test touch, trackpad, mouse, and keyboard.
-4. Test WebGL-disabled and reduced-motion modes.
-5. Test slow network conditions.
-6. File and fix defects.
+1. Test current Chromium, Firefox, and WebKit in Playwright CI.
+2. Manually test current Safari on macOS, current iOS Safari, and current Android Chrome on real devices.
+3. Treat previous major versions as best-effort, not a release gate.
+4. Test touch, trackpad, mouse, and keyboard.
+5. Test WebGL2-disabled and reduced-motion modes.
+6. Test slow network conditions.
+7. File and fix defects.
 
 **Acceptance criteria**
 
-- [ ] Core reading and interaction paths pass on every target browser.
+- [ ] Core reading and interaction paths pass on Chromium, Firefox, and WebKit.
+- [ ] The documented manual device pass passes on current Safari, iOS Safari, and Android Chrome.
 - [ ] No browser-specific layout breakage.
-- [ ] Touch orbit and zoom work on mobile.
+- [ ] Touch orbit and zoom work on mobile without trapping scroll.
 - [ ] WebGL fallback works on all browsers.
 - [ ] No console errors.
 
@@ -1576,10 +1676,11 @@ If the current Three.js release ships its own type declarations, skip the separa
 
 1. Verify baseline headers.
 2. Verify external links use `rel="noopener noreferrer"` where appropriate.
-3. Add a Content Security Policy compatible with Astro's generated scripts and styles.
-4. If a strict CSP requires hashes or nonces, use the framework's supported mechanism or document a conservative fallback.
-5. Test that analytics, fonts, and assets still load.
-6. Add the headers to the deployment smoke test.
+3. Add a Content Security Policy compatible with Astro's generated scripts, Svelte islands, and KaTeX styles.
+4. Decide between hashes/nonces and a documented conservative fallback; document the choice before launch.
+5. Add `frame-ancestors 'none'` and consider HSTS.
+6. Test that analytics (none in v1), fonts, and assets still load.
+7. Add the headers to the deployment smoke test.
 
 **Acceptance criteria**
 
@@ -1594,18 +1695,18 @@ If the current Three.js release ships its own type declarations, skip the separa
 
 **Tasks**
 
-1. Decide whether to enable Cloudflare Web Analytics.
-2. If enabled, add the beacon and update the privacy note.
+1. Confirm analytics are off for release 1.
+2. If analytics are enabled later, add the Cloudflare Web Analytics beacon and update the privacy note.
 3. Verify no cookies are set.
 4. Verify no personal data is collected.
 5. Ensure analytics never block rendering.
 
 **Acceptance criteria**
 
-- [ ] Analytics are off or cookie-less and disclosed.
+- [ ] Analytics are off in release 1.
 - [ ] No consent banner is required.
 - [ ] No tracking cookies are set.
-- [ ] The privacy note matches behavior.
+- [ ] The privacy note matches behavior and mentions `localStorage` preferences.
 
 ### Step 7.6 — Error handling and resilience
 
@@ -1636,60 +1737,65 @@ If the current Three.js release ships its own type declarations, skip the separa
 
 **Tasks**
 
-1. Add lint, type-check, unit tests, E2E tests, accessibility tests, build, link checking, bundle-size, and Lighthouse checks to CI.
+1. Add lint, type-check, unit tests, E2E tests, accessibility tests, visual regression, build, link checking, bundle-size, and Lighthouse checks to CI.
 2. Cache dependencies and Playwright browsers.
 3. Upload test artifacts and screenshots on failure.
 4. Require the CI checks before merging to main.
 5. Document how to run the suite locally.
+6. Ensure `test:a11y` is not run twice (either inside `test:e2e` or as a separate job, not both).
 
 **Acceptance criteria**
 
 - [ ] A clean pull request runs all checks.
 - [ ] A deliberately broken engine test fails CI.
 - [ ] A deliberately broken accessibility check fails CI.
+- [ ] A deliberately broken visual snapshot fails CI.
 - [ ] A bundle-budget regression fails CI.
 - [ ] Artifacts are available for failed runs.
 
-### Step 8.2 — Production deployment
+### Step 8.2 — Production deployment to the workers.dev URL
 
-**Goal:** A stable production release on Cloudflare.
+**Goal:** A stable production release on Cloudflare's workers.dev URL before the custom domain.
 
 **Tasks**
 
-1. Confirm the production `site` URL and canonical URLs.
+1. Confirm the workers.dev `site` URL and canonical URLs.
 2. Run the full build from a clean checkout.
 3. Deploy with Wrangler.
 4. Run the post-deploy smoke script.
 5. Verify both stories, 404, sitemap, robots, RSS, OG images, and headers.
-6. Tag the release in Git.
+6. Tag the release candidate in Git.
 
 **Acceptance criteria**
 
 - [ ] Production returns 200 for `/`, `/stories`, both stories, `/about`, and `/colophon`.
 - [ ] The custom 404 works.
-- [ ] Sitemap, robots, RSS, and OG images are reachable.
+- [ ] `sitemap-index.xml`, robots, RSS, and OG images are reachable.
 - [ ] Security and cache headers are correct.
 - [ ] Both stories work on desktop and mobile.
 - [ ] No paid Cloudflare service is used.
 
-### Step 8.3 — Custom domain and DNS
+### Step 8.3 — Custom domain and final verification
 
-**Goal:** A branded, secure URL.
+**Goal:** A branded, secure URL and a final verification against the canonical domain.
 
 **Tasks**
 
 1. Attach the custom domain to the Cloudflare project.
 2. Configure DNS.
 3. Verify HTTPS and redirects from the workers.dev URL if desired.
-4. Update the canonical site URL and sitemap.
-5. Redeploy and verify.
+4. Update the canonical `site` URL and sitemap.
+5. Redeploy.
+6. Re-run the full post-deploy smoke script with the custom domain: routes, canonicals, sitemap, robots, RSS, OG images, headers, and 404.
+7. Re-run the final visual and accessibility spot checks on the custom domain.
 
 **Acceptance criteria**
 
 - [ ] The custom domain serves the site over HTTPS.
-- [ ] Canonical URLs use the custom domain.
+- [ ] Canonical URLs, sitemap, RSS, and OG images use the custom domain.
 - [ ] The old deployment URL redirects or is clearly non-canonical.
 - [ ] No mixed-content warnings.
+- [ ] The full production verification is repeated after the domain change.
 
 ### Step 8.4 — Launch checklist
 
@@ -1702,7 +1808,7 @@ If the current Three.js release ships its own type declarations, skip the separa
 3. Confirm the README, docs, and colophon match reality.
 4. Confirm the privacy note and analytics behavior.
 5. Confirm the license and credits.
-6. Confirm the development smoke page is removed or `noindex` and absent from the sitemap.
+6. Confirm the development smoke page is `noindex` and absent from the sitemap.
 7. Confirm the repository has a clear README and contribution notes.
 8. Confirm the production deployment is tagged.
 
@@ -1719,12 +1825,13 @@ If the current Three.js release ships its own type declarations, skip the separa
 
 **Tasks**
 
-1. Monitor Cloudflare analytics and error reports.
+1. Monitor Cloudflare analytics only if it is enabled later; release 1 has no analytics beacon.
 2. Check Core Web Vitals in the field when data is available.
 3. Triage user feedback.
 4. Add regression tests for any reported defect.
 5. Review dependency updates on a regular cadence.
 6. Keep the backlog of future stories prioritized.
+7. Use the documented rollback path (redeploy the previous tagged commit or `wrangler rollback`) for a bad deployment.
 
 **Acceptance criteria**
 
@@ -1741,9 +1848,10 @@ If the current Three.js release ships its own type declarations, skip the separa
 {
   "scripts": {
     "dev": "astro dev",
-    "build": "astro check && astro build",
+    "build": "node scripts/build-figures.mjs && astro check && astro build",
+    "build:figures": "node scripts/build-figures.mjs",
     "preview": "astro preview",
-    "lint": "biome check .",
+    "lint": "biome check . && astro check",
     "format": "biome format --write .",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -1751,6 +1859,7 @@ If the current Three.js release ships its own type declarations, skip the separa
     "test:a11y": "playwright test tests/e2e/a11y.spec.ts",
     "test:visual": "playwright test tests/e2e/visual.spec.ts",
     "check:links": "node scripts/check-links.mjs",
+    "check:citations": "node scripts/check-citations.mjs",
     "check:bundle": "node scripts/check-bundle-size.mjs",
     "deploy": "pnpm build && wrangler deploy"
   }
@@ -1766,9 +1875,19 @@ import mdx from '@astrojs/mdx';
 import sitemap from '@astrojs/sitemap';
 
 export default defineConfig({
-  site: 'https://example.com',
+  site: 'https://<workers-dev-subdomain>.workers.dev',
+  trailingSlash: 'never',
   output: 'static',
-  integrations: [svelte(), mdx(), sitemap()],
+  integrations: [
+    svelte(),
+    mdx(),
+    sitemap({
+      filter: (page) =>
+        !page.includes('/dev/') &&
+        !page.endsWith('/404') &&
+        !page.includes('/og/'),
+    }),
+  ],
 });
 ```
 
@@ -1790,20 +1909,30 @@ jobs:
     steps:
       - uses: actions/checkout@<current-major>
       - uses: pnpm/action-setup@<current-major>
+        # Reads packageManager from package.json; pass `with: version: ...` if absent.
       - uses: actions/setup-node@<current-major>
         with:
           node-version: lts/*
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm exec playwright install --with-deps chromium firefox webkit
       - run: pnpm lint
       - run: pnpm test
       - run: pnpm build
       - run: pnpm check:links
+      - run: pnpm check:citations
       - run: pnpm check:bundle
       - run: pnpm test:e2e
-      - run: pnpm test:a11y
+      - run: pnpm test:visual
       - run: pnpm exec lhci autorun
+      - uses: actions/upload-artifact@<current-major>
+        if: failure()
+        with:
+          name: playwright-artifacts
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
 
   deploy:
     needs: verify
@@ -1841,7 +1970,7 @@ jobs:
 | Performance | — | — | — | Lighthouse + traces |
 | Responsive | — | Yes | Yes | Device lab |
 | No-JS reading | — | Yes | — | — |
-| WebGL fallback | — | Yes | — | — |
+| WebGL2 fallback | — | Yes | — | — |
 | Deployment | — | Smoke | — | Manual |
 
 ### Appendix E — Definition of done for a story
@@ -1851,11 +1980,11 @@ A story is done only when:
 - [ ] All chapters from `docs/stories.md` exist.
 - [ ] The engine has unit-tested invariants.
 - [ ] The renderer has all required layers.
-- [ ] Parameters, presets, seed, reset, and share work.
+- [ ] Parameters, presets, seed, reset, and share work; share restores the starting state and discloses excluded local edits.
 - [ ] The lab is complete.
-- [ ] Article mode and reduced motion are complete.
-- [ ] The no-JavaScript reading path works.
-- [ ] Accessibility checks pass.
+- [ ] Article mode and reduced motion are complete, including static figures.
+- [ ] The no-JavaScript reading path works and shows the article layout, not an empty stage.
+- [ ] Accessibility checks pass at WCAG 2.2 AA, including token contrast.
 - [ ] Performance budgets pass.
 - [ ] E2E and visual regression tests pass.
 - [ ] Mobile and desktop layouts pass.
