@@ -430,7 +430,7 @@ pnpm add -D subfont
 1. (DONE) Add `wrangler.jsonc` with the static assets directory, `html_handling: "drop-trailing-slash"`, and 404 handling.
 2. (DONE) Add `public/_headers` with baseline security headers, immutable caching for hashed assets, and explicit cache rules for `/fonts/*` and `/og/*`.
 3. (DONE) Add an internal link checker that fails on broken relative links.
-4. Create a GitHub Actions workflow that installs dependencies, lints, tests, builds, checks links, checks bundles, and deploys.
+4. (DONE) Create a GitHub Actions workflow that installs dependencies, lints, tests, builds, checks links, checks bundles, and deploys.
 5. Store `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` as repository secrets.
 6. Deploy once manually to verify the account and permissions.
 7. Record the production workers.dev URL in the repository documentation and set Astro's `site` to it. Replace it with the custom domain at Step 8.3.
