@@ -1,0 +1,65 @@
+---
+/**
+ * Static pseudocode for article mode and the no-JS document.
+ *
+ * The listing is highlighted by Shiki during the build (see `src/lib/pseudocode.ts`)
+ * and shipped as HTML. The component adds only the editorial frame: a visible
+ * heading, a plain-language description, and a scroll container. The stage's
+ * persistent panel uses the same pre-rendered HTML, so both copies come from
+ * one source and one grammar.
+ *
+ * `activeLine` is static here. In the stage panel the controller moves the
+ * active line on chapter entry; the article copy may still show the line its
+ * chapter introduces.
+ */
+
+import {
+  ACO_PSEUDOCODE,
+  ACO_PSEUDOCODE_LABEL,
+  highlightPseudocode,
+} from '../../lib/pseudocode';
+
+interface Props {
+  /** Unique id for the listing. Two copies on a page must not collide. */
+  id: string;
+  /** Visible heading. */
+  title?: string;
+  /** Visible description; also the listing's accessible description. */
+  description?: string;
+  /** Source listing. Defaults to the canonical Ant System pseudocode. */
+  source?: string;
+  /** Static line to mark, or null for none. */
+  activeLine?: number | null;
+  /** Heading level under the chapter's h2. */
+  level?: 3 | 4;
+}
+
+const {
+  id,
+  title = 'The algorithm in full',
+  description = 'The complete Ant System loop. Each chapter highlights the line it explains; the same listing drives the stage panel.',
+  source = ACO_PSEUDOCODE,
+  activeLine = null,
+  level = 3,
+} = Astro.props;
+
+const descriptionId = `${id}-description`;
+const html = await highlightPseudocode(source, {
+  id,
+  label: ACO_PSEUDOCODE_LABEL,
+  descriptionId,
+  activeLine,
+});
+---
+
+<figure class="pseudocode-figure" data-pseudocode-figure={id} id={`${id}-figure`}>
+  {
+    level === 4 ? (
+      <h4 class="pseudocode-figure__title" id={`${id}-title`}>{title}</h4>
+    ) : (
+      <h3 class="pseudocode-figure__title" id={`${id}-title`}>{title}</h3>
+    )
+  }
+  <p class="pseudocode-figure__description" id={descriptionId}>{description}</p>
+  <div class="pseudocode-figure__surface" set:html={html} />
+</figure>

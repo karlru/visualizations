@@ -147,21 +147,25 @@ describe('ACO story prose contract', () => {
     expect(chapterBody('one-ants-choice')).toMatch(/normalized/i);
 
     // 04 — the probability rule: τ^α and η^β, extremes, one prediction.
-    expect(chapterBody('the-probability-rule')).toMatch(/τ/);
-    expect(chapterBody('the-probability-rule')).toMatch(/η/);
-    expect(chapterBody('the-probability-rule')).toMatch(/α = 0/);
-    expect(chapterBody('the-probability-rule')).toMatch(/β = 0/);
+    expect(chapterBody('the-probability-rule')).toMatch(/(\\tau|τ)/);
+    expect(chapterBody('the-probability-rule')).toMatch(/(\\eta|η)/);
+    expect(chapterBody('the-probability-rule')).toMatch(/(\\alpha = 0|α = 0)/);
+    expect(chapterBody('the-probability-rule')).toMatch(/(\\beta = 0|β = 0)/);
     expect(chapterBody('the-probability-rule')).toMatch(/<Predict\b/);
+    expect(chapterBody('the-probability-rule')).toMatch(/<Math\b/);
+    expect(chapterBody('the-probability-rule')).toMatch(/<Pseudocode\b/);
 
     // 05 — leaving a trace: Q/L, shorter tours, positive feedback.
     expect(chapterBody('leaving-a-trace')).toMatch(/Q\/L/);
     expect(chapterBody('leaving-a-trace')).toMatch(/positive feedback/i);
     expect(chapterBody('leaving-a-trace')).toMatch(/shorter route|shorter tour/i);
+    expect(chapterBody('leaving-a-trace')).toMatch(/<Math\b/);
 
     // 06 — forgetting: (1 − ρ), stale paths, ρ = 1 boundary.
-    expect(chapterBody('forgetting')).toMatch(/\(1 − ρ\)/);
-    expect(chapterBody('forgetting')).toMatch(/ρ = 1/);
+    expect(chapterBody('forgetting')).toMatch(/(\(1 - \\rho\)|\(1 − ρ\))/);
+    expect(chapterBody('forgetting')).toMatch(/(\\rho = 1|ρ = 1)/);
     expect(chapterBody('forgetting')).toMatch(/zero/i);
+    expect(chapterBody('forgetting')).toMatch(/<Math\b/);
 
     // 07 — emergence: record vs mean, entropy, the static figure.
     expect(chapterBody('emergence')).toMatch(/never rises/i);

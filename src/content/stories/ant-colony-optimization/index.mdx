@@ -40,8 +40,15 @@ status: "initial-release"
 import Chapter from '../../../components/story/Chapter.astro';
 import Callout from '../../../components/ui/Callout.astro';
 import Figure from '../../../components/ui/Figure.astro';
+import Math from '../../../components/ui/Math.astro';
 import Predict from '../../../components/ui/Predict.astro';
+import Pseudocode from '../../../components/ui/Pseudocode.astro';
 import bestTourSvg from '../../../assets/figures/aco-best-tour.svg?raw';
+import {
+  ACO_DEPOSIT_TEX,
+  ACO_TRANSITION_TEX,
+  ACO_UPDATE_TEX,
+} from '../../../lib/aco-formulas';
 
 <Chapter id="the-colony" title="The colony" scene="colony-overview" eyebrow="Chapter 01">
 
@@ -104,17 +111,26 @@ These are the numbers at the start of the default run, when every edge carries t
   eyebrow="Chapter 04"
 >
 
-The fan comes from one rule. For an ant at city i, the probability of moving to an allowed city j is proportional to pheromone raised to α times inverse distance raised to β:
+The fan comes from one rule. For an ant at city $i$, the probability of moving to an allowed city $j$ is proportional to pheromone raised to $\alpha$ times inverse distance raised to $\beta$:
 
-<div class="formula" role="math" aria-label="The probability of moving from city i to city j is tau sub i j to the power alpha times eta sub i j to the power beta, divided by the sum over allowed cities l of tau sub i l to the power alpha times eta sub i l to the power beta">
-  <span aria-hidden="true">p(i → j) = τ<sub>ij</sub><sup>α</sup> · η<sub>ij</sub><sup>β</sup> / Σ<sub>l ∈ allowed</sub> τ<sub>il</sub><sup>α</sup> · η<sub>il</sub><sup>β</sup></span>
-</div>
+<Math
+  id="formula-transition"
+  label="Transition probability"
+  caption="The chance of choosing city j from city i is the pheromone weight multiplied by the inverse-distance weight, divided by the sum of that product over every city l that is still allowed."
+  tex={ACO_TRANSITION_TEX}
+/>
 
-Here τ<sub>ij</sub> is the pheromone on the edge, and η<sub>ij</sub> = 1/d<sub>ij</sub> is the inverse distance. The numerator is a weight, and the denominator adds up the weights of every allowed city. Dividing by that total is what makes the probabilities add to one.
+Here $\tau_{ij}$ is the pheromone on the edge, and $\eta_{ij} = 1/d_{ij}$ is the inverse distance. The numerator is a weight, and the denominator adds up the weights of every allowed city. Dividing by that total is what makes the probabilities add to one.
 
-The exponents set the balance. A larger α makes differences in pheromone matter more; a larger β makes differences in distance matter more. Neither is an on/off switch. At α = 1 and β = 2, a slightly shorter edge and a slightly stronger trail both raise a candidate's weight, and the ant samples from the result rather than taking the maximum.
+The exponents set the balance. A larger $\alpha$ makes differences in pheromone matter more; a larger $\beta$ makes differences in distance matter more. Neither is an on/off switch. At $\alpha = 1$ and $\beta = 2$, a slightly shorter edge and a slightly stronger trail both raise a candidate's weight, and the ant samples from the result rather than taking the maximum.
 
-The extremes are instructive. With β = 0 the distance term becomes 1 for every candidate, so only pheromone remains; at the start, when all trails are equal, the ant picks uniformly. With α = 0, pheromone is ignored and the weight is 1/d<sup>β</sup>. That is distance-driven sampling, not the nearest-neighbour rule: the closest city is the most likely, but it is not certain.
+The extremes are instructive. With $\beta = 0$ the distance term becomes 1 for every candidate, so only pheromone remains; at the start, when all trails are equal, the ant picks uniformly. With $\alpha = 0$, pheromone is ignored and the weight is $1/d^{\beta}$. That is distance-driven sampling, not the nearest-neighbour rule: the closest city is the most likely, but it is not certain.
+
+<Pseudocode
+  id="aco-pseudocode-article"
+  activeLine={4}
+  description="Ten lines, with no hidden machinery: initialize, construct a tour for every ant, score it, evaporate, deposit, record the best, and repeat. The stage panel highlights the line for the chapter you are reading."
+/>
 
 <Predict question="If β = 0 and α stays at 1, can the colony still find short tours?">
 
@@ -128,9 +144,16 @@ The extremes are instructive. With β = 0 the distance term becomes 1 for every 
 
 <Chapter id="leaving-a-trace" title="Leaving a trace" scene="deposit" eyebrow="Chapter 05">
 
-A completed tour is feedback. Every ant deposits pheromone on each edge it used, in proportion to how short its tour was. The amount is Q/L<sub>k</sub>, where L<sub>k</sub> is that ant's tour length and Q is the deposit constant, fixed at 1 in this release. A tour of length 5 adds 0.2 to each of its edges; a tour of length 10 adds 0.1. Within one tour every edge gets the same amount, because the whole route is judged by L<sub>k</sub>. A shorter route is therefore a stronger recommendation for all of its edges.
+A completed tour is feedback. Every ant deposits pheromone on each edge it used, in proportion to how short its tour was. The amount is $Q/L_k$, where $L_k$ is that ant's tour length and $Q$ is the deposit constant, fixed at 1 in this release. A tour of length 5 adds 0.2 to each of its edges; a tour of length 10 adds 0.1. Within one tour every edge gets the same amount, because the whole route is judged by $L_k$. A shorter route is therefore a stronger recommendation for all of its edges.
 
-Deposits accumulate across the colony. An edge used by several short tours gains more than an edge used by one long tour. In the next iteration that higher τ raises the edge's weight in the transition rule, so ants choose it more often, and its lead can grow. This is positive feedback: the trail shapes the choices that reshape the trail.
+<Math
+  id="formula-deposit"
+  label="Deposit for one ant"
+  caption="Ant k adds Q divided by the length of its tour to every edge it used, and nothing to every other edge. Q is fixed at 1 in this release."
+  tex={ACO_DEPOSIT_TEX}
+/>
+
+Deposits accumulate across the colony. An edge used by several short tours gains more than an edge used by one long tour. In the next iteration that higher $\tau$ raises the edge's weight in the transition rule, so ants choose it more often, and its lead can grow. This is positive feedback: the trail shapes the choices that reshape the trail.
 
 Positive feedback alone would be a trap. The first edge that looked good could keep winning even after a better route appeared. Two things limit that. The deposit is spread across many edges, so no single ant owns the map; and evaporation keeps subtracting from every trail, including the successful ones.
 
@@ -138,11 +161,18 @@ Positive feedback alone would be a trap. The first edge that looked good could k
 
 <Chapter id="forgetting" title="Forgetting" scene="evaporation" eyebrow="Chapter 06">
 
-After the ants finish an iteration, every edge loses a fraction of its pheromone: τ becomes (1 − ρ) times τ. With ρ = 0.5, half of each trail remains before the new deposits are added. The order matters: evaporate first, then deposit. A trail that no ant used shrinks each iteration; a trail that keeps being used is renewed.
+After the ants finish an iteration, every edge loses a fraction of its pheromone: $\tau$ becomes $(1 - \rho)$ times $\tau$. With $\rho = 0.5$, half of each trail remains before the new deposits are added. The order matters: evaporate first, then deposit. A trail that no ant used shrinks each iteration; a trail that keeps being used is renewed.
 
-Forgetting is not a bug. Without it, early deposits would dominate forever and the colony would stop responding to what it learns later. Evaporation gives the search a horizon: recent evidence counts more than old evidence. At ρ = 0 nothing evaporates, and stale paths persist. A very small ρ, such as the 0.1 in the stagnant preset, makes trails sticky and encourages lock-in.
+<Math
+  id="formula-update"
+  label="Evaporation and update"
+  caption="Every edge first keeps one minus rho of its pheromone, then receives the sum of the deposits from all ants that used it. Evaporation happens before deposit."
+  tex={ACO_UPDATE_TEX}
+/>
 
-ρ = 1 is the boundary case. Full evaporation happens before deposit, so every edge is zeroed and then the current ants write their tours. Any edge that no ant used in that iteration is exactly zero. The engine keeps pheromone non-negative and finite, and if a choice ever has all-zero weights it samples uniformly among the allowed cities. On screen a zero edge is drawn at a minimum width so the graph stays visible; zero pheromone is not the same as a missing edge.
+Forgetting is not a bug. Without it, early deposits would dominate forever and the colony would stop responding to what it learns later. Evaporation gives the search a horizon: recent evidence counts more than old evidence. At $\rho = 0$ nothing evaporates, and stale paths persist. A very small $\rho$, such as the 0.1 in the stagnant preset, makes trails sticky and encourages lock-in.
+
+$\rho = 1$ is the boundary case. Full evaporation happens before deposit, so every edge is zeroed and then the current ants write their tours. Any edge that no ant used in that iteration is exactly zero. The engine keeps pheromone non-negative and finite, and if a choice ever has all-zero weights it samples uniformly among the allowed cities. On screen a zero edge is drawn at a minimum width so the graph stays visible; zero pheromone is not the same as a missing edge.
 
 <Callout tone="warning" title="ρ = 1 erases the map every iteration">
 

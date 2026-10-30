@@ -623,6 +623,227 @@ html[data-reduced-motion="true"] {
   tab-size: 2;
 }
 
+/* ── Build-time math ──────────────────────────────────────────────────── */
+/*
+ * KaTeX ships static HTML + MathML. The wrapper owns the scroll surface, so a
+ * long display formula scrolls inside itself at 320 px instead of widening the
+ * page. The caption is the plain-language description; MathML remains in the
+ * output for assistive technology.
+ */
+.formula-math {
+  display: grid;
+  gap: var(--space-3xs);
+  min-inline-size: 0;
+  max-inline-size: 100%;
+  margin: 0;
+  padding: var(--space-sm) var(--space-md);
+  border: var(--hairline) solid var(--color-rule-paper);
+  border-inline-start: var(--rule-strong) solid var(--color-accent-paper);
+  border-radius: var(--radius-md);
+  background-color: var(--color-paper-inset);
+}
+
+.formula-math__label {
+  margin: 0;
+  color: var(--color-accent-paper);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-medium);
+  letter-spacing: var(--tracking-wider);
+  text-transform: uppercase;
+}
+
+.formula-math__display {
+  min-inline-size: 0;
+  max-inline-size: 100%;
+  padding-block: var(--space-3xs);
+  overflow-x: auto;
+  overflow-y: hidden;
+  color: var(--color-ink);
+  overscroll-behavior-x: contain;
+}
+
+.formula-math__display .katex-display {
+  margin: 0;
+}
+
+.formula-math__display .katex {
+  font-size: clamp(1rem, 0.82rem + 1.1vw, 1.3rem);
+}
+
+.formula-math__caption {
+  margin: 0;
+  color: var(--color-paper-muted);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+}
+
+/* ── Build-time pseudocode ────────────────────────────────────────────── */
+/*
+ * Shiki writes CSS variables rather than literal colours, so one build-time
+ * listing serves both tones. Paper is the default; the stage variant below is
+ * ready for the lab and any future placement on the dark surface.
+ *
+ * The active line uses a left rule and a weight change in addition to the
+ * tinted background, so the highlight is not colour-only. `aria-current="step"`
+ * is set by the controller at chapter entry.
+ */
+.pseudocode {
+  --pseudocode-bg: var(--color-paper-inset);
+  --pseudocode-ink: var(--color-ink);
+  --pseudocode-keyword: var(--color-accent-paper);
+  --pseudocode-function: var(--color-ink);
+  --pseudocode-symbol: var(--color-ink);
+  --pseudocode-operator: var(--color-paper-muted);
+  --pseudocode-number: var(--color-ink);
+  --pseudocode-comment: var(--color-paper-muted);
+
+  display: block;
+  min-inline-size: 0;
+  max-inline-size: 100%;
+  margin: 0;
+  padding: var(--space-sm);
+  overflow-x: auto;
+  border: var(--hairline) solid var(--color-rule-paper);
+  border-radius: var(--radius-md);
+  background-color: var(--pseudocode-bg);
+  color: var(--pseudocode-ink);
+  font-family: var(--font-mono);
+  font-size: clamp(var(--text-2xs), 0.62rem + 0.3vw, var(--text-sm));
+  line-height: 1.6;
+  tab-size: 2;
+  white-space: pre;
+  overscroll-behavior-x: contain;
+}
+
+pre.pseudocode > code {
+  display: block;
+  min-inline-size: max-content;
+}
+
+.pseudocode:focus-visible {
+  outline: var(--focus-ring-width) solid var(--color-focus);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.pseudocode__line {
+  display: block;
+  padding-inline: var(--space-2xs);
+  border-inline-start: var(--rule-strong) solid transparent;
+}
+
+.pseudocode__line[data-active] {
+  border-inline-start-color: var(--color-accent-paper);
+  background-color: var(--color-paper-raised);
+  font-weight: var(--weight-medium);
+}
+
+.pseudocode[data-tone="stage"],
+.stage .pseudocode {
+  --pseudocode-bg: var(--color-stage-inset);
+  --pseudocode-ink: var(--color-stage-ink);
+  --pseudocode-keyword: var(--color-accent-stage);
+  --pseudocode-function: var(--color-stage-ink);
+  --pseudocode-symbol: var(--color-cool);
+  --pseudocode-operator: var(--color-stage-muted);
+  --pseudocode-number: var(--color-amber);
+  --pseudocode-comment: var(--color-stage-muted);
+
+  border-color: var(--color-rule-stage);
+}
+
+.pseudocode[data-tone="stage"] .pseudocode__line[data-active],
+.stage .pseudocode .pseudocode__line[data-active] {
+  border-inline-start-color: var(--color-accent-stage);
+  background-color: color-mix(in srgb, var(--color-accent-stage) 14%, transparent);
+}
+
+.pseudocode-figure {
+  display: grid;
+  gap: var(--space-2xs);
+  min-inline-size: 0;
+  max-inline-size: 100%;
+  margin-block: var(--space-lg);
+}
+
+.pseudocode-figure__title {
+  margin: 0;
+  color: var(--color-ink);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+}
+
+.pseudocode-figure__description {
+  margin: 0;
+  color: var(--color-paper-muted);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+}
+
+.pseudocode-figure__surface {
+  min-inline-size: 0;
+  max-inline-size: 100%;
+}
+
+/* ── Stage pseudocode panel ───────────────────────────────────────────── */
+.story-layout__stage--with-pseudocode {
+  display: grid;
+  gap: var(--space-sm);
+}
+
+/*
+ * Leave room for the panel inside the pinned column. The panel is about 17rem
+ * tall at the default type scale; the stage gives up that room instead of
+ * pushing the listing below the viewport.
+ */
+.story-layout__stage--with-pseudocode .story-stage {
+  --story-stage-max-block: max(
+    14rem,
+    calc(100dvh - var(--header-height) - var(--space-xl) - 17rem)
+  );
+}
+
+.story-pseudocode {
+  display: grid;
+  gap: var(--space-2xs);
+  min-inline-size: 0;
+  padding: var(--space-sm);
+  border: var(--hairline) solid var(--color-rule-paper);
+  border-radius: var(--radius-md);
+  background-color: var(--color-paper-raised);
+}
+
+.story-pseudocode__head {
+  display: grid;
+  gap: var(--space-3xs);
+}
+
+.story-pseudocode__note {
+  margin: 0;
+  color: var(--color-paper-muted);
+  font-size: var(--text-xs);
+  line-height: var(--leading-normal);
+}
+
+.story-pseudocode__body {
+  min-inline-size: 0;
+}
+
+/*
+ * The panel is below the stage, so on one column the pinned wrapper would be
+ * taller than the viewport and its lower half unreachable. The dedicated mobile
+ * stage layout is Step 3.6; until then the ACO stage column scrolls normally
+ * while the prose remains the document scroller.
+ */
+@media (max-width: 60rem) {
+  .story-layout__stage.story-layout__stage--with-pseudocode {
+    position: static;
+  }
+}
+
 .data {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
