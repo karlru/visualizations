@@ -38,7 +38,7 @@ export interface ProbabilityFanLayerOptions {
 export function createProbabilityFanLayer(
   options: ProbabilityFanLayerOptions = {},
 ): Canvas2DLayer<AcoParams, AcoSnapshot> {
-  const focalCity = options.focalCity ?? ACO_FOCAL_CITY_INDEX;
+  const preferredFocalCity = options.focalCity ?? ACO_FOCAL_CITY_INDEX;
   const topN = options.topN ?? DEFAULT_FAN_CANDIDATES;
 
   let fan: ProbabilityFan | null = null;
@@ -67,6 +67,8 @@ export function createProbabilityFanLayer(
 
       const snapshot = frame.snapshot;
       const params = snapshot.params;
+      if (snapshot.cityCount < 2 || snapshot.cities.length < 2) return;
+      const focalCity = Math.min(preferredFocalCity, snapshot.cityCount - 1);
       const stale =
         fan === null ||
         cacheCities !== snapshot.cities ||

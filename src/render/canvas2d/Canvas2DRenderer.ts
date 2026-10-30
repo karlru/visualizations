@@ -28,6 +28,8 @@ import {
   type MutableCameraMatrix,
   type MutablePoint,
   projectInto,
+  projectPoint,
+  unprojectPoint,
 } from './camera';
 import { type CanvasSize, computeCanvasSize } from './sizing';
 import { type CanvasTheme, readCanvasTheme } from './theme';
@@ -365,6 +367,40 @@ export class Canvas2DRenderer<P extends object, S> implements StageRenderer<P, S
     this.updateLabels(true);
     this.drawLastFrame();
     this.syncDebugAttributes();
+  }
+
+  /**
+   * Convert a client coordinate to world space using the live camera.
+   *
+   * This is the generic hook the lab's map overlay uses to drag cities without
+   * duplicating the camera math in a Svelte component. It returns stage-local
+   * world coordinates; the overlay only cares that the renderer and the camera
+   * agree.
+   */
+  screenToWorld(
+    clientX: number,
+    clientY: number,
+  ): { readonly x: number; readonly y: number } | null {
+    if (this.disposed || this.canvas === null) return null;
+    const rect = this.canvas.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return null;
+    this.applySceneCamera();
+    return unprojectPoint(
+      this.workingCamera,
+      rect.width,
+      rect.height,
+      clientX - rect.left,
+      clientY - rect.top,
+    );
+  }
+
+  /** Project a world-space point to stage-local CSS pixels. */
+  worldToScreen(x: number, y: number): { readonly x: number; readonly y: number } | null {
+    if (this.disposed || this.canvas === null) return null;
+    const rect = this.canvas.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return null;
+    this.applySceneCamera();
+    return projectPoint(this.workingCamera, rect.width, rect.height, x, y);
   }
 
   debugState(): Canvas2DRendererDebugState {

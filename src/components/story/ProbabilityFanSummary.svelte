@@ -10,10 +10,10 @@
    * explanation and is sampled at UI frequency by its host.
    */
 
-  import type { ProbabilityFan } from '../../stories/aco/probability-fan';
+  import type { StoryFanView } from '../../stories/runtime';
 
   interface Props {
-    fan: ProbabilityFan;
+    fan: StoryFanView;
     id?: string;
     title?: string;
   }

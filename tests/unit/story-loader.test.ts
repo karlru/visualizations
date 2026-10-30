@@ -90,6 +90,7 @@ describe('story module registry', () => {
     expect(view.speedControl).toEqual({ kind: 'engine', param: 'speed' });
     expect(view.presetKeeps).toEqual(['seed', 'cityCount', 'antCount', 'speed']);
     expect(view.controlPanel).toBe('none');
+    expect(view.lab).toBe('aco');
   });
 
   it('keeps both development fixtures available through the module registry', async () => {

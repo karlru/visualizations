@@ -24,8 +24,9 @@
  * controller edit (`NFR-01`).
  */
 
+import type { Engine } from '../engines/core/types';
 import type { UrlParameterSchema } from '../engines/core/url-state';
-import type { StageRenderer } from '../render/types';
+import type { CameraState, StageRenderer } from '../render/types';
 import type {
   ChapterSpec,
   Preset,
@@ -98,6 +99,109 @@ export interface StoryModuleView {
    * lab step supplies a panel (ACO's lab is Step 3.5).
    */
   readonly controlPanel: 'none' | 'fixture';
+  /**
+   * Optional story-specific lab panel, rendered after the reader enters the
+   * story's lab chapter. The shell treats the kind as opaque and the lab
+   * component owns the concrete story controls.
+   */
+  readonly lab: 'aco' | null;
+}
+
+/** A renderer-agnostic 2D point used by the generic map overlay. */
+export interface StoryMapPoint {
+  readonly x: number;
+  readonly y: number;
+}
+
+/** Read-only map state for one UI sample. Points are in renderer world space. */
+export interface StoryMapView {
+  readonly points: readonly StoryMapPoint[];
+  /** True when the map came from the editor rather than the seeded generator. */
+  readonly custom: boolean;
+  readonly canAdd: boolean;
+  readonly canRemove: boolean;
+  /** World-space distance for one arrow-key nudge. */
+  readonly nudgeStep: number;
+}
+
+/**
+ * Generic editable-map operations.
+ *
+ * The concrete story converts world-space points to its own model; the shell
+ * only moves `{x, y}` values and never needs engine or camera knowledge.
+ */
+export interface StoryMapRuntime {
+  getView(): StoryMapView;
+  setPoint(index: number, point: StoryMapPoint): void;
+  addPoint(point?: StoryMapPoint): void;
+  removePoint(index: number): void;
+  reset(): void;
+}
+
+/** One convergence-history point, structurally compatible with the ACO chart. */
+export interface StoryHistoryPoint {
+  readonly iteration: number;
+  readonly bestLength: number;
+  readonly meanLength: number;
+}
+
+/** One named probability-fan candidate. */
+export interface StoryFanEntryView {
+  readonly city: number;
+  readonly probability: number;
+}
+
+/** The generic subset of a probability fan that the ranked text list renders. */
+export interface StoryFanView {
+  readonly currentCity: number;
+  readonly entries: readonly StoryFanEntryView[];
+  readonly other: { readonly probability: number; readonly count: number };
+  readonly total: number;
+  readonly uniform: boolean;
+}
+
+/** One keyboard-operable camera framing preset. */
+export interface StoryCameraPreset {
+  readonly id: string;
+  readonly label: string;
+  readonly camera: CameraState;
+}
+
+/**
+ * Low-frequency lab data.
+ *
+ * The story module computes everything here from its own snapshot, so the shell
+ * and the lab component never call engine internals. The controller samples it
+ * at UI frequency (chapter entry, pause, parameter change, one-second timer),
+ * never once per frame.
+ */
+export interface StoryAuxiliaryView {
+  readonly history: readonly StoryHistoryPoint[];
+  readonly fan: StoryFanView | null;
+  readonly tour: readonly number[] | null;
+  /** A readable sentence containing the same values as the metric rows. */
+  readonly summary: string;
+  readonly cameraPresets: readonly StoryCameraPreset[];
+  readonly map: StoryMapView | null;
+}
+
+/** Story-specific map adapter. All engine calls stay inside the story module. */
+export interface StoryMapHooks<P extends object, S, M> {
+  /** Current points in renderer world space. */
+  readonly read: (snapshot: Readonly<S>) => readonly StoryMapPoint[];
+  /** Deterministic point for the Add action. */
+  readonly suggest: (snapshot: Readonly<S>) => StoryMapPoint;
+  /** Replace the map and return the concrete params after the engine resets. */
+  readonly write: (engine: Engine<P, S, M>, points: readonly StoryMapPoint[]) => P;
+  /** Restore the seeded map and return the concrete params after the reset. */
+  readonly reset: (engine: Engine<P, S, M>) => P;
+  /** True when the snapshot's map came from the editor. */
+  readonly isCustom: (snapshot: Readonly<S>) => boolean;
+  /** Minimum and maximum editable city counts. */
+  readonly minPoints?: number;
+  readonly maxPoints?: number;
+  /** World-space distance for one arrow-key nudge. */
+  readonly nudgeStep?: number;
 }
 
 /** A renderer facade whose camera controls mirror the concrete renderer. */
@@ -106,6 +210,10 @@ export interface StoryRendererFacade extends StageRenderer<StoryParamBag, object
   zoomBy(factor: number): void;
   /** Remove user camera offsets, when supported. */
   resetCamera(): void;
+  /** Convert a client coordinate to world space, when supported. */
+  screenToWorld?(clientX: number, clientY: number): StoryMapPoint | null;
+  /** Project a world point to stage-local CSS pixels, when supported. */
+  worldToScreen?(x: number, y: number): StoryMapPoint | null;
 }
 
 /** The non-generic runtime handed to the story shell. */
@@ -125,6 +233,10 @@ export interface StoryRuntime {
   step(deltaSeconds: number): void;
   /** Low-frequency metrics for the HUD and polite live region. */
   metrics(context: StoryMetricsContext): readonly StoryMetric[];
+  /** Low-frequency lab data (history, fan, summary, camera presets, map). */
+  auxiliary(): StoryAuxiliaryView | null;
+  /** Editable map operations, or null for stories without a map editor. */
+  map(): StoryMapRuntime | null;
   /** Structural run identity, recorded on chapter entry. */
   structural(): StoryParamBag;
   /** Cheap read-only snapshot for the active renderer. */
@@ -148,6 +260,16 @@ export interface StoryModuleHooks<P extends object, S, M> {
   }) => readonly StoryMetric[];
   /** Describe the run identity that chapter entry captures. */
   readonly describeStructural: (params: P) => StoryParamBag;
+  /** Low-frequency lab data. Omitted means the story has no lab. */
+  readonly auxiliary?: (input: {
+    readonly params: P;
+    readonly metrics: Readonly<M>;
+    readonly snapshot: Readonly<S>;
+  }) => StoryAuxiliaryView;
+  /** Optional editable map adapter. */
+  readonly map?: StoryMapHooks<P, S, M>;
+  /** Optional story-specific lab panel kind. */
+  readonly lab?: 'aco';
   /** Development-only controls panel. Omitted means no panel. */
   readonly controlPanel?: 'fixture';
 }
@@ -255,6 +377,20 @@ function hasCameraControls<P extends object, S>(
   return typeof candidate.zoomBy === 'function' && typeof candidate.resetCamera === 'function';
 }
 
+interface ProjectionControls {
+  screenToWorld(clientX: number, clientY: number): StoryMapPoint | null;
+  worldToScreen(x: number, y: number): StoryMapPoint | null;
+}
+
+function hasProjectionControls<P extends object, S>(
+  renderer: StageRenderer<P, S>,
+): renderer is StageRenderer<P, S> & ProjectionControls {
+  const candidate = renderer as StageRenderer<P, S> & Partial<ProjectionControls>;
+  return (
+    typeof candidate.screenToWorld === 'function' && typeof candidate.worldToScreen === 'function'
+  );
+}
+
 /**
  * Close over a concrete story config and expose the non-generic runtime.
  *
@@ -292,6 +428,7 @@ export function createStoryModule<P extends object, S, M>(
     speedControl: Object.freeze(speedControl),
     presetKeeps,
     controlPanel: hooks.controlPanel ?? 'none',
+    lab: hooks.lab ?? null,
   });
 
   return {
@@ -322,6 +459,70 @@ export function createStoryModule<P extends object, S, M>(
         if (options.reset === true) engine.reset();
       };
 
+      const mapHook = hooks.map;
+      const mapMinPoints = mapHook?.minPoints ?? 1;
+      const mapMaxPoints = mapHook?.maxPoints ?? Number.MAX_SAFE_INTEGER;
+      let mapRuntime: StoryMapRuntime | null = null;
+
+      const readMapPoints = (): readonly StoryMapPoint[] =>
+        mapHook === undefined ? [] : mapHook.read(engine.snapshot());
+
+      const commitMap = (points: readonly StoryMapPoint[]): void => {
+        if (mapHook === undefined || disposed) return;
+        // The story hook wraps `engine.setCities`/`engine.resetMap`; it returns
+        // the concrete params after the engine's restart so the bag (including
+        // the city count) stays coherent for the next structural edit.
+        bag = toStoryParamBag(mapHook.write(engine, points));
+      };
+
+      const mapView = (): StoryMapView => {
+        const points = readMapPoints();
+        return {
+          points,
+          custom: mapHook === undefined ? false : mapHook.isCustom(engine.snapshot()),
+          canAdd: points.length < mapMaxPoints,
+          canRemove: points.length > mapMinPoints,
+          nudgeStep: mapHook?.nudgeStep ?? 0.1,
+        };
+      };
+
+      const ensureMap = (): StoryMapRuntime | null => {
+        if (mapHook === undefined || disposed) return null;
+        if (mapRuntime !== null) return mapRuntime;
+
+        mapRuntime = {
+          getView: mapView,
+          setPoint(index: number, point: StoryMapPoint): void {
+            if (disposed || !Number.isInteger(index)) return;
+            if (!Number.isFinite(point.x) || !Number.isFinite(point.y)) return;
+            const points = readMapPoints();
+            if (index < 0 || index >= points.length) return;
+            commitMap(points.map((current, position) => (position === index ? point : current)));
+          },
+          addPoint(point?: StoryMapPoint): void {
+            if (disposed) return;
+            const points = readMapPoints();
+            if (points.length >= mapMaxPoints) return;
+            const next = point ?? mapHook.suggest(engine.snapshot());
+            if (!Number.isFinite(next.x) || !Number.isFinite(next.y)) return;
+            commitMap([...points, next]);
+          },
+          removePoint(index: number): void {
+            if (disposed || !Number.isInteger(index)) return;
+            const points = readMapPoints();
+            if (points.length <= mapMinPoints) return;
+            if (index < 0 || index >= points.length) return;
+            commitMap(points.filter((_point, position) => position !== index));
+          },
+          reset(): void {
+            if (disposed) return;
+            const next = mapHook.reset(engine);
+            bag = toStoryParamBag(next);
+          },
+        };
+        return mapRuntime;
+      };
+
       return {
         get params(): StoryParamBag {
           return bag;
@@ -350,6 +551,19 @@ export function createStoryModule<P extends object, S, M>(
             snapshot: engine.snapshot(),
             context,
           });
+        },
+
+        auxiliary(): StoryAuxiliaryView | null {
+          if (disposed || hooks.auxiliary === undefined) return null;
+          return hooks.auxiliary({
+            params: concrete(),
+            metrics: engine.metrics(),
+            snapshot: engine.snapshot(),
+          });
+        },
+
+        map(): StoryMapRuntime | null {
+          return ensureMap();
         },
 
         structural(): StoryParamBag {
@@ -385,6 +599,14 @@ export function createStoryModule<P extends object, S, M>(
             },
             resetCamera: () => {
               if (hasCameraControls(inner)) inner.resetCamera();
+            },
+            screenToWorld: (clientX: number, clientY: number) => {
+              if (hasProjectionControls(inner)) return inner.screenToWorld(clientX, clientY);
+              return null;
+            },
+            worldToScreen: (x: number, y: number) => {
+              if (hasProjectionControls(inner)) return inner.worldToScreen(x, y);
+              return null;
             },
             dispose: () => {
               renderers.delete(inner);

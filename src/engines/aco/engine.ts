@@ -444,6 +444,7 @@ interface MutableAcoSnapshot {
   cityCount: number;
   antCount: number;
   cities: readonly City[];
+  explicitCities: boolean;
   distanceMatrix: TspInstance['distanceMatrix'];
   pheromone: Float64Array;
   ants: readonly MutableAntSnapshot[];
@@ -608,6 +609,7 @@ export class AcoEngine implements Engine<AcoParams, AcoSnapshot, AcoMetrics> {
       cityCount: size,
       antCount: normalized.antCount,
       cities: this.instance.cities,
+      explicitCities: false,
       distanceMatrix: this.instance.distanceMatrix,
       pheromone: this.pheromone,
       ants: this.ants,
@@ -685,6 +687,21 @@ export class AcoEngine implements Engine<AcoParams, AcoSnapshot, AcoMetrics> {
     this.instance = createTspInstanceFromCities(cities, this.params.seed);
     this.explicitCities = true;
     this.params = { ...this.params, cityCount: this.instance.cityCount };
+    this.rebindProblem();
+    this.restartRun();
+  }
+
+  /**
+   * Restore the seeded layout for the current seed and city count.
+   *
+   * This is the lab's "Reset map" action. It drops an explicit map, rebuilds
+   * the generated instance, and restarts at iteration 0. The seed and the
+   * number of cities are preserved, so a share link reproduces the same
+   * seeded map.
+   */
+  resetMap(): void {
+    this.explicitCities = false;
+    this.instance = createTspInstance(this.params.seed, this.params.cityCount);
     this.rebindProblem();
     this.restartRun();
   }
@@ -865,6 +882,7 @@ export class AcoEngine implements Engine<AcoParams, AcoSnapshot, AcoMetrics> {
     this.snapshotValue.cityCount = size;
     this.snapshotValue.antCount = this.params.antCount;
     this.snapshotValue.cities = this.instance.cities;
+    this.snapshotValue.explicitCities = this.explicitCities;
     this.snapshotValue.distanceMatrix = this.instance.distanceMatrix;
     this.snapshotValue.pheromone = this.pheromone;
     this.snapshotValue.ants = this.ants;
@@ -875,6 +893,7 @@ export class AcoEngine implements Engine<AcoParams, AcoSnapshot, AcoMetrics> {
   /** Copy current scalar state into the stable snapshot object. */
   private publish(): void {
     this.snapshotValue.iteration = this.iteration;
+    this.snapshotValue.explicitCities = this.explicitCities;
     this.snapshotValue.bestTour = this.bestTour;
     this.snapshotValue.bestLength = this.bestLength;
     this.snapshotValue.meanLength = this.meanLength;

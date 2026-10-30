@@ -237,6 +237,13 @@ export interface AcoSnapshot {
   /** The problem's cities in index order. Stable for a fixed city set. */
   readonly cities: readonly City[];
 
+  /**
+   * True when the current map came from the lab's explicit city editor rather
+   * than the seeded generator. It is presentation metadata for the UI; the
+   * engine's run identity still includes the city set itself.
+   */
+  readonly explicitCities: boolean;
+
   /** Precomputed symmetric distances. Stable for a fixed city set. */
   readonly distanceMatrix: Readonly<DistanceMatrix>;
 

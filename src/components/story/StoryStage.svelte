@@ -114,10 +114,26 @@
     resetCamera(): void;
   }
 
+  interface ProjectionControl {
+    screenToWorld(clientX: number, clientY: number): { readonly x: number; readonly y: number } | null;
+    worldToScreen(x: number, y: number): { readonly x: number; readonly y: number } | null;
+  }
+
   function cameraControl(instance: StageRenderer<P, S>): CameraControl | null {
     const candidate = instance as Partial<CameraControl>;
     if (typeof candidate.zoomBy === 'function' && typeof candidate.resetCamera === 'function') {
       return candidate as CameraControl;
+    }
+    return null;
+  }
+
+  function projectionControl(instance: StageRenderer<P, S>): ProjectionControl | null {
+    const candidate = instance as Partial<ProjectionControl>;
+    if (
+      typeof candidate.screenToWorld === 'function' &&
+      typeof candidate.worldToScreen === 'function'
+    ) {
+      return candidate as ProjectionControl;
     }
     return null;
   }
@@ -329,6 +345,14 @@
           const control = cameraControl(instance);
           control?.resetCamera();
           drawFrame(true);
+        },
+        screenToWorld: (clientX: number, clientY: number) => {
+          const control = projectionControl(instance);
+          return control?.screenToWorld(clientX, clientY) ?? null;
+        },
+        worldToScreen: (x: number, y: number) => {
+          const control = projectionControl(instance);
+          return control?.worldToScreen(x, y) ?? null;
         },
         /** Repaint the last snapshot, for deterministic keyboard stepping. */
         redraw: () => {

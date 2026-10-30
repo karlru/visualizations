@@ -11,11 +11,11 @@
 
   import { scaleLinear } from 'd3-scale';
   import { curveMonotoneX, line } from 'd3-shape';
-  import type { AcoHistoryPoint } from '../../engines/aco/types';
+  import type { StoryHistoryPoint } from '../../stories/runtime';
 
   interface Props {
     /** Chronological history, oldest first. */
-    history: readonly AcoHistoryPoint[];
+    history: readonly StoryHistoryPoint[];
     bestLength: number | null;
     meanLength: number | null;
     iteration: number;
@@ -71,13 +71,13 @@
   const yScale = $derived(scaleLinear().domain(domain.y).range([plotHeight, 0]));
 
   const bestPath = $derived(
-    line<AcoHistoryPoint>()
+    line<StoryHistoryPoint>()
       .x((point) => xScale(point.iteration))
       .y((point) => yScale(point.bestLength))
       .curve(curveMonotoneX)(history) ?? '',
   );
   const meanPath = $derived(
-    line<AcoHistoryPoint>()
+    line<StoryHistoryPoint>()
       .x((point) => xScale(point.iteration))
       .y((point) => yScale(point.meanLength))
       .curve(curveMonotoneX)(history) ?? '',
