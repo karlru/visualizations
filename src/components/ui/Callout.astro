@@ -1,0 +1,108 @@
+---
+/**
+ * Editorial callout for one idea, warning, or invitation to experiment.
+ *
+ * The element is an `<aside role="note">` with a real accessible name, so a
+ * screen reader announces what kind of interruption this is before reading it.
+ * It carries no JavaScript: the colour is reinforcement, and the visible label
+ * ("Key idea", "Warning", "Try it") carries the meaning.
+ */
+
+type CalloutTone = 'idea' | 'warning' | 'try';
+
+interface Props {
+  /** What kind of note this is. */
+  tone?: CalloutTone;
+  /** Short, specific title. Used as the note's accessible name. */
+  title: string;
+  /** Optional label override; defaults to the tone's label. */
+  label?: string;
+  /** Optional stable id, for deep links or tests. */
+  id?: string;
+}
+
+const { tone = 'idea', title, label, id } = Astro.props;
+
+const defaultLabels: Record<CalloutTone, string> = {
+  idea: 'Key idea',
+  warning: 'Warning',
+  try: 'Try it',
+};
+
+const slug = title
+  .toLowerCase()
+  .replace(/[^a-z0-9]+/g, '-')
+  .replace(/^-+|-+$/g, '');
+const titleId = id ? `${id}-title` : `callout-${slug}-title`;
+---
+
+<aside class="callout" data-callout={tone} role="note" aria-labelledby={titleId}>
+  <p class="callout__label">{label ?? defaultLabels[tone]}</p>
+  <p class="callout__title" id={titleId}>{title}</p>
+  <div class="callout__body">
+    <slot />
+  </div>
+</aside>
+
+<style>
+  .callout {
+    display: grid;
+    gap: var(--space-3xs);
+    margin-block: var(--space-lg);
+    padding: var(--space-sm) var(--space-md);
+    border: var(--hairline) solid var(--color-rule-paper);
+    border-inline-start: var(--rule-strong) solid var(--color-accent-paper);
+    border-radius: var(--radius-md);
+    background-color: var(--color-paper-raised);
+  }
+
+  .callout__label {
+    margin: 0;
+    color: var(--color-accent-paper);
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    font-weight: var(--weight-medium);
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+  }
+
+  .callout__title {
+    margin: 0;
+    color: var(--color-ink);
+    font-size: var(--text-lead);
+    font-weight: var(--weight-semibold);
+    line-height: var(--leading-snug);
+  }
+
+  .callout__body {
+    display: grid;
+    gap: var(--space-2xs);
+    color: var(--color-paper-muted);
+    line-height: var(--leading-relaxed);
+  }
+
+  .callout__body :global(p) {
+    margin: 0;
+  }
+
+  .callout__body :global(a) {
+    color: var(--color-accent-paper);
+  }
+
+  .callout[data-callout='warning'] {
+    border-inline-start-color: var(--color-ink);
+    background-color: var(--color-paper-inset);
+  }
+
+  .callout[data-callout='warning'] .callout__label {
+    color: var(--color-ink);
+  }
+
+  .callout[data-callout='try'] {
+    border-inline-start-color: var(--color-focus);
+  }
+
+  .callout[data-callout='try'] .callout__label {
+    color: var(--color-focus);
+  }
+</style>
