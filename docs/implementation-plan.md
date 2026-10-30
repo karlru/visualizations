@@ -860,7 +860,7 @@ Verified 2026-10-30 with `pnpm lint`, `pnpm test` (188 passing, 1 existing todo)
 
 ## 6. Phase 2 — ACO engine
 
-### Step 2.1 — TSP model
+### (DONE) Step 2.1 — TSP model
 
 **Goal:** A correct, testable traveling salesman model.
 
@@ -872,7 +872,7 @@ Verified 2026-10-30 with `pnpm lint`, `pnpm test` (188 passing, 1 existing todo)
 4. (DONE) Compute tour length, including the return edge.
 5. (DONE) Validate that a tour visits every city exactly once.
 6. (DONE) Add a nearest-neighbor initial tour for comparison.
-7. Add tests for distance, tour length, validation, and coincident cities.
+7. (DONE) Add tests for distance, tour length, validation, and coincident cities.
 
 **Files**
 
@@ -882,13 +882,15 @@ Verified 2026-10-30 with `pnpm lint`, `pnpm test` (188 passing, 1 existing todo)
 
 **Acceptance criteria**
 
-- [ ] Tour length is symmetric for symmetric distances.
-- [ ] A tour that misses a city is rejected.
-- [ ] A tour that visits a city twice is rejected.
-- [ ] The return edge is included.
-- [ ] The same seed produces the same layout.
-- [ ] A 2-city and a 1-city instance are handled without crashing.
-- [ ] Coincident cities produce finite distances and no `NaN` or `Infinity`.
+- [x] Tour length is symmetric for symmetric distances.
+- [x] A tour that misses a city is rejected.
+- [x] A tour that visits a city twice is rejected.
+- [x] The return edge is included.
+- [x] The same seed produces the same layout.
+- [x] A 2-city and a 1-city instance are handled without crashing.
+- [x] Coincident cities produce finite distances and no `NaN` or `Infinity`.
+
+Verified 2026-10-30 with `pnpm lint` and `pnpm test` (225 passing, 1 existing todo). `src/engines/aco/types.ts` owns `City`, `Tour`, `DistanceMatrix`, `TspInstance`, and the discriminated `TourValidation` result. `src/engines/aco/tsp.ts` generates each city from two consecutive `SeededRandom` floats, stores cities in index order, and builds a symmetric row-major `Float64Array`. Off-diagonal distances below `DISTANCE_EPSILON = 1e-6` clamp to that value so `η = 1/d` stays finite; the diagonal stays zero because a tour never contains a self-edge. `createTspInstance` throws a clear `RangeError` for zero, negative, fractional, or non-finite city counts; `createTspInstanceFromCities(cities, seed)` copies, validates (`[0, 1]²`), and freezes explicit lists for the Step 3.5 editor. `validateTour` returns `wrong-length`, `out-of-range`, or `duplicate-city` with a display-ready message; a missing city appears as a wrong length, and with the correct length a duplicate necessarily means a missing city. `tourLength` validates first and throws on programmer error. `nearestNeighborTour(instance, startCity = 0)` is deterministic, tie-breaks toward the lower index, consumes no random numbers, and returns a frozen tour. `tests/unit/aco.test.ts` has 37 cases, including fast-check properties for matrix symmetry/bounds, validation against a reference permutation check, and greedy nearest-neighbor selection.
 
 ### Step 2.2 — Ant System engine
 
