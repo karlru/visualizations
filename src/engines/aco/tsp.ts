@@ -230,3 +230,54 @@ export function tourLength(instance: TspInstance, tour: Tour): number {
 
   return total + data[previous * size + tour[0]];
 }
+
+/**
+ * Build a deterministic nearest-neighbor tour.
+ *
+ * Starting at `startCity`, each step moves to the closest unvisited city. Ties
+ * are broken by the lower city index because candidates are scanned in
+ * ascending order with a strict comparison. The baseline is the greedy result
+ * the story compares against the colony; it consumes no random numbers and is
+ * not affected by the instance seed.
+ *
+ * Complexity is `O(n²)` and the returned tour is frozen.
+ *
+ * @param startCity First city, an integer in `[0, cityCount - 1]`. Defaults to
+ *   city `0`.
+ * @throws RangeError if `startCity` is not a valid city index.
+ */
+export function nearestNeighborTour(instance: TspInstance, startCity = 0): Tour {
+  const size = instance.cityCount;
+  assertCityIndex(startCity, size, 'startCity');
+
+  const { data } = instance.distanceMatrix;
+  const visited = new Uint8Array(size);
+  const tour = new Array<number>(size);
+
+  let current = startCity;
+  visited[current] = 1;
+  tour[0] = current;
+
+  for (let position = 1; position < size; position += 1) {
+    const rowOffset = current * size;
+    let nextCity = -1;
+    let nextDistance = Number.POSITIVE_INFINITY;
+
+    for (let candidate = 0; candidate < size; candidate += 1) {
+      if (visited[candidate] === 1) {
+        continue;
+      }
+      const distance = data[rowOffset + candidate];
+      if (distance < nextDistance) {
+        nextDistance = distance;
+        nextCity = candidate;
+      }
+    }
+
+    current = nextCity;
+    visited[current] = 1;
+    tour[position] = current;
+  }
+
+  return Object.freeze(tour);
+}
