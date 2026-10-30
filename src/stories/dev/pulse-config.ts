@@ -180,4 +180,6 @@ export const pulseStoryConfig = defineStoryConfig<SmokeParams, SmokeSnapshot, Sm
     ],
     chapter: { source: 'fragment' },
   },
+  // Keep the reader's structural variant across preset changes.
+  presetKeeps: ['variant'],
 });

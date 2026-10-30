@@ -5,17 +5,20 @@
  * a development and acceptance-test surface, not part of the reader UI: it
  * reports the latest deterministic chapter entry and enough lifecycle detail to
  * detect leaked timers, listeners, stages, or directors.
+ *
+ * The entry uses the shell's primitive parameter bag rather than a concrete
+ * story type, so the same hook works for the fixtures and ACO.
  */
 
-import type { SmokeParams } from '../../stories/dev/canvas-smoke-engine';
+import type { StoryParamBag } from '../../stories/runtime';
 
 export interface StoryRuntimeEntryState {
   readonly storyKey: string;
   readonly chapter: string;
   readonly scene: string;
   readonly seed: number;
-  readonly params: SmokeParams;
-  readonly structural: { readonly variant: SmokeParams['variant'] };
+  readonly params: StoryParamBag;
+  readonly structural: StoryParamBag;
   readonly steps: 0;
   readonly simulatedSeconds: 0;
   readonly sceneStep: number;

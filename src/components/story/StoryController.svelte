@@ -32,7 +32,6 @@
   import { onDestroy, onMount, type Snippet } from 'svelte';
   import { SITE_URL } from '../../config/site';
   import { FixedStepClock } from '../../engines/core/clock';
-  import type { Engine } from '../../engines/core/types';
   import {
     parseUrlState,
     serializeUrlState,
@@ -58,22 +57,22 @@
   import { composeSceneState } from '../../lib/scene-composition';
   import { type ScrollChapterEvent, ScrollDirector } from '../../lib/scroll-director';
   import type { SceneState } from '../../render/types';
-  import type {
-    SmokeMetrics,
-    SmokeParams,
-    SmokeSnapshot,
-  } from '../../stories/dev/canvas-smoke-engine';
-  import { type FixtureStoryConfig, loadStoryConfig } from '../../stories/loader';
+  import { loadStoryModule, type StoryModule } from '../../stories/loader';
   import type { ChapterSpec } from '../../stories/registry';
+  import type {
+    StoryMetric,
+    StoryModuleView,
+    StoryParamBag,
+    StoryRuntime,
+  } from '../../stories/runtime';
+  import { presetParams } from '../../stories/runtime';
   import Metrics from '../controls/Metrics.svelte';
-  import type { MetricItem } from '../controls/metrics-types';
   import PresetPicker from '../controls/PresetPicker.svelte';
   import SeedControl from '../controls/SeedControl.svelte';
   import Slider from '../controls/Slider.svelte';
   import Toggle from '../controls/Toggle.svelte';
   import ArticleModeToggle from './ArticleModeToggle.svelte';
   import ProgressRail from './ProgressRail.svelte';
-  import { createStoryRenderer } from './renderer-factory';
   import StageChrome from './StageChrome.svelte';
   import StoryStage from './StoryStage.svelte';
   import type {
@@ -113,14 +112,11 @@
     children,
   }: Props = $props();
 
-  /** Server-safe defaults before the story module resolves in onMount. */
-  const PLACEHOLDER_PARAMS: SmokeParams = {
-    speed: 1,
-    orbit: 1,
-    trails: true,
-    seed: 0,
-    variant: 'orbit',
-  };
+  /**
+   * Server-safe empty state. The story module resolves in onMount; nothing in
+   * the server-rendered article depends on a parameter being present.
+   */
+  const EMPTY_PARAMS: StoryParamBag = Object.freeze({ seed: 0 });
 
   interface RuntimeChapter {
     readonly id: string;
@@ -128,10 +124,10 @@
     readonly sceneId: string;
     readonly overrides: ChapterSceneOverrides;
     readonly element: HTMLElement;
-    readonly spec: ChapterSpec<SmokeParams> | undefined;
+    readonly spec: ChapterSpec<StoryParamBag> | undefined;
   }
 
-  const EMPTY_SNAPSHOT: SmokeSnapshot = { time: 0, phase: 0, pulse: 0, orbit: 1 };
+  const EMPTY_SNAPSHOT: Readonly<object> = Object.freeze({});
   const clamp01 = (value: number): number => Math.max(0, Math.min(1, value));
   /** Backward stepping replays from reset; cap the work a long run can cause. */
   const MAX_REPLAY_STEPS = 10_000;
@@ -140,7 +136,7 @@
 
   let root: HTMLElement | null = null;
 
-  let story = $state<FixtureStoryConfig | null>(null);
+  let story = $state<StoryModuleView | null>(null);
   let status = $state<'pending' | 'ready' | 'error' | 'destroyed'>('pending');
   let activeChapterId = $state<string | null>(null);
   let activeSceneId = $state<string | null>(null);
@@ -150,7 +146,7 @@
   let paused = $state(false);
   let speed = $state(1);
   let scene = $state<SceneState | null>(null);
-  let params = $state<SmokeParams>({ ...PLACEHOLDER_PARAMS });
+  let params = $state<StoryParamBag>({ ...EMPTY_PARAMS });
   let chapters = $state<readonly RailChapterInfo[]>(initialChapters);
   let selectedPreset = $state<string | null>(null);
   /**
@@ -166,21 +162,16 @@
   let urlNotices = $state<readonly UrlStateNotice[]>([]);
   let shareStatus = $state<{ readonly ok: boolean; readonly message: string } | null>(null);
   let sharing = $state(false);
-  let metricItems = $state<readonly MetricItem[]>([
-    { id: 'sim-time', label: 'Simulated time', value: '0.0 s' },
-    { id: 'steps', label: 'Fixed steps', value: '0' },
-    { id: 'orbit', label: 'Orbit radius', value: `${PLACEHOLDER_PARAMS.orbit.toFixed(2)} ×` },
-    { id: 'seed', label: 'Seed', value: String(PLACEHOLDER_PARAMS.seed) },
-  ]);
+  let metricItems = $state<readonly StoryMetric[]>([]);
 
   let director: ScrollDirector | null = null;
-  let engine: Engine<SmokeParams, SmokeSnapshot, SmokeMetrics> | null = null;
+  let runtime: StoryRuntime | null = null;
   let clock: FixedStepClock | null = null;
   let stageHandle: StoryStageHandle | null = null;
   let motionQuery: MediaQueryList | null = null;
   let runtimeChapters = new Map<string, RuntimeChapter>();
   /** Reader overrides persist across chapter entry; chapters reset the run only. */
-  let readerParams: Partial<SmokeParams> = {};
+  let readerParams: Partial<StoryParamBag> = {};
   let simulatedSeconds = 0;
   let stepCount = 0;
   let frameCount = 0;
@@ -217,6 +208,31 @@
   );
 
   /**
+   * Typed accessors for the shell's primitive parameter bag. The concrete story
+   * types stay behind `StoryRuntime`; the shell only needs these values for its
+   * development control panel and debug attributes.
+   */
+  function numberParam(bag: StoryParamBag, key: string): number | null {
+    const value = bag[key];
+    return typeof value === 'number' && Number.isFinite(value) ? value : null;
+  }
+
+  function stringParam(bag: StoryParamBag, key: string): string | null {
+    const value = bag[key];
+    return typeof value === 'string' ? value : null;
+  }
+
+  function booleanParam(bag: StoryParamBag, key: string): boolean | null {
+    const value = bag[key];
+    return typeof value === 'boolean' ? value : null;
+  }
+
+  let orbitValue = $derived(numberParam(params, 'orbit'));
+  let trailsValue = $derived(booleanParam(params, 'trails'));
+  let seedValue = $derived(numberParam(params, 'seed'));
+  let variantValue = $derived(stringParam(params, 'variant'));
+
+  /**
    * Effective motion policy. The OS preference is authoritative; the manual
    * preference can only add constraint. The story stage exists only after
    * hydration, and never in article mode.
@@ -234,20 +250,19 @@
   );
 
   /**
-   * Renderer selection is by config `rendererId`, never by the controller. The
-   * factory is constructed inside the island because Astro cannot pass a
-   * function across hydration. The config has already loaded before the stage
-   * mounts, so the key is available here.
+   * The story module owns the concrete renderer factory. The controller only
+   * asks the non-generic runtime for one facade per stage mount; this keeps the
+   * renderer hook out of the shell and makes the same controller serve the
+   * development fixtures and ACO without a second import.
    */
   const createRenderer = () => {
-    const currentStory = story;
-    if (currentStory === null) {
-      throw new Error('The story config has not loaded yet.');
+    if (runtime === null) {
+      throw new Error('The story runtime has not loaded yet.');
     }
-    return createStoryRenderer(currentStory.rendererId);
+    return runtime.createRenderer();
   };
 
-  const getSnapshot = (): Readonly<SmokeSnapshot> => engine?.snapshot() ?? EMPTY_SNAPSHOT;
+  const getSnapshot = (): Readonly<object> => runtime?.snapshot() ?? EMPTY_SNAPSHOT;
 
   /** Keyframes declared by a chapter, with a safe settled minimum of one. */
   function sceneStepCountFor(chapter: RuntimeChapter | undefined): number {
@@ -381,10 +396,18 @@
     root.dataset.simSteps = String(stepCount);
     root.dataset.paused = paused ? 'true' : 'false';
     root.dataset.speed = String(speed);
-    root.dataset.engineOrbit = params.orbit.toFixed(3);
-    root.dataset.engineTrails = params.trails ? 'true' : 'false';
-    root.dataset.engineSeed = String(params.seed);
-    root.dataset.engineVariant = params.variant;
+    const orbit = numberParam(params, 'orbit');
+    if (orbit === null) delete root.dataset.engineOrbit;
+    else root.dataset.engineOrbit = orbit.toFixed(3);
+    const trails = booleanParam(params, 'trails');
+    if (trails === null) delete root.dataset.engineTrails;
+    else root.dataset.engineTrails = trails ? 'true' : 'false';
+    const seed = numberParam(params, 'seed');
+    if (seed === null) delete root.dataset.engineSeed;
+    else root.dataset.engineSeed = String(seed);
+    const variant = stringParam(params, 'variant');
+    if (variant === null) delete root.dataset.engineVariant;
+    else root.dataset.engineVariant = variant;
     root.dataset.urlNoticeCodes = urlNotices.map((notice) => notice.code).join(' ');
     root.dataset.preset = selectedPreset ?? 'custom';
     root.dataset.motion = reducedMotion ? 'reduced' : 'full';
@@ -417,42 +440,15 @@
     document.documentElement.dataset.reducedMotion = reducedMotion ? 'true' : 'false';
   }
 
-  function metricsFor(
-    values: SmokeParams,
-    simulated: number = simulatedSeconds,
-    steps: number = stepCount,
-  ): readonly MetricItem[] {
-    return [
-      {
-        id: 'sim-time',
-        label: 'Simulated time',
-        value: `${simulated.toFixed(1)} s`,
-      },
-      {
-        id: 'steps',
-        label: 'Fixed steps',
-        value: String(steps),
-      },
-      {
-        id: 'orbit',
-        label: 'Orbit radius',
-        value: `${values.orbit.toFixed(2)} ×`,
-      },
-      {
-        id: 'seed',
-        label: 'Seed',
-        value: String(values.seed),
-      },
-    ];
-  }
-
   /**
-   * Rebuild the metrics rows only when the signature changes. The controller
+   * Rebuild the metrics rows only when the signature changes. The story's own
+   * hook formats the values; the controller supplies the clock counters and
    * calls this on chapter entry, pause/replay, and a one-second timer — never
    * from `handleFrame`.
    */
   function sampleMetrics(force = false): void {
-    const next = metricsFor(params, simulatedSeconds, stepCount);
+    if (runtime === null) return;
+    const next = runtime.metrics({ simulatedSeconds, steps: stepCount });
 
     const signature = next.map((item) => `${item.id}=${item.value}`).join('|');
     if (!force && signature === metricSignature) return;
@@ -460,12 +456,12 @@
     metricItems = next;
   }
 
-  function resolveParams(spec: ChapterSpec<SmokeParams> | undefined): SmokeParams {
+  function resolveParams(spec: ChapterSpec<StoryParamBag> | undefined): StoryParamBag {
     const overrides = spec?.sceneOverrides?.params;
     // Parameter changes happen on chapter entry only, never on progress. Reader
     // control overrides sit on top so a slider or toggle does not get wiped out
     // when the next chapter applies its own typed defaults.
-    const defaults = story?.defaults ?? PLACEHOLDER_PARAMS;
+    const defaults = story?.defaults ?? EMPTY_PARAMS;
     const base = overrides === undefined ? { ...defaults } : { ...defaults, ...overrides };
     return { ...base, ...readerParams };
   }
@@ -576,9 +572,10 @@
         // Chapter entry is the only place simulation configuration changes.
         // Reader overrides are re-applied so live controls survive scrolling.
         params = resolveParams(chapter.spec);
-        engine?.setParams(params);
-        engine?.reset();
+        runtime?.setParams(params);
+        runtime?.reset();
         clock?.reset();
+        syncStageSpeedFromParams();
         simulatedSeconds = 0;
         stepCount = 0;
         frameCount = 0;
@@ -593,9 +590,9 @@
           storyKey,
           chapter: chapter.id,
           scene: chapter.sceneId,
-          seed: params.seed,
+          seed: numberParam(params, 'seed') ?? 0,
           params: { ...params },
-          structural: { variant: params.variant },
+          structural: runtime?.structural() ?? {},
           steps: 0,
           simulatedSeconds: 0,
           sceneStep,
@@ -638,12 +635,12 @@
    */
   function handleFrame(deltaSeconds: number): void {
     const currentClock = clock;
-    const currentEngine = engine;
-    if (currentClock === null || currentEngine === null) return;
+    const currentRuntime = runtime;
+    if (currentClock === null || currentRuntime === null) return;
 
     const steps = currentClock.advance(deltaSeconds);
     for (let step = 0; step < steps; step += 1) {
-      currentEngine.step(currentClock.fixedStepSeconds);
+      currentRuntime.step(currentClock.fixedStepSeconds);
     }
 
     if (steps === 0) return;
@@ -665,15 +662,38 @@
     setPaused(!paused);
   }
 
+  /**
+   * Reflect a presentation parameter back into the stage Speed readout.
+   *
+   * For an `engine` speed story the control writes `params.speed`; the fixed
+   * clock stays at 1× so the multiplier is applied exactly once. A `clock`
+   * story never calls this path.
+   */
+  function syncStageSpeedFromParams(): void {
+    const control = story?.speedControl;
+    if (control?.kind !== 'engine' || control.param === undefined) return;
+    const value = numberParam(params, control.param);
+    if (value !== null && value > 0) speed = value;
+  }
+
   function changeSpeed(next: number): void {
     if (!Number.isFinite(next) || next <= 0) return;
+    const control = story?.speedControl;
+    if (control?.kind === 'engine' && control.param !== undefined) {
+      // The engine applies the multiplier without a reset; the URL keeps it as
+      // the ACO `speed` field. Do not also touch the clock.
+      speed = next;
+      applyParams({ [control.param]: next });
+      return;
+    }
+
     speed = next;
     if (clock !== null) clock.speed = next;
     writeDebug();
   }
 
   function replay(): void {
-    engine?.reset();
+    runtime?.reset();
     clock?.reset();
     simulatedSeconds = 0;
     stepCount = 0;
@@ -695,13 +715,17 @@
    * Slider and toggle edits update the existing engine and renderer. Seed and
    * preset changes pass `reset: true` because they define a new run.
    */
-  function applyParams(next: Partial<SmokeParams>, options: { reset?: boolean } = {}): void {
+  function applyParams(
+    next: Partial<StoryParamBag>,
+    options: { reset?: boolean } = {},
+  ): void {
     params = { ...params, ...next };
     readerParams = { ...readerParams, ...next };
-    engine?.setParams(params);
+    runtime?.setParams(params);
+    syncStageSpeedFromParams();
 
     if (options.reset === true) {
-      engine?.reset();
+      runtime?.reset();
       clock?.reset();
       simulatedSeconds = 0;
       stepCount = 0;
@@ -730,15 +754,10 @@
     if (preset === undefined) return;
 
     selectedPreset = id;
-    // A preset is relative to the story defaults, but the seed and structural
-    // variant are the reader's run identity, not preset fields; keep both
-    // across preset changes.
-    const base: SmokeParams = {
-      ...currentStory.defaults,
-      ...preset.params,
-      seed: params.seed,
-      variant: params.variant,
-    };
+    // A preset is relative to the story defaults. The seed and any declared
+    // `presetKeeps` fields are the reader's run identity or presentation
+    // choice, not preset fields, so they survive the change.
+    const base = presetParams(currentStory, preset, params);
     readerParams = { ...readerParams, ...preset.params };
     applyParams(base, { reset: true });
   }
@@ -753,25 +772,25 @@
    * pure seeded engine; the replay is capped for very long runs.
    */
   function stepSimulation(direction: 1 | -1): void {
-    const currentEngine = engine;
+    const currentRuntime = runtime;
     const currentClock = clock;
-    if (currentEngine === null || currentClock === null) return;
+    if (currentRuntime === null || currentClock === null) return;
 
     setPaused(true);
     const stepSeconds = currentClock.fixedStepSeconds;
 
     if (direction > 0) {
-      currentEngine.step(stepSeconds);
+      currentRuntime.step(stepSeconds);
       stepCount += 1;
     } else {
       const target = Math.max(0, stepCount - 1);
       if (stepCount > MAX_REPLAY_STEPS) {
-        currentEngine.reset();
+        currentRuntime.reset();
         stepCount = 0;
       } else {
-        currentEngine.reset();
+        currentRuntime.reset();
         for (let step = 0; step < target; step += 1) {
-          currentEngine.step(stepSeconds);
+          currentRuntime.step(stepSeconds);
         }
         stepCount = target;
       }
@@ -1057,7 +1076,8 @@
       delete window.__scrollDirectorDebug;
     }
 
-    engine = null;
+    runtime?.dispose();
+    runtime = null;
     clock = null;
     stageHandle = null;
     runtimeChapters = new Map();
@@ -1071,14 +1091,14 @@
   }
 
   /**
-   * Resolve the config module, parse the shared state, then build the runtime.
+   * Resolve the story module, parse the shared state, then build the runtime.
    * Everything before this point is synchronous and safe on the server; the
    * article layout remains untouched while the story chunk loads.
    */
   async function initialize(): Promise<void> {
-    let loaded: FixtureStoryConfig;
+    let loaded: StoryModule;
     try {
-      loaded = await loadStoryConfig(storyKey);
+      loaded = await loadStoryModule(storyKey);
     } catch (error) {
       if (!mounted) return;
       status = 'error';
@@ -1090,36 +1110,44 @@
     }
 
     if (!mounted) return;
-    story = loaded;
-    selectedPreset = loaded.presets[0]?.id ?? null;
-    params = { ...loaded.defaults };
-    metricItems = metricsFor(params, 0, 0);
+    const view = loaded.view;
+    story = view;
+    selectedPreset = view.presets[0]?.id ?? null;
+    params = { ...view.defaults };
 
     // Parse the shareable starting state before constructing the engine. The
     // URL describes the run's start, never a mid-run frame: values are clamped
     // or rejected with notices here, and chapter entry below resets to step 0.
     chapterIds = readChapterIds();
-    const parsedUrl = parseUrlState(loaded.urlParams, loaded.defaults, window.location.href, {
+    const parsedUrl = parseUrlState(view.urlParams, view.defaults, window.location.href, {
       chapterIds,
     });
     urlNotices = parsedUrl.notices;
     urlChapter = parsedUrl.chapter;
-    params = { ...loaded.defaults, ...parsedUrl.explicit };
+    params = { ...view.defaults, ...parsedUrl.explicit };
     readerParams = { ...parsedUrl.explicit };
 
-    engine = loaded.createEngine(params);
-    clock = new FixedStepClock({ paused, speed });
+    runtime = loaded.createRuntime();
+    runtime.setParams(params);
+    syncStageSpeedFromParams();
+    // `clock` stories use the stage control as the playback rate. `engine`
+    // stories (ACO) keep the clock at 1× and write the presentation multiplier
+    // into the engine, so the speed is never applied twice.
+    clock = new FixedStepClock({
+      paused,
+      speed: view.speedControl.kind === 'clock' ? speed : 1,
+    });
 
     const instance = new ScrollDirector();
     director = instance;
     instance.setReducedMotionOverride(paused);
 
     try {
-      const { runtime, rail } = readChapters();
-      runtimeChapters = new Map(runtime.map((chapter) => [chapter.id, chapter]));
+      const { runtime: chaptersInDocument, rail } = readChapters();
+      runtimeChapters = new Map(chaptersInDocument.map((chapter) => [chapter.id, chapter]));
       chapters = rail;
 
-      for (const chapter of runtime) {
+      for (const chapter of chaptersInDocument) {
         instance.registerChapter(chapter.element, {
           id: chapter.id,
           onEnter: (event) => handleChapterEvent('enter', chapter, event),
@@ -1247,10 +1275,10 @@
   data-scroll-event={lastEvent || undefined}
   data-chapter-count={chapters.length}
   data-engine-params={JSON.stringify(params)}
-  data-engine-orbit={params.orbit.toFixed(3)}
-  data-engine-trails={params.trails ? 'true' : 'false'}
-  data-engine-seed={params.seed}
-  data-engine-variant={params.variant}
+  data-engine-orbit={orbitValue === null ? undefined : orbitValue.toFixed(3)}
+  data-engine-trails={trailsValue === null ? undefined : String(trailsValue)}
+  data-engine-seed={seedValue ?? undefined}
+  data-engine-variant={variantValue ?? undefined}
   data-preset={selectedPreset ?? 'custom'}
   data-entry-count={entryCount}
   data-entry-chapter={entryState?.chapter}
@@ -1347,7 +1375,7 @@
         </div>
       {/if}
 
-      {#if showStage}
+      {#if showStage && story?.controlPanel === 'fixture'}
         <section class="story-controls" aria-labelledby="story-controls-title" data-controls-panel>
           <div class="story-controls__head">
             <h2 class="story-controls__title" id="story-controls-title">Simulation controls</h2>
@@ -1366,7 +1394,7 @@
             <Slider
               id="orbit"
               label="Orbit radius"
-              value={params.orbit}
+              value={orbitValue ?? 1}
               min={0.4}
               max={2.4}
               step={0.05}
@@ -1378,7 +1406,7 @@
             <Toggle
               id="trails"
               label="Show ant trails"
-              checked={params.trails}
+              checked={trailsValue ?? false}
               description="Draws a line from each ant to the focal city."
               onCheckedChange={changeTrails}
             />
@@ -1390,32 +1418,34 @@
               onSelect={applyPreset}
             />
 
-            <SeedControl id="seed" seed={params.seed} onSeedChange={changeSeed} />
+            <SeedControl id="seed" seed={seedValue ?? 0} onSeedChange={changeSeed} />
           </div>
-
-          <details class="story-controls__shortcuts" id="story-shortcuts" data-stage-shortcuts>
-            <summary class="story-controls__summary">Keyboard shortcuts</summary>
-            <ul class="story-controls__keys">
-              <li><kbd>Space</kbd> Play or pause the simulation.</li>
-              <li>
-                <kbd>ArrowRight</kbd> / <kbd>ArrowUp</kbd> Pause and advance one fixed step (1/60 s).
-              </li>
-              <li>
-                <kbd>ArrowLeft</kbd> / <kbd>ArrowDown</kbd> Pause and step back one fixed step.
-              </li>
-              <li><kbd>Escape</kbd> Leave the stage and move to the first simulation control.</li>
-            </ul>
-            <p class="story-controls__keys-note">
-              Backward stepping replays the run from its first fixed step, so it is exact; runs
-              longer than 10,000 fixed steps restart at zero when stepped back. Shortcuts apply
-              only while the stage region itself has focus. Buttons, sliders, and inputs keep their
-              native Space and arrow behaviour, and page scrolling is never hi-jacked from outside
-              the stage.
-            </p>
-          </details>
         </section>
+      {/if}
 
+      {#if showStage}
         <Metrics id="story-metrics" title="Live metrics" items={metricItems} />
+
+        <details class="story-controls__shortcuts" id="story-shortcuts" data-stage-shortcuts>
+          <summary class="story-controls__summary">Keyboard shortcuts</summary>
+          <ul class="story-controls__keys">
+            <li><kbd>Space</kbd> Play or pause the simulation.</li>
+            <li>
+              <kbd>ArrowRight</kbd> / <kbd>ArrowUp</kbd> Pause and advance one fixed step (1/60 s).
+            </li>
+            <li>
+              <kbd>ArrowLeft</kbd> / <kbd>ArrowDown</kbd> Pause and step back one fixed step.
+            </li>
+            <li><kbd>Escape</kbd> Leave the stage and move to the first simulation control.</li>
+          </ul>
+          <p class="story-controls__keys-note">
+            Backward stepping replays the run from its first fixed step, so it is exact; runs
+            longer than 10,000 fixed steps restart at zero when stepped back. Shortcuts apply
+            only while the stage region itself has focus. Buttons, sliders, and inputs keep their
+            native Space and arrow behaviour, and page scrolling is never hi-jacked from outside
+            the stage.
+          </p>
+        </details>
       {/if}
 
       <div class="story-layout__chapters" data-story-chapters>

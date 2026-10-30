@@ -133,10 +133,19 @@ export interface StoryConfig<P extends object, S, M> {
   readonly chapters: readonly ChapterSpec<P>[];
   readonly urlParams: UrlParameterSchema<P>;
   /**
-   * Speed-control wiring. Omitted means `{ kind: 'clock' }`; steps 3.3/3.5
-   * consume this field when the controller and lab controls are wired.
+   * Speed-control wiring. Omitted means `{ kind: 'clock' }`.
    */
   readonly speedControl?: SpeedControl<P>;
+  /**
+   * Extra parameters a preset must not overwrite. The seed is always preserved,
+   * because it is the run's identity rather than a presentation choice.
+   *
+   * A preset is relative to the story defaults; these keys are copied from the
+   * reader's current parameters instead. For the development fixtures that is
+   * the structural `variant`; for ACO it is the map/colony shape and the stage
+   * speed, so choosing "greedy" changes α/β without silently resizing the map.
+   */
+  readonly presetKeeps?: readonly (keyof P & string)[];
 }
 
 /**

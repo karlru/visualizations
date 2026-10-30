@@ -202,4 +202,7 @@ export const devStoryConfig = defineStoryConfig<SmokeParams, SmokeSnapshot, Smok
     ],
     chapter: { source: 'fragment' },
   },
+  // The variant is the fixture's structural run identity; presets change the
+  // orbit and trails but must not silently switch the generated path shape.
+  presetKeeps: ['variant'],
 });

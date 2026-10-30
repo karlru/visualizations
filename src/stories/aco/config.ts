@@ -241,4 +241,7 @@ export const acoStoryConfig = defineStoryConfig<AcoParams, AcoSnapshot, AcoMetri
   chapters: ACO_CHAPTERS,
   urlParams: ACO_URL_PARAMS,
   speedControl: { kind: 'engine', param: 'speed' },
+  // A preset changes α/β/ρ only. The map size, colony size, seed, and the
+  // reader's chosen speed remain their run identity/presentation choices.
+  presetKeeps: ['cityCount', 'antCount', 'speed'],
 });
