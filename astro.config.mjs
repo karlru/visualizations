@@ -14,5 +14,13 @@ export default defineConfig({
   site: SITE_URL,
   output: 'static',
   trailingSlash: 'never',
-  integrations: [svelte(), mdx(), sitemap()],
+  integrations: [
+    svelte(),
+    mdx(),
+    sitemap({
+      // Development specimen pages stay in the build for Playwright, but they
+      // are not public routes. OG images and the 404 page are not indexable.
+      filter: (page) => !page.includes('/dev/') && !page.endsWith('/404') && !page.includes('/og/'),
+    }),
+  ],
 });

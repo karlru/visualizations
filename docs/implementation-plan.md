@@ -429,7 +429,7 @@ pnpm add -D subfont
 
 1. (DONE) Add `wrangler.jsonc` with the static assets directory, `html_handling: "drop-trailing-slash"`, and 404 handling.
 2. (DONE) Add `public/_headers` with baseline security headers, immutable caching for hashed assets, and explicit cache rules for `/fonts/*` and `/og/*`.
-3. Add an internal link checker that fails on broken relative links.
+3. (DONE) Add an internal link checker that fails on broken relative links.
 4. Create a GitHub Actions workflow that installs dependencies, lints, tests, builds, checks links, checks bundles, and deploys.
 5. Store `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` as repository secrets.
 6. Deploy once manually to verify the account and permissions.
@@ -487,7 +487,7 @@ pnpm add -D subfont
 - [x] `curl -I` shows the security headers. (verified locally with `wrangler dev --local`)
 - [x] Hashed assets show the immutable cache header; fonts and OG images show their explicit cache rules. (verified locally; the `/og/*` rule used a temporary probe file that was removed)
 - [ ] The GitHub Actions workflow succeeds from a clean checkout.
-- [ ] The link checker passes on the built output and fails on a deliberately broken internal link.
+- [x] The link checker passes on the built output and fails on a deliberately broken internal link.
 - [ ] No Cloudflare paid service is required.
 
 ## 5. Phase 1 — Story runtime
