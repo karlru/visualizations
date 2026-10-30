@@ -222,10 +222,10 @@ git --version
 
 **Tasks**
 
-1. Initialize Git.
-2. Scaffold Astro in a temporary directory, then merge the generated files into the repository. The repository already contains `README.md` and `docs/`, and `create-astro` prompts or can overwrite the README when run in place.
-3. Choose the minimal template and install dependencies. Strict TypeScript is the default; current `create-astro` has no `--typescript` flag. Do not initialize a nested Git repository.
-4. Add a `packageManager` field to `package.json` for `pnpm/action-setup`.
+1. (DONE) Initialize Git.
+2. (DONE) Scaffold Astro in a temporary directory, then merge the generated files into the repository. The repository already contains `README.md` and `docs/`, and `create-astro` prompts or can overwrite the README when run in place.
+3. (DONE) Choose the minimal template and install dependencies. Strict TypeScript is the default; current `create-astro` has no `--typescript` flag. Do not initialize a nested Git repository.
+4. (DONE) Add a `packageManager` field to `package.json` for `pnpm/action-setup`.
 5. Confirm `src/pages/index.astro` renders.
 6. Add a `.gitignore` covering build output, dependencies, test artifacts, and local environment files.
 7. Make the first commit.
