@@ -1,0 +1,793 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+---
+
+<BaseLayout
+  title="Type and token specimen"
+  description="Internal review page for the Algorithm Stories type scale, colour tokens, spacing, radii, shadows, and motion."
+  noindex
+>
+  <div class="specimen page-shell">
+    <header class="specimen__intro">
+      <p class="eyebrow">Internal · not indexed</p>
+      <h1 class="specimen__title">Type and token specimen</h1>
+      <p class="specimen__dek">
+        A visual review surface for the paper and stage systems. All samples read from
+        <code>src/styles/tokens.css</code>; nothing on this page defines its own colour, size,
+        spacing, radius, shadow, or timing value.
+      </p>
+    </header>
+
+    <section class="specimen__section" aria-labelledby="faces-title">
+      <div class="section-head">
+        <h2 id="faces-title">The three voices</h2>
+        <p class="eyebrow">Display · Body · Data</p>
+      </div>
+
+      <div class="faces">
+        <article class="face">
+          <p class="eyebrow">Instrument Serif · 400</p>
+          <p class="face__glyphs" aria-hidden="true">Aa</p>
+          <p class="face__alphabet">
+            ABCDEFGHIJKLMNOPQRSTUVWXYZ<br />
+            abcdefghijklmnopqrstuvwxyz<br />
+            0123456789 &amp; ? ! . , ; :
+          </p>
+          <p class="face__italic">Italic: the colony finds a short route.</p>
+        </article>
+
+        <article class="face">
+          <p class="eyebrow">Geist · variable 100–900</p>
+          <p class="face__body-sample">The colony finds a short route.</p>
+          <p class="face__copy">
+            Good body type disappears into the argument. Geist carries long passages at a
+            comfortable measure, keeps counters open at small sizes, and pairs with the serif
+            without competing for attention.
+          </p>
+          <p class="face__weights">
+            <span style="font-weight: var(--weight-regular)">400 Regular</span>
+            <span style="font-weight: var(--weight-medium)">500 Medium</span>
+            <span style="font-weight: var(--weight-semibold)">600 Semibold</span>
+            <span style="font-weight: var(--weight-bold)">700 Bold</span>
+          </p>
+        </article>
+
+        <article class="face">
+          <p class="eyebrow">JetBrains Mono · variable 100–800</p>
+          <p class="face__mono-sample">0123456789<br />2.71828 · 0.500 · 42</p>
+          <pre class="code-surface"><code>for ant in colony:
+  tour = construct(ant, tau, eta)
+  deposit(tour)
+  evaporate(tau, rho)</code></pre>
+          <p class="face__copy data">tabular figures · 1,024 iterations · 0.731</p>
+        </article>
+      </div>
+
+      <p class="specimen__note">
+        Fallbacks are metric-matched local faces: Times New Roman/Liberation Serif for Instrument
+        Serif, Arial/Liberation Sans for Geist, and DejaVu Sans Mono/Menlo/Consolas for JetBrains
+        Mono. <code>size-adjust</code>, <code>ascent-override</code>, <code>descent-override</code>,
+        and <code>line-gap-override</code> keep line breaks and block heights close during the
+        swap. Only the two critical faces are preloaded.
+      </p>
+    </section>
+
+    <section class="specimen__section" aria-labelledby="scale-title">
+      <div class="section-head">
+        <h2 id="scale-title">Type scale</h2>
+        <p class="eyebrow">Clamped for 320 px → 1440 px</p>
+      </div>
+
+      <ul class="scale">
+        <li class="scale__row">
+          <code class="scale__token">--text-display</code>
+          <span class="scale__sample" style="font-size: var(--text-display)">Aa</span>
+          <span class="scale__use">Hero display</span>
+        </li>
+        <li class="scale__row">
+          <code class="scale__token">--text-h1</code>
+          <span class="scale__sample" style="font-size: var(--text-h1)">Aa</span>
+          <span class="scale__use">Page title</span>
+        </li>
+        <li class="scale__row">
+          <code class="scale__token">--text-h2</code>
+          <span class="scale__sample" style="font-size: var(--text-h2)">Aa</span>
+          <span class="scale__use">Section title</span>
+        </li>
+        <li class="scale__row">
+          <code class="scale__token">--text-h3</code>
+          <span class="scale__sample" style="font-size: var(--text-h3)">Aa</span>
+          <span class="scale__use">Card and chapter</span>
+        </li>
+        <li class="scale__row">
+          <code class="scale__token">--text-lead</code>
+          <span class="scale__sample" style="font-size: var(--text-lead)">Aa</span>
+          <span class="scale__use">Deck</span>
+        </li>
+        <li class="scale__row">
+          <code class="scale__token">--text-body</code>
+          <span class="scale__sample" style="font-size: var(--text-body)">Aa</span>
+          <span class="scale__use">Reading text</span>
+        </li>
+        <li class="scale__row">
+          <code class="scale__token">--text-sm</code>
+          <span class="scale__sample" style="font-size: var(--text-sm)">Aa</span>
+          <span class="scale__use">Captions</span>
+        </li>
+        <li class="scale__row">
+          <code class="scale__token">--text-xs</code>
+          <span class="scale__sample" style="font-size: var(--text-xs)">Aa</span>
+          <span class="scale__use">Labels</span>
+        </li>
+      </ul>
+    </section>
+
+    <section class="specimen__section" aria-labelledby="colour-title">
+      <div class="section-head">
+        <h2 id="colour-title">Colour on both grounds</h2>
+        <p class="eyebrow">Normative pairs · WCAG 2.2 AA</p>
+      </div>
+
+      <div class="grounds">
+        <article class="ground ground--paper">
+          <h3 class="ground__title">On paper</h3>
+          <ul class="swatches">
+            <li class="swatch">
+              <span class="swatch__chip" style="background-color: var(--color-paper)"></span>
+              <span class="swatch__name">Paper</span>
+              <code class="swatch__token">--color-paper</code>
+              <span class="swatch__ratio">Page ground</span>
+            </li>
+            <li class="swatch">
+              <span class="swatch__chip" style="background-color: var(--color-ink)"></span>
+              <span class="swatch__name">Ink</span>
+              <code class="swatch__token">--color-ink</code>
+              <span class="swatch__ratio">16.02:1</span>
+            </li>
+            <li class="swatch">
+              <span class="swatch__chip" style="background-color: var(--color-paper-muted)"></span>
+              <span class="swatch__name">Paper muted</span>
+              <code class="swatch__token">--color-paper-muted</code>
+              <span class="swatch__ratio">5.87:1</span>
+            </li>
+            <li class="swatch">
+              <span class="swatch__chip" style="background-color: var(--color-accent-paper)"></span>
+              <span class="swatch__name">Accent on paper</span>
+              <code class="swatch__token">--color-accent-paper</code>
+              <span class="swatch__ratio">5.20:1</span>
+            </li>
+            <li class="swatch">
+              <span class="swatch__chip" style="background-color: var(--color-focus)"></span>
+              <span class="swatch__name">Focus ring</span>
+              <code class="swatch__token">--color-focus</code>
+              <span class="swatch__ratio">4.62:1 · UI</span>
+            </li>
+            <li class="swatch">
+              <span class="swatch__chip" style="background-color: var(--color-accent-stage)"></span>
+              <span class="swatch__name">Vermilion, large only</span>
+              <code class="swatch__token">--color-accent-stage</code>
+              <span class="swatch__ratio">3.20:1 · large/graphic</span>
+            </li>
+          </ul>
+        </article>
+
+        <article class="ground ground--stage">
+          <h3 class="ground__title">On stage</h3>
+          <ul class="swatches">
+            <li class="swatch">
+              <span class="swatch__chip" style="background-color: var(--color-stage)"></span>
+              <span class="swatch__name">Stage</span>
+              <code class="swatch__token">--color-stage</code>
+              <span class="swatch__ratio">Instrument ground</span>
+            </li>
+            <li class="swatch">
+              <span class="swatch__chip" style="background-color: var(--color-stage-ink)"></span>
+              <span class="swatch__name">Stage ink</span>
+              <code class="swatch__token">--color-stage-ink</code>
+              <span class="swatch__ratio">17.02:1</span>
+            </li>
+            <li class="swatch">
+              <span class="swatch__chip" style="background-color: var(--color-stage-muted)"></span>
+              <span class="swatch__name">Stage muted</span>
+              <code class="swatch__token">--color-stage-muted</code>
+              <span class="swatch__ratio">6.50:1</span>
+            </li>
+            <li class="swatch">
+              <span class="swatch__chip" style="background-color: var(--color-accent-stage)"></span>
+              <span class="swatch__name">Accent on stage</span>
+              <code class="swatch__token">--color-accent-stage</code>
+              <span class="swatch__ratio">5.31:1</span>
+            </li>
+            <li class="swatch">
+              <span class="swatch__chip" style="background-color: var(--color-focus)"></span>
+              <span class="swatch__name">Focus ring</span>
+              <code class="swatch__token">--color-focus</code>
+              <span class="swatch__ratio">3.68:1 · UI</span>
+            </li>
+            <li class="swatch">
+              <span class="swatch__chip" style="background-color: var(--color-amber)"></span>
+              <span class="swatch__name">Warm amber</span>
+              <code class="swatch__token">--color-amber</code>
+              <span class="swatch__ratio">10.98:1 · graphic</span>
+            </li>
+            <li class="swatch">
+              <span class="swatch__chip" style="background-color: var(--color-cool)"></span>
+              <span class="swatch__name">Cool accent</span>
+              <code class="swatch__token">--color-cool</code>
+              <span class="swatch__ratio">14.64:1 · graphic</span>
+            </li>
+          </ul>
+        </article>
+      </div>
+
+      <div class="stage stage--specimen">
+        <div class="stage__surface stage--specimen__surface">
+          <p class="eyebrow stage__eyebrow">Stage sample</p>
+          <p class="stage__headline">The colony is a probability field with legs.</p>
+          <p class="stage__caption">
+            Stage ink for prose, stage muted for labels, vermilion for the current best tour, amber
+            for ants and warm data, cool for comparison data.
+          </p>
+          <div class="stage__chips">
+            <span class="stage__chip stage__chip--amber">Amber · ants</span>
+            <span class="stage__chip stage__chip--cool">Cool · best tour</span>
+            <span class="stage__chip stage__chip--accent">Vermilion · highlight</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="specimen__section" aria-labelledby="spacing-title">
+      <div class="section-head">
+        <h2 id="spacing-title">Spacing, radii, shadows</h2>
+        <p class="eyebrow">4 px base · restrained surfaces</p>
+      </div>
+
+      <ul class="spacing">
+        <li class="spacing__row">
+          <code class="spacing__token">--space-2xs</code>
+          <span class="spacing__bar" style="width: var(--space-2xs)"></span>
+        </li>
+        <li class="spacing__row">
+          <code class="spacing__token">--space-xs</code>
+          <span class="spacing__bar" style="width: var(--space-xs)"></span>
+        </li>
+        <li class="spacing__row">
+          <code class="spacing__token">--space-sm</code>
+          <span class="spacing__bar" style="width: var(--space-sm)"></span>
+        </li>
+        <li class="spacing__row">
+          <code class="spacing__token">--space-md</code>
+          <span class="spacing__bar" style="width: var(--space-md)"></span>
+        </li>
+        <li class="spacing__row">
+          <code class="spacing__token">--space-lg</code>
+          <span class="spacing__bar" style="width: var(--space-lg)"></span>
+        </li>
+        <li class="spacing__row">
+          <code class="spacing__token">--space-xl</code>
+          <span class="spacing__bar" style="width: var(--space-xl)"></span>
+        </li>
+        <li class="spacing__row">
+          <code class="spacing__token">--space-2xl</code>
+          <span class="spacing__bar" style="width: var(--space-2xl)"></span>
+        </li>
+        <li class="spacing__row">
+          <code class="spacing__token">--space-3xl</code>
+          <span class="spacing__bar" style="width: var(--space-3xl)"></span>
+        </li>
+        <li class="spacing__row">
+          <code class="spacing__token">--space-4xl</code>
+          <span class="spacing__bar" style="width: var(--space-4xl)"></span>
+        </li>
+      </ul>
+
+      <div class="surfaces">
+        <div class="surface">
+          <p class="eyebrow">Radii</p>
+          <div class="radius-row">
+            <span class="radius-box" style="border-radius: var(--radius-xs)">xs</span>
+            <span class="radius-box" style="border-radius: var(--radius-sm)">sm</span>
+            <span class="radius-box" style="border-radius: var(--radius-md)">md</span>
+            <span class="radius-box" style="border-radius: var(--radius-lg)">lg</span>
+            <span class="radius-box" style="border-radius: var(--radius-xl)">xl</span>
+            <span class="radius-box" style="border-radius: var(--radius-pill)">pill</span>
+          </div>
+        </div>
+
+        <div class="surface">
+          <p class="eyebrow">Shadows</p>
+          <div class="shadow-row">
+            <span class="shadow-card shadow-card--paper">--shadow-paper</span>
+            <span class="shadow-card shadow-card--stage">--shadow-panel</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="specimen__section" aria-labelledby="motion-title">
+      <div class="section-head">
+        <h2 id="motion-title">Motion</h2>
+        <p class="eyebrow">Strong ease-out · 400–900 ms for explanation</p>
+      </div>
+
+      <div class="motion-list">
+        <div class="motion-row">
+          <code class="motion-row__token">--duration-calm · --ease-calm</code>
+          <span class="motion-track"><span class="motion-dot motion-dot--calm"></span></span>
+        </div>
+        <div class="motion-row">
+          <code class="motion-row__token">--duration-slow · --ease-out</code>
+          <span class="motion-track"><span class="motion-dot motion-dot--slow"></span></span>
+        </div>
+        <div class="motion-row">
+          <code class="motion-row__token">--duration-act · --ease-out</code>
+          <span class="motion-track"><span class="motion-dot motion-dot--act"></span></span>
+        </div>
+      </div>
+
+      <p class="specimen__note">
+        Direct UI feedback uses <code>--duration-instant</code> and <code>--duration-quick</code>.
+        Explanatory movement stays in the calm range; no bouncy springs. Under reduced motion the
+        duration tokens collapse to 1 ms and animation is disabled by <code>base.css</code>.
+      </p>
+    </section>
+  </div>
+</BaseLayout>
+
+<style>
+  .specimen {
+    padding-block-start: var(--space-3xl);
+  }
+
+  .specimen__intro {
+    max-inline-size: var(--measure-prose);
+    padding-block-end: var(--space-2xl);
+    border-block-end: var(--hairline) solid var(--color-rule-paper);
+  }
+
+  .specimen__title {
+    margin-block-start: var(--space-sm);
+    font-size: var(--text-h1);
+    letter-spacing: var(--tracking-tighter);
+  }
+
+  .specimen__dek {
+    margin-block-start: var(--space-md);
+    color: var(--color-paper-muted);
+    font-size: var(--text-lead);
+    line-height: var(--leading-relaxed);
+  }
+
+  .specimen__section {
+    padding-block: var(--space-2xl);
+    border-block-end: var(--hairline) solid var(--color-rule-paper);
+  }
+
+  .section-head {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+    align-items: baseline;
+    justify-content: space-between;
+    margin-block-end: var(--space-lg);
+  }
+
+  .section-head h2 {
+    font-size: var(--text-h2);
+  }
+
+  .specimen__note {
+    max-inline-size: var(--measure-prose);
+    margin-block-start: var(--space-lg);
+    color: var(--color-paper-muted);
+    font-size: var(--text-sm);
+    line-height: var(--leading-relaxed);
+  }
+
+  .specimen code {
+    font-size: 0.92em;
+  }
+
+  /* Faces */
+  .faces {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+    gap: var(--space-xl);
+  }
+
+  .face {
+    min-width: 0;
+  }
+
+  .face__glyphs {
+    margin-block-start: var(--space-sm);
+    font-family: var(--font-display);
+    font-size: var(--text-display);
+    line-height: var(--leading-none);
+    letter-spacing: var(--tracking-tighter);
+  }
+
+  .face__alphabet {
+    margin-block-start: var(--space-sm);
+    font-family: var(--font-display);
+    font-size: var(--text-lead);
+    line-height: var(--leading-snug);
+  }
+
+  .face__italic {
+    margin-block-start: var(--space-sm);
+    font-family: var(--font-display);
+    font-size: var(--text-lead);
+    font-style: italic;
+  }
+
+  .face__body-sample {
+    margin-block-start: var(--space-sm);
+    font-size: var(--text-h3);
+    line-height: var(--leading-snug);
+    letter-spacing: var(--tracking-tight);
+  }
+
+  .face__copy {
+    margin-block-start: var(--space-sm);
+    line-height: var(--leading-relaxed);
+  }
+
+  .face__weights {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs) var(--space-md);
+    margin-block-start: var(--space-md);
+    font-size: var(--text-sm);
+  }
+
+  .face__mono-sample {
+    margin-block-start: var(--space-sm);
+    font-family: var(--font-mono);
+    font-size: var(--text-h3);
+    line-height: var(--leading-snug);
+    letter-spacing: var(--tracking-tight);
+  }
+
+  .face .code-surface {
+    margin-block-start: var(--space-sm);
+  }
+
+  /* Scale */
+  .scale {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .scale__row {
+    display: grid;
+    grid-template-columns: minmax(8rem, 12rem) 1fr auto;
+    gap: var(--space-md);
+    align-items: baseline;
+    padding-block: var(--space-sm);
+    border-block-start: var(--hairline) solid var(--color-rule-paper);
+  }
+
+  .scale__row:last-child {
+    border-block-end: var(--hairline) solid var(--color-rule-paper);
+  }
+
+  .scale__token {
+    color: var(--color-paper-muted);
+    font-size: var(--text-xs);
+    overflow-wrap: anywhere;
+  }
+
+  .scale__sample {
+    font-family: var(--font-display);
+    line-height: var(--leading-none);
+    letter-spacing: var(--tracking-tight);
+  }
+
+  .scale__use {
+    color: var(--color-paper-muted);
+    font-size: var(--text-sm);
+  }
+
+  /* Colour */
+  .grounds {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+    gap: var(--space-lg);
+  }
+
+  .ground {
+    padding: var(--space-lg);
+    border-radius: var(--radius-md);
+  }
+
+  .ground--paper {
+    border: var(--hairline) solid var(--color-rule-paper);
+    background-color: var(--color-paper-raised);
+  }
+
+  .ground--stage {
+    background-color: var(--color-stage);
+    color: var(--color-stage-ink);
+  }
+
+  .ground__title {
+    font-size: var(--text-h3);
+  }
+
+  .swatches {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
+    gap: var(--space-md);
+    margin-block-start: var(--space-md);
+    padding: 0;
+    list-style: none;
+  }
+
+  .swatches li + li {
+    margin-block-start: 0;
+  }
+
+  .swatch {
+    display: grid;
+    gap: var(--space-3xs);
+    min-width: 0;
+  }
+
+  .swatch__chip {
+    display: block;
+    height: var(--space-xl);
+    border: var(--hairline) solid var(--color-rule-paper);
+    border-radius: var(--radius-sm);
+  }
+
+  .ground--stage .swatch__chip {
+    border-color: var(--color-rule-stage);
+  }
+
+  .swatch__name {
+    font-size: var(--text-sm);
+    font-weight: var(--weight-medium);
+  }
+
+  .swatch__token {
+    color: var(--color-paper-muted);
+    font-size: var(--text-2xs);
+    overflow-wrap: anywhere;
+  }
+
+  .swatch__ratio {
+    color: var(--color-paper-muted);
+    font-size: var(--text-2xs);
+  }
+
+  .ground--stage .swatch__token,
+  .ground--stage .swatch__ratio {
+    color: var(--color-stage-muted);
+  }
+
+  .stage--specimen {
+    margin-block-start: var(--space-lg);
+  }
+
+  .stage--specimen__surface {
+    aspect-ratio: auto;
+    padding: clamp(var(--space-md), 5vw, var(--space-2xl));
+  }
+
+  .stage__eyebrow {
+    color: var(--color-stage-muted);
+  }
+
+  .stage__headline {
+    max-inline-size: var(--measure-narrow);
+    margin-block-start: var(--space-sm);
+    font-family: var(--font-display);
+    font-size: var(--text-h2);
+    line-height: var(--leading-tight);
+    letter-spacing: var(--tracking-tight);
+  }
+
+  .stage__caption {
+    max-inline-size: var(--measure-prose);
+    margin-block-start: var(--space-sm);
+    color: var(--color-stage-muted);
+    line-height: var(--leading-relaxed);
+  }
+
+  .stage__chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs);
+    margin-block-start: var(--space-md);
+  }
+
+  .stage__chip {
+    padding: var(--space-3xs) var(--space-2xs);
+    border: var(--hairline) solid currentcolor;
+    border-radius: var(--radius-pill);
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    letter-spacing: var(--tracking-wide);
+  }
+
+  .stage__chip--amber {
+    color: var(--color-amber);
+  }
+
+  .stage__chip--cool {
+    color: var(--color-cool);
+  }
+
+  .stage__chip--accent {
+    color: var(--color-accent-stage);
+  }
+
+  /* Spacing */
+  .spacing {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .spacing__row {
+    display: grid;
+    grid-template-columns: 8rem 1fr;
+    gap: var(--space-md);
+    align-items: center;
+    padding-block: var(--space-3xs);
+  }
+
+  .spacing__row + .spacing__row {
+    margin-block-start: 0;
+  }
+
+  .spacing__token {
+    color: var(--color-paper-muted);
+    font-size: var(--text-xs);
+  }
+
+  .spacing__bar {
+    display: block;
+    height: var(--space-2xs);
+    border-radius: var(--radius-xs);
+    background-color: var(--color-accent-paper);
+  }
+
+  .surfaces {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+    gap: var(--space-xl);
+    margin-block-start: var(--space-xl);
+  }
+
+  .radius-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+    margin-block-start: var(--space-sm);
+  }
+
+  .radius-box {
+    display: grid;
+    place-items: center;
+    width: var(--space-3xl);
+    height: var(--space-xl);
+    border: var(--hairline) solid var(--color-rule-paper);
+    background-color: var(--color-paper-inset);
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+  }
+
+  .shadow-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-lg);
+    margin-block-start: var(--space-md);
+  }
+
+  .shadow-card {
+    display: grid;
+    place-items: center;
+    width: var(--space-4xl);
+    height: var(--space-3xl);
+    border-radius: var(--radius-md);
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+  }
+
+  .shadow-card--paper {
+    background-color: var(--color-paper-raised);
+    box-shadow: var(--shadow-paper);
+  }
+
+  .shadow-card--stage {
+    background-color: var(--color-stage);
+    color: var(--color-stage-ink);
+    box-shadow: var(--shadow-panel);
+  }
+
+  /* Motion */
+  .motion-list {
+    display: grid;
+    gap: var(--space-md);
+    max-inline-size: var(--measure-prose);
+  }
+
+  .motion-row {
+    display: grid;
+    grid-template-columns: minmax(10rem, 16rem) 1fr;
+    gap: var(--space-md);
+    align-items: center;
+  }
+
+  .motion-row__token {
+    color: var(--color-paper-muted);
+    font-size: var(--text-2xs);
+  }
+
+  .motion-track {
+    position: relative;
+    display: block;
+    height: var(--space-sm);
+    overflow: hidden;
+    border-radius: var(--radius-pill);
+    background-color: var(--color-paper-inset);
+  }
+
+  .motion-dot {
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline-start: 0;
+    width: var(--space-sm);
+    height: var(--space-sm);
+    border-radius: var(--radius-pill);
+    background-color: var(--color-accent-paper);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .motion-dot--calm {
+      animation: specimen-travel var(--duration-calm) var(--ease-calm) infinite alternate;
+    }
+
+    .motion-dot--slow {
+      animation: specimen-travel var(--duration-slow) var(--ease-out) infinite alternate;
+    }
+
+    .motion-dot--act {
+      animation: specimen-travel var(--duration-act) var(--ease-out) infinite alternate;
+    }
+  }
+
+  @keyframes specimen-travel {
+    from {
+      left: 0;
+    }
+
+    to {
+      left: calc(100% - var(--space-sm));
+    }
+  }
+
+  @media (max-width: 40rem) {
+    .scale__row {
+      grid-template-columns: 1fr auto;
+    }
+
+    .scale__sample {
+      grid-column: 1 / -1;
+      grid-row: 2;
+    }
+
+    .motion-row {
+      grid-template-columns: 1fr;
+      gap: var(--space-2xs);
+    }
+
+    .spacing__row {
+      grid-template-columns: 6.5rem 1fr;
+    }
+  }
+</style>

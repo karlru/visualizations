@@ -354,7 +354,7 @@ pnpm exec playwright install --with-deps chromium firefox webkit
 2. (DONE) Self-host the three font families in `public/fonts/` with appropriate weights and subsets: Instrument Serif (display), Geist (body), JetBrains Mono (data/code). Subset with `subfont` or `fonttools`.
 3. (DONE) Create `BaseLayout.astro` with the paper background, header, footer, skip link, and main landmark.
 4. (DONE) Create `tokens.css`, `base.css`, and `story.css`.
-5. Add a typographic specimen page or section for visual review.
+5. (DONE) Add a typographic specimen page or section for visual review.
 6. Verify font loading does not cause visible layout shift.
 7. Add a unit test that every text/UI token pair meets its contrast threshold on both paper and stage.
 
