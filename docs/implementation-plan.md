@@ -427,7 +427,7 @@ pnpm add -D subfont
 
 **Tasks**
 
-1. Add `wrangler.jsonc` with the static assets directory, `html_handling: "drop-trailing-slash"`, and 404 handling.
+1. (DONE) Add `wrangler.jsonc` with the static assets directory, `html_handling: "drop-trailing-slash"`, and 404 handling.
 2. Add `public/_headers` with baseline security headers, immutable caching for hashed assets, and explicit cache rules for `/fonts/*` and `/og/*`.
 3. Add an internal link checker that fails on broken relative links.
 4. Create a GitHub Actions workflow that installs dependencies, lints, tests, builds, checks links, checks bundles, and deploys.
@@ -479,8 +479,8 @@ pnpm add -D subfont
 
 **Acceptance criteria**
 
-- [ ] `pnpm build` completes without errors.
-- [ ] `pnpm exec wrangler deploy --dry-run` succeeds.
+- [x] `pnpm build` completes without errors.
+- [x] `pnpm exec wrangler deploy --dry-run` succeeds.
 - [ ] The production deployment returns 200 for `/` and `/stories` without a trailing-slash redirect.
 - [ ] `site` is set to the deployed workers.dev URL, not `example.com`.
 - [ ] The custom 404 is served for an unknown route.

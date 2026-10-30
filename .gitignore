@@ -14,6 +14,11 @@ test-results/
 blob-report/
 .lighthouseci/
 
+# local Wrangler state and secrets
+.wrangler/
+.dev.vars
+.dev.vars.*
+
 # local environment files
 .env
 .env.*

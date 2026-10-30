@@ -1,0 +1,14 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "algorithm-stories",
+  // Keep this current: Cloudflare applies runtime defaults up to this date.
+  "compatibility_date": "2026-10-30",
+  "assets": {
+    "directory": "./dist",
+    // Match Astro's `trailingSlash: 'never'` so `/stories` is served directly
+    // and `/stories/` redirects to it.
+    "html_handling": "drop-trailing-slash",
+    // Serve Astro's custom dist/404.html with a 404 status for unknown routes.
+    "not_found_handling": "404-page"
+  }
+}
