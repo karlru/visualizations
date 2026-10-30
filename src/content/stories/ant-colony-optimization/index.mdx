@@ -38,29 +38,62 @@ status: "initial-release"
 ---
 
 import Chapter from '../../../components/story/Chapter.astro';
-
-{/* Placeholder prose for the route/runtime session. Step 3.3's prose session
-    replaces these bodies with the narrative, callouts, figures, and citations;
-    the ids, titles, and scenes are already the contract from `ACO_CHAPTERS`. */}
+import Callout from '../../../components/ui/Callout.astro';
+import Figure from '../../../components/ui/Figure.astro';
+import Predict from '../../../components/ui/Predict.astro';
+import bestTourSvg from '../../../assets/figures/aco-best-tour.svg?raw';
 
 <Chapter id="the-colony" title="The colony" scene="colony-overview" eyebrow="Chapter 01">
 
-The colony has no leader and no map. Each ant sees only the city it stands in and the trails
-left by the ants before it.
+Look at the map and there is no control room. Thirty cities, forty ants, and no ant holds the route. Each ant stands in one city, sees the trails left on the edges around it, and picks a next city. That is the whole decision.
+
+An ant cannot see the colony's best tour. It does not know the total length or the shape of the map. It knows the city it is in, which cities it has already visited, and how much pheromone sits on the edges it might take. Pheromone is a chemical trail that ants deposit and that slowly fades; the trail network is the colony's only shared memory.
+
+Biologists call this stigmergy: coordination through a shared environment rather than through messages. One ant changes the world slightly, and the next ant responds to the changed world. No ant needs to know why a trail is there. The bet behind the algorithm is that many simple local decisions, repeated, can do useful work that no single ant could plan.
+
+<Callout tone="idea" title="Stigmergy">
+
+Indirect communication through a shared environment. The trail is the message, and every ant both reads it and writes it.
+
+</Callout>
 
 </Chapter>
 
 <Chapter id="the-problem" title="The problem" scene="tour-problem" eyebrow="Chapter 02">
 
-The task is to visit every city once and return to the start. A short tour is hard to find
-because the number of possible orderings grows very quickly.
+The task is the traveling salesman problem. A salesman must visit every city once and come home. In graph terms, a tour is a cycle through all the cities: each city appears exactly once, and the last edge returns to the first. That return edge counts. Without it you have a path, not a round trip.
+
+A tour's length is the sum of its edges, return included. The goal is the shortest such cycle. The difficulty is the number of candidates. Fix a starting city and there are 29 orders of the other cities in a 30-city problem. Each tour has two directions, which give the same cycle, so the count is about 29!/2, or roughly 4.4 × 10³⁰ distinct tours. At one billion tours per second, checking them all would take on the order of ten thousand times the age of the universe.
+
+So this story does not claim to find the shortest tour. It asks a different question: can a colony of local rules find a good tour quickly? That is a heuristic framing. A heuristic gives up the guarantee of optimality in exchange for a method that scales to instances where exhaustive search is hopeless.
+
+<Callout tone="idea" title="What the reader should take away">
+
+A tour is a closed cycle, not an open path. And "good" is not the same as "proven shortest": the colony will search, not enumerate.
+
+</Callout>
 
 </Chapter>
 
 <Chapter id="one-ants-choice" title="One ant's choice" scene="focal-choice" eyebrow="Chapter 03">
 
-Watch one ant at a focal city. Its next move depends on two local signals: how much pheromone
-an edge carries and how far away its other end is.
+Zoom to city 17. An ant has just arrived, and its next move is ahead. The cities it may visit are the unvisited ones. On the first move of a tour that is every city except 17; later, the allowed set shrinks as the tour fills in.
+
+The stage draws the choice as a fan: an arc from the focal city to each candidate, with the arc's weight following its probability. The fan names the top eight candidates and groups the rest into one "other (Σ)" bucket, because twenty-nine thin arcs would be unreadable. The list below is the textual version of the same fan. The probabilities are normalized, which means each candidate's number is its share of the total, and the named cities plus the bucket sum to one.
+
+<ol class="fan-ranking" aria-label="Focal ant's next-city probabilities at the first move of the default run">
+  <li><span class="fan-ranking__city">City 7</span> <span class="fan-ranking__probability">0.163</span></li>
+  <li><span class="fan-ranking__city">City 24</span> <span class="fan-ranking__probability">0.110</span></li>
+  <li><span class="fan-ranking__city">City 2</span> <span class="fan-ranking__probability">0.106</span></li>
+  <li><span class="fan-ranking__city">City 3</span> <span class="fan-ranking__probability">0.087</span></li>
+  <li><span class="fan-ranking__city">City 21</span> <span class="fan-ranking__probability">0.085</span></li>
+  <li><span class="fan-ranking__city">City 20</span> <span class="fan-ranking__probability">0.065</span></li>
+  <li><span class="fan-ranking__city">City 19</span> <span class="fan-ranking__probability">0.037</span></li>
+  <li><span class="fan-ranking__city">City 0</span> <span class="fan-ranking__probability">0.036</span></li>
+  <li><span class="fan-ranking__city">Other 21 cities (Σ)</span> <span class="fan-ranking__probability">0.311</span></li>
+</ol>
+
+These are the numbers at the start of the default run, when every edge carries the same pheromone. With α = 1 and β = 2, distance sets the ranking: city 7 is the closest candidate, and its 16.3% is not a certainty. Every allowed city keeps a nonzero chance, so the ant can still explore. The Greek capital sigma (Σ) simply means "sum": the other bucket is the total probability of the cities that were not named.
 
 </Chapter>
 
@@ -71,29 +104,76 @@ an edge carries and how far away its other end is.
   eyebrow="Chapter 04"
 >
 
-An ant does not pick the shortest edge outright. It samples from a probability distribution
-shaped by pheromone and distance, so every allowed city keeps a chance.
+The fan comes from one rule. For an ant at city i, the probability of moving to an allowed city j is proportional to pheromone raised to α times inverse distance raised to β:
+
+<div class="formula" role="math" aria-label="The probability of moving from city i to city j is tau sub i j to the power alpha times eta sub i j to the power beta, divided by the sum over allowed cities l of tau sub i l to the power alpha times eta sub i l to the power beta">
+  <span aria-hidden="true">p(i → j) = τ<sub>ij</sub><sup>α</sup> · η<sub>ij</sub><sup>β</sup> / Σ<sub>l ∈ allowed</sub> τ<sub>il</sub><sup>α</sup> · η<sub>il</sub><sup>β</sup></span>
+</div>
+
+Here τ<sub>ij</sub> is the pheromone on the edge, and η<sub>ij</sub> = 1/d<sub>ij</sub> is the inverse distance. The numerator is a weight, and the denominator adds up the weights of every allowed city. Dividing by that total is what makes the probabilities add to one.
+
+The exponents set the balance. A larger α makes differences in pheromone matter more; a larger β makes differences in distance matter more. Neither is an on/off switch. At α = 1 and β = 2, a slightly shorter edge and a slightly stronger trail both raise a candidate's weight, and the ant samples from the result rather than taking the maximum.
+
+The extremes are instructive. With β = 0 the distance term becomes 1 for every candidate, so only pheromone remains; at the start, when all trails are equal, the ant picks uniformly. With α = 0, pheromone is ignored and the weight is 1/d<sup>β</sup>. That is distance-driven sampling, not the nearest-neighbour rule: the closest city is the most likely, but it is not certain.
+
+<Predict question="If β = 0 and α stays at 1, can the colony still find short tours?">
+
+<p>
+  At first, only by accident. With no distance signal, the first tours are effectively random, and the pheromone they leave records whichever routes happened to be short. Later ants follow those trails, so the colony can drift toward an early lucky route. But it has no reliable gradient toward the nearest city, and on the default map it ends up clearly worse than the balanced preset. Turning β back on restores the distance signal. The opposite extreme matters too: α = 0 does not switch the colony to a deterministic greedy tour; it still samples, just with distance as the only weight.
+</p>
+
+</Predict>
 
 </Chapter>
 
 <Chapter id="leaving-a-trace" title="Leaving a trace" scene="deposit" eyebrow="Chapter 05">
 
-When an ant completes a tour, it adds pheromone to the edges it used. Shorter tours leave a
-stronger trace than longer ones.
+A completed tour is feedback. Every ant deposits pheromone on each edge it used, in proportion to how short its tour was. The amount is Q/L<sub>k</sub>, where L<sub>k</sub> is that ant's tour length and Q is the deposit constant, fixed at 1 in this release. A tour of length 5 adds 0.2 to each of its edges; a tour of length 10 adds 0.1. Within one tour every edge gets the same amount, because the whole route is judged by L<sub>k</sub>. A shorter route is therefore a stronger recommendation for all of its edges.
+
+Deposits accumulate across the colony. An edge used by several short tours gains more than an edge used by one long tour. In the next iteration that higher τ raises the edge's weight in the transition rule, so ants choose it more often, and its lead can grow. This is positive feedback: the trail shapes the choices that reshape the trail.
+
+Positive feedback alone would be a trap. The first edge that looked good could keep winning even after a better route appeared. Two things limit that. The deposit is spread across many edges, so no single ant owns the map; and evaporation keeps subtracting from every trail, including the successful ones.
 
 </Chapter>
 
 <Chapter id="forgetting" title="Forgetting" scene="evaporation" eyebrow="Chapter 06">
 
-Pheromone does not accumulate forever. Evaporation removes a fraction of every trail each
-iteration, so stale choices lose their advantage.
+After the ants finish an iteration, every edge loses a fraction of its pheromone: τ becomes (1 − ρ) times τ. With ρ = 0.5, half of each trail remains before the new deposits are added. The order matters: evaporate first, then deposit. A trail that no ant used shrinks each iteration; a trail that keeps being used is renewed.
+
+Forgetting is not a bug. Without it, early deposits would dominate forever and the colony would stop responding to what it learns later. Evaporation gives the search a horizon: recent evidence counts more than old evidence. At ρ = 0 nothing evaporates, and stale paths persist. A very small ρ, such as the 0.1 in the stagnant preset, makes trails sticky and encourages lock-in.
+
+ρ = 1 is the boundary case. Full evaporation happens before deposit, so every edge is zeroed and then the current ants write their tours. Any edge that no ant used in that iteration is exactly zero. The engine keeps pheromone non-negative and finite, and if a choice ever has all-zero weights it samples uniformly among the allowed cities. On screen a zero edge is drawn at a minimum width so the graph stays visible; zero pheromone is not the same as a missing edge.
+
+<Callout tone="warning" title="ρ = 1 erases the map every iteration">
+
+The colony still runs, but it loses the shared memory that makes it a colony. Expect much more random behaviour, and use ρ = 0.95 when you want strong forgetting without throwing every trail away.
+
+</Callout>
 
 </Chapter>
 
 <Chapter id="emergence" title="Emergence" scene="emergence" eyebrow="Chapter 07">
 
-No ant plans the whole route, yet the colony's best tour improves. The result emerges from
-repeated local choices and a shared environment.
+Pull back. The best tour is the record of the shortest complete tour found since the run started. It is a record, not an average, so it can only stay the same or improve: the best-length number never rises. The mean is different. It is the mean length of the current iteration's forty tours, and it moves up and down as the colony explores. A bad generation can raise the mean while the record holds.
+
+On the default map the first iteration's best is 7.54. By iteration 40 it is 4.91, and it stays 4.91 through iteration 200. The mean starts at 9.44, falls to 6.38 by iteration 40, and keeps fluctuating around 6.2. For comparison, a nearest-neighbour tour on the same 30 cities is 6.36 long. The colony's record is shorter, but this is one map and one seed, not a proof about all maps.
+
+The diversity number is a normalized entropy of the pheromone distribution. Think of it as how evenly the pheromone is spread. A value of 1 means every edge carries the same share, so the trail gives no clue where to go; 0 means all of it sits on a single edge, so there is no doubt. A zero total is defined as 1, because nothing has been learned yet. It describes the trail, not the chance that the tour is correct. Here it falls from 0.91 after one iteration to about 0.70 by iteration 40: the colony is concentrating, but not collapsing.
+
+<Figure
+  name="aco-best-tour"
+  id="figure-aco-best-tour"
+  svg={bestTourSvg}
+  title="Figure 1. The best tour after 40 iterations of the default run."
+  caption="Seed 42, 30 cities, 40 ants, α = 1, β = 2, ρ = 0.5. The tour is drawn three ways so it does not depend on colour: a wide amber halo, a dashed accent line, and square markers at every city. Its length is 4.91 in the map's normalized units, where the whole unit square spans one unit; the mean that iteration is 6.38."
+  source="Generated at build time by scripts/build-figures.mjs from the Ant System engine. It is server-rendered with the article, not drawn by client JavaScript."
+/>
+
+<Callout tone="try" title="Watch a record and an average">
+
+Press replay and keep an eye on the best-length and diversity rows in the metrics panel. Best length only falls; diversity falls as the trails concentrate. At 4× the same sequence runs faster, because speed changes how many iterations a second produces, not what an iteration does.
+
+</Callout>
 
 </Chapter>
 
@@ -104,21 +184,125 @@ repeated local choices and a shared environment.
   eyebrow="Chapter 08"
 >
 
-The weights α and β change how strongly the colony trusts pheromone or distance, while ρ sets
-how quickly old trails fade.
+Two forces pull in opposite directions. Exploration sends ants to try edges that have not proved themselves; exploitation sends them back to trails that already look good. α and β set how strongly the transition rule trusts pheromone and distance, and ρ sets how quickly old evidence fades. The four presets are named combinations of those three values.
+
+<dl class="preset-list">
+  <div class="preset-list__item">
+    <dt>Balanced</dt>
+    <dd><span class="data">α = 1, β = 2, ρ = 0.5</span> — a readable, effective colony where distance and pheromone both matter.</dd>
+  </div>
+  <div class="preset-list__item">
+    <dt>Greedy</dt>
+    <dd><span class="data">α = 0.5, β = 8, ρ = 0.5</span> — distance dominates, so the colony becomes short-sighted.</dd>
+  </div>
+  <div class="preset-list__item">
+    <dt>Stagnant</dt>
+    <dd><span class="data">α = 5, β = 1, ρ = 0.1</span> — pheromone dominates and early paths lock in.</dd>
+  </div>
+  <div class="preset-list__item">
+    <dt>Forgetful</dt>
+    <dd><span class="data">α = 1, β = 2, ρ = 0.95</span> — strong evaporation keeps resetting the trails.</dd>
+  </div>
+</dl>
+
+No preset is best in general. Distance-heavy greedy is short-sighted: with β = 8 the nearest edges dominate, so tours look locally sensible and can miss a better global arrangement. Pheromone-heavy stagnant is the opposite: α = 5 and ρ = 0.1 make an early trail almost impossible to overturn, so the colony can lock in a mediocre route. Forgetful keeps the search moving by discarding most of the trail each iteration, at the cost of forgetting good structure. Balanced is the readable default.
+
+A concrete experiment on this map: after 60 iterations, the balanced preset's best is 4.91, greedy is 4.95, forgetful is 5.04, and stagnant is 5.35. One run at one iteration count is not a benchmark; the point is the direction. Strong exploitation can buy early speed and then plateau, while strong exploration keeps options open and may never settle.
+
+<Predict question="Which preset is most likely to lock in an early, mediocre route: greedy or stagnant?">
+
+<p>
+  Stagnant. Greedy is short-sighted, but it still re-evaluates distance at every step, so a newly short edge can win. Stagnant weights pheromone five times against distance and evaporates only 10% per iteration, so an early trail keeps its advantage even when a better route exists. Greedy tends to produce decent tours that are not the best; stagnant tends to stop improving early.
+</p>
+
+</Predict>
 
 </Chapter>
 
 <Chapter id="when-it-fails" title="When it fails" scene="limits" eyebrow="Chapter 09">
 
-Ant System is a heuristic, not a guarantee. It can settle on a mediocre tour, and its cost
-grows with the size of the problem.
+Ant System is a heuristic. It has no optimality guarantee, and the tour it finds can be improved by a different run, a different seed, or a different parameter set.
+
+<h3>Limitations</h3>
+
+Local optima are the first limit. The record can plateau: on the default map it reaches 4.91 by iteration 40 and is still 4.91 at iteration 200. A plateau is not proof of optimality. It means this colony, on this map, stopped finding improvements, and a later variant might still find a shorter tour.
+
+Cost grows quickly. Each iteration builds one tour per ant, and each construction step compares up to n candidates, so the work is roughly proportional to ants × n². At 150 cities and 200 ants that is about 4.5 million candidate evaluations per iteration, before deposit and evaporation. More ants buy more samples per iteration, not a better guarantee.
+
+Parameter sensitivity is the third limit. The same map ends at 4.91 or 5.35 depending on α, β, and ρ, and the seed changes the city layout and the sampled choices. A setting that works on one instance is not automatically a good default for another.
+
+The variant matters too. This story implements Ant System, the 1996 formulation by Dorigo, Maniezzo, and Colorni. Ant Colony System and Max–Min Ant System are later refinements: they change the transition and update rules, for example with stronger exploitation or explicit bounds on pheromone. They are not implemented here, and their guarantees and typical results should not be read into this run.
+
+<h3>Applications</h3>
+
+Where a good-enough tour beats a guaranteed optimum, ant colony methods are used in practice. Vehicle routing plans deliveries under capacity and time-window constraints. Network design lays out links and cable across a set of sites. Scheduling sequences jobs whose setup costs depend on the order. Dynamic combinatorial problems, where the instance changes while the solution is in use, suit the incremental nature of a pheromone trail: the colony can adapt an existing trail instead of starting over. The TSPLIB benchmark library is the standard way to compare traveling-salesman implementations on shared instances.
+
+<Callout tone="warning" title="A heuristic is not a guarantee">
+
+The best tour is the best one this run found. Nothing in the method proves that a shorter tour does not exist.
+
+</Callout>
 
 </Chapter>
 
 <Chapter id="the-lab" title="The lab" scene="lab" eyebrow="Chapter 10">
 
-The final chapter is a place to compare how the colony behaves under different conditions. The
-same local rules can produce a very different search.
+The lab is where you change the experiment. Cities (2–150) and ants (1–200) change the instance and the colony size. α (0–5), β (0–10), and ρ (0–1) change the rule. Speed (0.5×, 1×, 2×, 4×) changes how fast iterations arrive, not what an iteration does. The seed reproduces a run: the same seed produces the same map and the same sampled choices.
+
+The four presets are shortcuts to the combinations in the previous chapter. A share link records the seed, the structural parameters, the speed, and the chapter you are reading. City-map edits are local to your session: they are not encoded in a share URL, and the interface says so when you make one.
+
+Be honest about what is here now. This page's stage offers playback, replay, speed, and the chapter rail. The parameter panel, presets, city editor, reset, and share button belong to the lab experience and are not part of this chapter yet. The explanations above do not depend on them: every number in the story is reproducible from the engine with the defaults.
 
 </Chapter>
+
+<section id="glossary" class="story-appendix prose" aria-labelledby="glossary-title">
+
+<h2 id="glossary-title">Glossary</h2>
+
+<dl class="glossary">
+  <dt>Ant (agent)</dt>
+  <dd>One member of the colony. It sees only its current city, its unvisited set, and the local pheromone; it constructs one complete tour per iteration.</dd>
+  <dt>Pheromone</dt>
+  <dd>A non-negative value on each edge, written by ants and reduced by evaporation. It is the colony's shared memory and the main input to the transition rule.</dd>
+  <dt>Stigmergy</dt>
+  <dd>Indirect communication through a shared environment. An ant changes the trail; later ants respond to the changed trail without meeting the first ant.</dd>
+  <dt>Tour</dt>
+  <dd>A cycle that visits every city exactly once. The edge from the last city back to the first is part of the tour and part of its length.</dd>
+  <dt>Traveling salesman problem (TSP)</dt>
+  <dd>The problem of finding the shortest tour through a set of cities with known distances. The symmetric version has the same distance in both directions.</dd>
+  <dt>Heuristic</dt>
+  <dd>A method that aims for a good solution without guaranteeing the best one. Ant System is a heuristic; its result is the best tour found, not a proof of optimality.</dd>
+  <dt>Exploration and exploitation</dt>
+  <dd>Exploration tries less-used edges; exploitation returns to trails that already look good. α, β, and ρ shift the balance between them.</dd>
+  <dt>Evaporation</dt>
+  <dd>The per-iteration loss of pheromone, written as (1 − ρ) times the current value. It stops old evidence from dominating forever.</dd>
+  <dt>Diversity (normalized entropy)</dt>
+  <dd>A number in [0, 1] describing how evenly pheromone is spread. 1 means every edge has the same share; 0 means all of it is on one edge; a zero total is defined as 1. It is not a probability that the tour is correct.</dd>
+</dl>
+
+</section>
+
+<section id="references" class="story-appendix prose" aria-labelledby="references-title">
+
+<h2 id="references-title">References and further reading</h2>
+
+<p>
+  The claims in this story follow the Ant System literature. Each source has a stable DOI or publisher page; the citation checker verifies the links.
+</p>
+
+<ol class="reference-list">
+  <li>
+    Dorigo, M., Maniezzo, V., &amp; Colorni, A. (1996). <cite>Ant System: Optimization by a colony of cooperating agents.</cite> <em>IEEE Transactions on Systems, Man, and Cybernetics, Part B</em>, 26(1), 29–41. <a href="https://doi.org/10.1109/3477.484436" rel="noopener noreferrer">doi:10.1109/3477.484436</a>
+  </li>
+  <li>
+    Dorigo, M., &amp; Stützle, T. (2004). <cite>Ant Colony Optimization.</cite> MIT Press. <a href="https://mitpress.mit.edu/9780262042192/ant-colony-optimization/" rel="noopener noreferrer">mitpress.mit.edu/9780262042192</a>
+  </li>
+  <li>
+    Stützle, T., &amp; Hoos, H. H. (2000). <cite>MAX–MIN Ant System.</cite> <em>Future Generation Computer Systems</em>, 16(8), 889–914. <a href="https://doi.org/10.1016/S0167-739X(00)00043-1" rel="noopener noreferrer">doi:10.1016/S0167-739X(00)00043-1</a>
+  </li>
+  <li>
+    TSPLIB benchmark library. Universität Heidelberg. <a href="https://comopt.ifi.uni-heidelberg.de/software/TSPLIB95/" rel="noopener noreferrer">comopt.ifi.uni-heidelberg.de/software/TSPLIB95</a>
+  </li>
+</ol>
+
+</section>
