@@ -67,6 +67,7 @@ git --version
 │  ├─ requirements.md
 │  ├─ technology.md
 │  ├─ implementation-plan.md
+│  ├─ runtime-acceptance.md
 │  └─ stories.md
 ├─ .github/workflows/deploy.yml
 ├─ .gitignore
@@ -89,6 +90,7 @@ git --version
 │  ├─ check-links.mjs
 │  ├─ check-bundle-size.mjs
 │  ├─ check-citations.mjs
+│  ├─ capture-runtime.mjs
 │  └─ build-figures.mjs
 ├─ src/
 │  ├─ pages/
@@ -100,7 +102,11 @@ git --version
 │  │  ├─ 404.astro
 │  │  ├─ rss.xml.ts
 │  │  ├─ og/[...slug].png.ts
-│  │  └─ dev/story-smoke.astro
+│  │  └─ dev/
+│  │     ├─ canvas-smoke.astro
+│  │     ├─ pulse-smoke.astro
+│  │     ├─ story-smoke.astro
+│  │     └─ type-specimen.astro
 │  ├─ content/
 │  │  └─ stories/
 │  │     ├─ ant-colony-optimization/index.mdx
@@ -115,7 +121,9 @@ git --version
 │  │  │  ├─ StoryController.svelte
 │  │  │  ├─ Chapter.astro
 │  │  │  ├─ ProgressRail.svelte
+│  │  │  ├─ renderer-factory.ts
 │  │  │  ├─ StageChrome.svelte
+│  │  │  ├─ story-runtime-debug.ts
 │  │  │  ├─ ConvergenceChart.svelte
 │  │  │  └─ ArticleModeToggle.svelte
 │  │  ├─ controls/
@@ -172,8 +180,12 @@ git --version
 │  │     └─ theme.ts
 │  ├─ stories/
 │  │  ├─ registry.ts
+│  │  ├─ loader.ts
 │  │  ├─ dev/
 │  │  │  ├─ config.ts
+│  │  │  ├─ pulse-config.ts
+│  │  │  ├─ pulse-engine.ts
+│  │  │  ├─ scene-layers.ts
 │  │  │  └─ canvas-smoke-engine.ts
 │  │  ├─ aco/
 │  │  │  ├─ config.ts
@@ -208,11 +220,13 @@ git --version
    │  ├─ aco.test.ts
    │  ├─ randu.test.ts
    │  ├─ import-boundaries.test.ts
+   │  ├─ story-loader.test.ts
    │  └─ content-schema.test.ts
    └─ e2e/
       ├─ smoke.spec.ts
       ├─ site.spec.ts
       ├─ story-runtime.spec.ts
+      ├─ story-runtime-acceptance.spec.ts
       ├─ url-state.spec.ts
       ├─ aco.spec.ts
       ├─ randu.spec.ts
@@ -813,25 +827,27 @@ Verified 2026-10-30 with `pnpm lint`, `pnpm test` (139 passing, 1 existing todo)
 
 Verified 2026-10-30 with `pnpm lint`, `pnpm test` (185 passing, 1 existing todo), `pnpm build`, `pnpm check:links`, and `CI=1 pnpm test:e2e` (61 Playwright tests). `src/engines/core/url-state.ts` owns the `UrlParamSpec`/`UrlParameterSchema` contracts (re-exported by `src/stories/registry.ts`) and implements canonical query serialization, typed parsing, clamping, and structured notices. The dev story declares `seed` (integer 0–4,294,967,295, structural), `orbit` (0.4–2.4), `variant` (`orbit`/`spiral`, structural), and `trails` (boolean); `story.defaults` remains the single source of defaults and is passed to the serializer so default fields are omitted from canonical URLs. The stage Speed control is the clock's playback rate and is intentionally not part of the shared run identity; the dev config's `speed` field remains the engine's internal chapter rate. `StoryController` parses the URL before building the engine, applies only accepted explicit values on top of chapter entry, resolves a valid fragment after layout measurement, and updates `?query#fragment` through a 180 ms debounced `replaceState`; unrelated query fields such as the `?lenis=off` test switch stay in the live address bar but are excluded from share links. Share copies an absolute URL built from `SITE_URL` plus the current path, with the canonical query and chapter fragment, through `src/lib/clipboard.ts` (Clipboard API with a hidden-textarea `execCommand` fallback; failures resolve instead of throwing). Notices render once in a polite `role="status"` region, never per frame. The dev fixture has no editable city map yet, so the city-edit criterion is verified through the visible disclosure that map edits are local, the seeded default map, and the share/reload test; the ACO lab will exercise the same disclosure with real edits.
 
-### Step 1.9 — Story runtime acceptance gate
+### (DONE) Step 1.9 — Story runtime acceptance gate
 
 **Goal:** Prove the runtime before building the first real story.
 
 **Tasks**
 
-1. Expand the development story to exercise play/pause, speed, replay, reduced motion, article mode, share, resize, and navigation cleanup.
-2. Add E2E tests for the runtime.
-3. Add a navigation stress test.
-4. Record a short screen capture for design review.
+1. (DONE) Expand the development story to exercise play/pause, speed, replay, reduced motion, article mode, share, resize, and navigation cleanup.
+2. (DONE) Add E2E tests for the runtime.
+3. (DONE) Add a navigation stress test.
+4. (DONE) Record a short screen capture for design review.
 
 **Acceptance criteria**
 
-- [ ] All runtime requirements in `docs/requirements.md` pass on the development story.
-- [ ] The runtime works at 360 px and 1440 px widths.
-- [ ] Deep-link, forward-scroll, reverse-scroll, and reload converge on the same starting state at chapter entry.
-- [ ] The no-JS article layout renders without an empty stage.
-- [ ] No uncaught errors occur during the stress test.
-- [ ] The runtime can be reused by a new story by adding a config and an MDX file.
+- [x] All runtime requirements in `docs/requirements.md` pass on the development story.
+- [x] The runtime works at 360 px and 1440 px widths.
+- [x] Deep-link, forward-scroll, reverse-scroll, and reload converge on the same starting state at chapter entry.
+- [x] The no-JS article layout renders without an empty stage.
+- [x] No uncaught errors occur during the stress test.
+- [x] The runtime can be reused by a new story by adding a config and an MDX file.
+
+Verified 2026-10-30 with `pnpm lint`, `pnpm test` (188 passing, 1 existing todo), `pnpm build`, `pnpm check:links`, and `CI=1 pnpm test:e2e` (74 Playwright tests). `src/stories/loader.ts` is a story-config registry keyed by slug; it dynamic-imports each config, and `StoryController` takes a `storyKey` prop instead of importing a concrete story. `src/components/story/renderer-factory.ts` selects a renderer by `StoryConfig.rendererId`, leaving the Step 4.1 Three.js extension as a factory edit rather than a controller edit. The second fixture, `/dev/pulse-smoke`, adds `PulseEngine`, its own defaults, presets, four scenes, four chapters, URL schema, and page without touching controller internals; both dev pages stay `noindex`, unlinked, and sitemap-excluded. Chapter entry now records a deterministic `entryState` (chapter, scene, seed, structural and presentation params, step 0, simulated time 0, keyframe) before any frame can advance, exposed through `window.__storyRuntimeDebug.entryState()` and `data-entry-*`; the convergence test compares deep-link, forward-scroll, reverse-scroll, and reload entries for deep equality. `tests/e2e/story-runtime-acceptance.spec.ts` adds the acceptance matrix, all-four-speed rate test, offscreen/hidden pause, fast forward/reverse settling, 360/1440 flows with DPR 3 (capped at 2), share-and-reopen, ten round-trips between both stories, in-page teardown, and preference persistence. `tests/unit/story-loader.test.ts` checks the registry, chapter↔scene map, and that the two configs instantiate different engines. The runtime requirements matrix is in `docs/runtime-acceptance.md`. `scripts/capture-runtime.mjs` (also `pnpm capture:runtime`) records `test-results/design-review/story-runtime-review.webm` at 1440×900; the ignored artifact is about 3.5 MB and is not committed. The pre-existing URL-history test now waits 150 ms for a previous smooth scroll to settle between rail clicks; it still asserts that repeated slider and chapter changes do not grow history.
 
 ## 6. Phase 2 — ACO engine
 
