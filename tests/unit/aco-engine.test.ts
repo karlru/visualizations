@@ -1171,14 +1171,7 @@ describe('known small instances', () => {
     pheromone[1 * 3 + 0] = 0.2;
     pheromone[0 * 3 + 2] = 0.8;
     pheromone[2 * 3 + 0] = 0.8;
-    const pheromoneDriven = transitionProbabilities(
-      symmetric,
-      pheromone,
-      0,
-      allowedMask(3),
-      1,
-      0,
-    );
+    const pheromoneDriven = transitionProbabilities(symmetric, pheromone, 0, allowedMask(3), 1, 0);
     expect(pheromoneDriven.probabilities[0]).toBeCloseTo(0.2, 12);
     expect(pheromoneDriven.probabilities[1]).toBeCloseTo(0.8, 12);
   });
@@ -1431,9 +1424,9 @@ describe('invalid parameters and inputs', () => {
     expect(() => transitionProbabilities(instance, pheromone, 0, allowed, -0.5, 2)).toThrow(
       /alpha/,
     );
-    expect(() =>
-      transitionProbabilities(instance, pheromone, 0, allowed, 1, Number.NaN),
-    ).toThrow(/beta/);
+    expect(() => transitionProbabilities(instance, pheromone, 0, allowed, 1, Number.NaN)).toThrow(
+      /beta/,
+    );
     expect(() => buildTransitionWeights(instance, new Float64Array(4), 1, 2)).toThrow(/pheromone/);
     expect(() => buildTransitionWeights(instance, pheromone, 1, 2, new Float64Array(4))).toThrow(
       /weights/,
@@ -1520,9 +1513,7 @@ describe('beta distance sensitivity', () => {
 
       // Ants starting at city 0 choose between city 1 (near) and city 2 (far);
       // ant k starts at city k mod 3, so every third ant is in this sample.
-      return engine
-        .snapshot()
-        .ants.filter((ant) => ant.tour[0] === 0 && ant.tour[1] === 1).length;
+      return engine.snapshot().ants.filter((ant) => ant.tour[0] === 0 && ant.tour[1] === 1).length;
     };
 
     expect(countNear(8)).toBeGreaterThan(countNear(0));
@@ -1605,5 +1596,69 @@ describe('evaporation without deposit', () => {
         }
       }
     }
+  });
+});
+
+describe('best tour history', () => {
+  it('retains the same best tour when an iteration does not improve it', () => {
+    const cities = [
+      { x: 0, y: 0 },
+      { x: 0.4, y: 0 },
+    ];
+    const engine = new AcoEngine(params({ cityCount: 2, antCount: 2, seed: 4 }));
+    engine.setCities(cities);
+    engine.stepIteration();
+
+    const tour = engine.snapshot().bestTour;
+    const length = engine.snapshot().bestLength;
+    expect(tour).not.toBeNull();
+    expect(length).not.toBeNull();
+
+    for (let iteration = 0; iteration < 5; iteration += 1) {
+      engine.stepIteration();
+      const snapshot = engine.snapshot();
+
+      // Two cities make every tour equal-length, so no iteration can improve
+      // the best and the stored tour must not be replaced.
+      expect(snapshot.bestLength).toBe(length);
+      expect(snapshot.bestTour).toBe(tour);
+    }
+  });
+
+  it('keeps bestTour and bestLength consistent across improving and flat runs', () => {
+    const settings = params({ cityCount: 10, antCount: 4, seed: 42 });
+    const instance = instanceFor(settings);
+    const engine = new AcoEngine(settings);
+    engine.stepIteration();
+
+    let previousTour = engine.snapshot().bestTour;
+    let previousLength = engine.snapshot().bestLength as number;
+    let flatIterations = 0;
+
+    for (let iteration = 0; iteration < 40; iteration += 1) {
+      engine.stepIteration();
+      const snapshot = engine.snapshot();
+      const length = snapshot.bestLength as number;
+
+      expect(length).toBeLessThanOrEqual(previousLength);
+      if (length === previousLength) {
+        flatIterations += 1;
+        expect(snapshot.bestTour).toBe(previousTour);
+      } else {
+        expect(length).toBeLessThan(previousLength);
+        expect(snapshot.bestTour).not.toBe(previousTour);
+      }
+
+      const tour = snapshot.bestTour as readonly number[];
+      expect(validateTour(instance, tour)).toEqual({ valid: true });
+      expect(tourLength(instance, tour)).toBeCloseTo(length, 12);
+
+      previousTour = snapshot.bestTour;
+      previousLength = length;
+    }
+
+    // The run must actually exercise the non-improving path, otherwise this
+    // test would not prove preservation across flat iterations.
+    expect(flatIterations).toBeGreaterThan(0);
   });
 });
