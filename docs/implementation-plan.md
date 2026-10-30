@@ -344,7 +344,7 @@ pnpm exec playwright install --with-deps chromium firefox webkit
 - [x] `pnpm exec lhci autorun` runs against a built preview and reports results.
 - [x] CI can run all verification commands without interactive prompts.
 
-### Step 0.4 — Design tokens, fonts, and base layout
+### (DONE) Step 0.4 — Design tokens, fonts, and base layout
 
 **Goal:** The editorial paper + dark stage visual system exists as reusable tokens and primitives.
 
@@ -355,8 +355,8 @@ pnpm exec playwright install --with-deps chromium firefox webkit
 3. (DONE) Create `BaseLayout.astro` with the paper background, header, footer, skip link, and main landmark.
 4. (DONE) Create `tokens.css`, `base.css`, and `story.css`.
 5. (DONE) Add a typographic specimen page or section for visual review.
-6. Verify font loading does not cause visible layout shift.
-7. Add a unit test that every text/UI token pair meets its contrast threshold on both paper and stage.
+6. (DONE) Verify font loading does not cause visible layout shift.
+7. (DONE) Add a unit test that every text/UI token pair meets its contrast threshold on both paper and stage.
 
 **Commands**
 
@@ -375,13 +375,13 @@ pnpm add -D subfont
 
 **Acceptance criteria**
 
-- [ ] All colors and spacing values used by components come from tokens.
-- [ ] Every text/UI token pair passes its contrast threshold on both backgrounds.
-- [ ] Fonts are self-hosted; no third-party font requests are made.
-- [ ] The base layout has a skip link that becomes visible on focus.
-- [ ] The header and footer are keyboard accessible.
-- [ ] The page has no horizontal overflow at 320 px.
-- [ ] The font fallback metrics are configured to minimize layout shift.
+- [x] All colors and spacing values used by components come from tokens.
+- [x] Every text/UI token pair passes its contrast threshold on both backgrounds.
+- [x] Fonts are self-hosted; no third-party font requests are made.
+- [x] The base layout has a skip link that becomes visible on focus.
+- [x] The header and footer are keyboard accessible.
+- [x] The page has no horizontal overflow at 320 px.
+- [x] The font fallback metrics are configured to minimize layout shift.
 
 ### Step 0.5 — Base SEO, 404, and content schema skeleton
 
