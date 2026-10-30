@@ -8,8 +8,18 @@
   },
   "scripts": {
     "dev": "astro dev",
-    "build": "astro check && astro build",
+    "build": "node scripts/build-figures.mjs && astro check && astro build",
+    "build:figures": "node scripts/build-figures.mjs",
     "preview": "astro preview",
+    "lint": "biome check . && astro check",
+    "format": "biome format --write .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "test:a11y": "playwright test tests/e2e/a11y.spec.ts",
+    "test:visual": "playwright test tests/e2e/visual.spec.ts",
+    "check:bundle": "node scripts/check-bundle-size.mjs",
+    "lighthouse": "lhci autorun && lhci autorun --config=lighthouserc.mobile.json",
     "astro": "astro"
   },
   "dependencies": {
@@ -23,6 +33,14 @@
   "packageManager": "pnpm@12.16.1+sha512.091d1dee7927575661b25dab3c2ae31cafc1c54d6b71ed6a6600cf0c1cb10434a447eae14015f1b23e2e6bedeed79df94a932e2164d2832280dce3fb32f656d1",
   "devDependencies": {
     "@astrojs/check": "^0.9.12",
-    "typescript": "^6.0.3"
+    "@axe-core/playwright": "^4.14.0",
+    "@biomejs/biome": "^2.6.4",
+    "@lhci/cli": "^0.15.1",
+    "@playwright/test": "^1.64.1",
+    "fast-check": "^4.10.2",
+    "typescript": "^6.0.3",
+    "vitest": "^5.0.5",
+    "web-vitals": "^6.2.3",
+    "wrangler": "^4.155.0"
   }
 }

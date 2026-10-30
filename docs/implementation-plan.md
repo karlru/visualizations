@@ -297,21 +297,21 @@ pnpm exec astro check
 - [x] `sitemap-index.xml` and its numbered sitemap file are generated after a build.
 - [x] No framework adapter for server rendering is installed.
 
-### Step 0.3 — Add tooling: Biome, Vitest, Playwright, axe, Lighthouse CI
+### (DONE) Step 0.3 — Add tooling: Biome, Vitest, Playwright, axe, Lighthouse CI
 
 **Goal:** One command each for linting, unit tests, browser tests, accessibility checks, and performance budgets.
 
 **Tasks**
 
-1. Initialize Biome and configure formatting and linting for TypeScript, JavaScript, and CSS. Enable `html.experimentalFullSupportEnabled` for Astro/Svelte markup, and document that `astro check` is the framework-template check because Biome's HTML support is experimental.
-2. Add Vitest and a smoke unit test.
-3. Add Playwright and a smoke browser test; configure it to start a preview server for the built site.
-4. Add axe-core integration for Playwright.
-5. Add Lighthouse CI configuration with desktop and mobile presets.
-6. Add `fast-check` for property-based tests.
-7. Create stub `scripts/check-bundle-size.mjs` and `scripts/build-figures.mjs` so the build and CI commands exist from Phase 0; fill in the real logic in Steps 3.2 and 7.2.
-8. Add package scripts for all verification commands, including `test:visual`.
-9. Add `web-vitals` for the INP harness.
+1. (DONE) Initialize Biome and configure formatting and linting for TypeScript, JavaScript, and CSS. Enable `html.experimentalFullSupportEnabled` for Astro/Svelte markup, and document that `astro check` is the framework-template check because Biome's HTML support is experimental.
+2. (DONE) Add Vitest and a smoke unit test.
+3. (DONE) Add Playwright and a smoke browser test; configure it to start a preview server for the built site.
+4. (DONE) Add axe-core integration for Playwright.
+5. (DONE) Add Lighthouse CI configuration with desktop and mobile presets.
+6. (DONE) Add `fast-check` for property-based tests.
+7. (DONE) Create stub `scripts/check-bundle-size.mjs` and `scripts/build-figures.mjs` so the build and CI commands exist from Phase 0; fill in the real logic in Steps 3.2 and 7.2.
+8. (DONE) Add package scripts for all verification commands, including `test:visual`.
+9. (DONE) Add `web-vitals` for the INP harness.
 
 **Commands**
 
@@ -335,14 +335,14 @@ pnpm exec playwright install --with-deps chromium firefox webkit
 
 **Acceptance criteria**
 
-- [ ] `pnpm lint` passes.
-- [ ] `pnpm test` runs at least one unit test and passes.
-- [ ] `pnpm test:e2e` runs at least one Playwright test and passes.
-- [ ] `pnpm test:visual` runs at least one screenshot test or a documented placeholder.
-- [ ] `pnpm check:bundle` runs without a missing-file error.
-- [ ] `pnpm build` runs the figures stub without a missing-file error.
-- [ ] `pnpm exec lhci autorun` runs against a built preview and reports results.
-- [ ] CI can run all verification commands without interactive prompts.
+- [x] `pnpm lint` passes.
+- [x] `pnpm test` runs at least one unit test and passes.
+- [x] `pnpm test:e2e` runs at least one Playwright test and passes.
+- [x] `pnpm test:visual` runs at least one screenshot test or a documented placeholder.
+- [x] `pnpm check:bundle` runs without a missing-file error.
+- [x] `pnpm build` runs the figures stub without a missing-file error.
+- [x] `pnpm exec lhci autorun` runs against a built preview and reports results.
+- [x] CI can run all verification commands without interactive prompts.
 
 ### Step 0.4 — Design tokens, fonts, and base layout
 
