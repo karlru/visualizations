@@ -7,6 +7,8 @@ import {
   BASE_ITERATIONS_PER_SECOND,
   buildTransitionWeights,
   INITIAL_PHEROMONE,
+  MAX_ITERATIONS_PER_STEP,
+  MAX_PENDING_ITERATIONS,
   normalizedPheromoneEntropy,
   transitionProbabilities,
 } from '../../src/engines/aco/engine';
@@ -108,6 +110,8 @@ describe('parameters, constants, and presets', () => {
     expect(INITIAL_PHEROMONE).toBeGreaterThan(0);
     expect(Number.isFinite(INITIAL_PHEROMONE)).toBe(true);
     expect(BASE_ITERATIONS_PER_SECOND).toBeGreaterThan(0);
+    expect(MAX_ITERATIONS_PER_STEP).toBeGreaterThanOrEqual(1);
+    expect(MAX_PENDING_ITERATIONS).toBeGreaterThanOrEqual(MAX_ITERATIONS_PER_STEP);
   });
 
   it('publishes the documented preset values from docs/stories.md §2.5', () => {
@@ -960,5 +964,53 @@ describe('render snapshot', () => {
       expect(ant.tourLength).toBeGreaterThan(0);
     }
     expect(snapshot.bestTour?.length).toBe(7);
+  });
+});
+describe('workload cap and backlog', () => {
+  it('caps iterations per step and counts dropped backlog', () => {
+    const engine = engineWith();
+    engine.step(100);
+
+    const metrics = engine.metrics();
+    expect(metrics.iteration).toBe(MAX_ITERATIONS_PER_STEP);
+    expect(metrics.pendingIterations).toBeLessThanOrEqual(MAX_PENDING_ITERATIONS);
+    expect(metrics.droppedIterations).toBeGreaterThan(0);
+    expect(metrics.degraded).toBe(true);
+
+    for (let call = 0; call < 20; call += 1) {
+      const before = engine.snapshot().iteration;
+      engine.step(1 / 60);
+      expect(engine.snapshot().iteration - before).toBeLessThanOrEqual(MAX_ITERATIONS_PER_STEP);
+      expect(engine.metrics().pendingIterations).toBeLessThanOrEqual(MAX_PENDING_ITERATIONS);
+    }
+  });
+
+  it('preserves the fractional remainder when the whole backlog is trimmed', () => {
+    const engine = engineWith();
+    engine.step(10.4);
+
+    const metrics = engine.metrics();
+    expect(metrics.iteration).toBe(MAX_ITERATIONS_PER_STEP);
+    expect(metrics.droppedIterations).toBe(10 - MAX_PENDING_ITERATIONS);
+    expect(metrics.pendingIterations).toBeCloseTo(
+      MAX_PENDING_ITERATIONS - MAX_ITERATIONS_PER_STEP + 0.4,
+      12,
+    );
+    expect(engine.snapshot().iterationProgress).toBeCloseTo(0.4, 12);
+  });
+
+  it('does not spiral: a long gap is bounded, not replayed forever', () => {
+    const engine = engineWith();
+    engine.step(3600);
+
+    expect(engine.metrics().pendingIterations).toBeLessThanOrEqual(MAX_PENDING_ITERATIONS);
+    const dropped = engine.metrics().droppedIterations;
+    expect(dropped).toBeGreaterThan(3000);
+
+    for (let call = 0; call < 10; call += 1) {
+      engine.step(1 / 60);
+    }
+    expect(engine.metrics().droppedIterations).toBe(dropped);
+    expect(engine.metrics().pendingIterations).toBeLessThanOrEqual(MAX_PENDING_ITERATIONS);
   });
 });

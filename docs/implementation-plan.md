@@ -892,7 +892,7 @@ Verified 2026-10-30 with `pnpm lint`, `pnpm test` (188 passing, 1 existing todo)
 
 Verified 2026-10-30 with `pnpm lint` and `pnpm test` (225 passing, 1 existing todo). `src/engines/aco/types.ts` owns `City`, `Tour`, `DistanceMatrix`, `TspInstance`, and the discriminated `TourValidation` result. `src/engines/aco/tsp.ts` generates each city from two consecutive `SeededRandom` floats, stores cities in index order, and builds a symmetric row-major `Float64Array`. Off-diagonal distances below `DISTANCE_EPSILON = 1e-6` clamp to that value so `η = 1/d` stays finite; the diagonal stays zero because a tour never contains a self-edge. `createTspInstance` throws a clear `RangeError` for zero, negative, fractional, or non-finite city counts; `createTspInstanceFromCities(cities, seed)` copies, validates (`[0, 1]²`), and freezes explicit lists for the Step 3.5 editor. `validateTour` returns `wrong-length`, `out-of-range`, or `duplicate-city` with a display-ready message; a missing city appears as a wrong length, and with the correct length a duplicate necessarily means a missing city. `tourLength` validates first and throws on programmer error. `nearestNeighborTour(instance, startCity = 0)` is deterministic, tie-breaks toward the lower index, consumes no random numbers, and returns a frozen tour. `tests/unit/aco.test.ts` has 37 cases, including fast-check properties for matrix symmetry/bounds, validation against a reference permutation check, and greedy nearest-neighbor selection.
 
-### Step 2.2 — Ant System engine
+### (DONE) Step 2.2 — Ant System engine
 
 **Goal:** A complete Ant System implementation with live parameters and metrics.
 
@@ -908,7 +908,7 @@ Verified 2026-10-30 with `pnpm lint` and `pnpm test` (225 passing, 1 existing to
 8. (DONE) Restart the run at iteration 0 when a structural parameter or the city set changes; invalidate best/mean history.
 9. (DONE) Handle edge cases: `α = 0`, `β = 0`, `ρ = 1`, one ant, two cities, collinear cities.
 10. (DONE) Expose a snapshot suitable for rendering without copying the entire graph every frame.
-11. Cap simulated iterations per frame at the worst-case workload.
+11. (DONE) Cap simulated iterations per frame at the worst-case workload.
 
 **Files**
 
@@ -927,6 +927,8 @@ Verified 2026-10-30 with `pnpm lint` and `pnpm test` (225 passing, 1 existing to
 - [x] A fixed run identity produces identical results.
 - [x] Structural parameter changes restart at iteration 0; presentation changes do not.
 - [x] Metrics are available at a low frequency.
+
+Verified 2026-10-30 with `pnpm lint`, `pnpm test` (281 passing, 1 existing todo; 56 new engine tests), and `pnpm build`. `src/engines/aco/engine.ts` implements the complete Ant System: `τ₀ = 0.1` on every off-diagonal edge, construction with `p_ij ∝ τ_ij^α η_ij^β` and one seeded draw per next-city choice, deposit `Q / L_k`, evaporation then deposit, and normalized entropy with `E = n(n−1)/2`. `Q = 1`, the base rate (`1` iteration per simulated second), and the per-call/backlog caps (`2` and `8`) are exported constants. `stepIteration()` is the deterministic test/reduced-motion entry point; `step(dt)` converts simulated seconds into a pending-iteration budget, carries the fraction, runs at most two whole iterations per call, and counts trimmed whole backlog in `metrics().droppedIterations`. The fixed-step suite reaches identical tours and pheromone at 30, 60, and 120 fps. Structural fields (`cityCount`, `antCount`, `α`, `β`, `ρ`, `seed`) and `setCities()` restart at iteration 0 and clear best/mean history; `speed` changes apply without a reset, and a same-value `setParams` is a no-op. `transitionProbabilities(instance, pheromone, currentCity, allowed, alpha, beta, options?)` is exported for Step 3.2's fan and returns `{ cities, probabilities, count, uniform }`, with ascending candidate order and a uniform fallback for all-zero or non-finite weights. `AcoSnapshot` keeps stable references to cities, distances, the pheromone matrix, ant tour buffers, and the last best tour; ants are animated from `tour` plus the shared `iterationProgress`, so no graph is copied per frame. Best length starts from the first iteration's fastest ant; the nearest-neighbor baseline remains a separate `nearestNeighborTour` comparison. `src/engines/aco/presets.ts` carries the four documented parameter patches. `tests/unit/aco-engine.test.ts` covers valid tours, normalization, fallback, `ρ = 1`, non-increasing best, entropy with known distributions, determinism, structural/presentation resets, snapshot buffer reuse, collinear/coincident/one-city cases, frame-rate independence, and the workload cap.
 
 ### Step 2.3 — ACO correctness tests
 

@@ -475,7 +475,7 @@ function normalizeParams(params: AcoParams): AcoParams {
   assertNumberParam('beta', params.beta, ACO_LIMITS.beta.min, ACO_LIMITS.beta.max);
   assertNumberParam('rho', params.rho, ACO_LIMITS.rho.min, ACO_LIMITS.rho.max);
 
-  return {
+  return Object.freeze({
     cityCount: params.cityCount,
     antCount: params.antCount,
     alpha: params.alpha,
@@ -483,7 +483,7 @@ function normalizeParams(params: AcoParams): AcoParams {
     rho: params.rho,
     speed: sanitizeSpeed(params.speed),
     seed: normalizeSeed(params.seed),
-  };
+  });
 }
 
 /** True when two parameter objects share every structural field. */
@@ -517,6 +517,12 @@ function createAntSnapshots(antCount: number, cityCount: number): MutableAntSnap
  *
  * The constructor and every structural change restart at iteration 0 with the
  * run's seed. Presentation speed can change at any time without a reset.
+ *
+ * Best length is initialized from the first iteration's fastest ant. The
+ * nearest-neighbor baseline is deliberately not injected into this history: the
+ * story computes `nearestNeighborTour` separately when it wants to compare the
+ * colony with the greedy tour, so "best" always means "best tour an ant has
+ * actually built".
  */
 export class AcoEngine implements Engine<AcoParams, AcoSnapshot, AcoMetrics> {
   private params: AcoParams;
