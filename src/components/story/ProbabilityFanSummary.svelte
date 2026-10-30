@@ -43,7 +43,7 @@
   <div class="fan__head">
     <h2 class="fan__title" id={headingId}>{title}</h2>
     <p class="fan__description" id={descriptionId}>
-      The focal ant is at city {fan.focalCity}. The {fan.entries.length} most likely next cities,
+      The focal ant is at city {fan.currentCity}. The {fan.entries.length} most likely next cities,
       plus every remaining candidate grouped as “other (Σ)”.
     </p>
   </div>

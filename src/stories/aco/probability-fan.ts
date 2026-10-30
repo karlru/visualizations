@@ -64,8 +64,8 @@ export interface ProbabilityFanOther {
 
 /** Everything the canvas fan and the DOM ranked list need. */
 export interface ProbabilityFan {
-  /** Focal city index. */
-  readonly focalCity: number;
+  /** The city the focal ant is choosing from. */
+  readonly currentCity: number;
 
   /** Named candidates, highest probability first. At most `topN`. */
   readonly entries: readonly ProbabilityFanEntry[];
@@ -210,7 +210,7 @@ export function buildProbabilityFan(
   }
 
   return {
-    focalCity,
+    currentCity: focalCity,
     entries,
     other: {
       probability: otherProbability,

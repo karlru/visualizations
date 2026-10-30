@@ -93,7 +93,7 @@ export function createProbabilityFanLayer(
       const reveal = clamp01(frame.revealProgress);
       if (reveal <= 0) return;
 
-      const city = snapshot.cities[fan.focalCity];
+      const city = snapshot.cities[fan.currentCity];
       if (city === undefined) return;
       const focalX = (city.x - 0.5) * ACO_WORLD_SCALE;
       const focalY = (city.y - 0.5) * ACO_WORLD_SCALE;
