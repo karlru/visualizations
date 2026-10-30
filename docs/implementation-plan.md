@@ -958,7 +958,7 @@ Verified 2026-10-30 with `pnpm lint`, `pnpm test` (308 passing, 1 existing todo;
 
 ## 7. Phase 3 — ACO story
 
-### Step 3.1 — Story configuration and scenes
+### (DONE) Step 3.1 — Story configuration and scenes
 
 **Goal:** A complete scene map connecting chapters to ACO behavior.
 
@@ -979,14 +979,17 @@ Verified 2026-10-30 with `pnpm lint`, `pnpm test` (308 passing, 1 existing todo;
 - `src/stories/aco/annotations.ts`
 - `src/stories/aco/world.ts`
 - `src/stories/registry.ts`
+- `tests/unit/aco-story.test.ts`
 
 **Acceptance criteria**
 
-- [ ] Every chapter has a scene.
-- [ ] Every scene declares its camera, layers, and annotations.
-- [ ] Presets apply the documented parameter values.
-- [ ] The default story is deterministic.
-- [ ] Scene transitions settle into coherent states.
+- [x] Every chapter has a scene.
+- [x] Every scene declares its camera, layers, and annotations.
+- [x] Presets apply the documented parameter values.
+- [x] The default story is deterministic.
+- [x] Scene transitions settle into coherent states.
+
+Verified 2026-10-30 with `pnpm lint`, `pnpm test` (331 passing, 1 existing todo; 23 new cases in `tests/unit/aco-story.test.ts`), and `pnpm build`. `src/stories/aco/config.ts` exports `acoStoryConfig` with slug `ant-colony-optimization`, renderer `canvas2d`, `createEngine: (params) => new AcoEngine(params)`, the exact defaults (30 cities, 40 ants, α 1, β 2, ρ 0.5, speed 1, seed 42; `Q` remains the engine's fixed constant), and the four documented preset patches spread from `ACO_PRESETS` so city count, ant count, seed, and speed are preserved. The URL schema matches `docs/requirements.md` §2.6.1: `seed` (integer, structural), `cities` → `cityCount` (2–150, structural), `ants` → `antCount` (1–200, structural), `alpha` (0–5, structural), `beta` (0–10, structural), `rho` (0–1, structural), `speed` (0.5/1/2/4, presentation), and a `{ source: 'fragment' }` chapter. `StoryConfig` gains an optional `speedControl`: omitted means the existing clock behaviour, while ACO declares `{ kind: 'engine', param: 'speed' }` so Step 3.3/3.5 write the engine's presentation multiplier and leave the clock at 1× instead of applying speed twice. `src/stories/aco/scenes.ts` defines ten scenes in the exact chapter order (the-colony → colony-overview, the-problem → tour-problem, one-ants-choice → focal-choice, the-probability-rule → probability-rule, leaving-a-trace → deposit, forgetting → evaporation, emergence → emergence, tuning-the-colony → tuning, when-it-fails → limits, the-lab → lab), each with a 2D camera, all five canvas layers (`graph`, `pheromone`, `ants`, `best-tour`, `probability-fan`), highlights, reveal, and DOM labels. `src/stories/aco/world.ts` fixes the story world space (normalized unit square × 6, centred on the origin); the focal camera pans to city 17 of the seed-42/30-city layout and the deposit/evaporation cameras follow the best-tour centroid after 40 iterations, both checked against the pure engine in the tests. The convergence chart is not a canvas layer: `AcoSceneDefinition.convergenceChart` is a documented story-level field for the DOM chart that Step 3.2 builds. `src/stories/aco/annotations.ts` holds a 20-entry catalogue keyed by stable id; every chapter's annotation ids resolve in its own scene labels and every catalogue entry is used. Tests cover the chapter↔scene bijection, canonical layers and opacity bounds, graph visibility, annotation resolution, preset patches, exact defaults, URL field mapping plus round-trip/validation, import side effects, 12-iteration determinism (tour, length, pheromone, metrics), 40-iteration world anchors, and `composeSceneState` at progress 0/0.5/1 including exact settlement at progress 1.
 
 ### Step 3.2 — ACO renderer layers
 
