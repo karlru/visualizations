@@ -1,15 +1,16 @@
 import { expect, type Page, test } from '@playwright/test';
 import type { ScrollDirectorDebugState } from '../../src/lib/scroll-director';
 
-const HARNESS = '/dev/scroll-smoke';
+const HARNESS = '/dev/story-smoke';
 
 interface HarnessState {
   readonly activeChapterId: string | null;
-  readonly overlayActive: string | null;
-  readonly overlayProgress: number;
+  readonly activeSceneId: string | null;
   readonly controllerStatus: string | null;
-  readonly dataActiveChapter: string | null;
-  readonly dataProgress: string | null;
+  readonly dataProgress: number;
+  readonly railActive: string | null;
+  readonly stageCount: number;
+  readonly canvasCount: number;
 }
 
 /** Collect console errors and uncaught page errors for a page. */
@@ -43,30 +44,43 @@ async function readDebug(page: Page): Promise<ScrollDirectorDebugState> {
 
 async function readHarnessState(page: Page): Promise<HarnessState> {
   return page.evaluate(() => {
-    const controller = document.querySelector<HTMLElement>('.story-controller');
-    const overlayActive = document.querySelector<HTMLElement>('[data-scroll-active]');
-    const overlayProgress = document.querySelector<HTMLElement>('[data-scroll-progress-label]');
+    const controller = document.querySelector<HTMLElement>('[data-story-controller]');
+    const railActive = document.querySelector<HTMLElement>('[data-progress-rail] [aria-current]');
     return {
       activeChapterId: controller?.dataset.activeChapter ?? null,
-      overlayActive: overlayActive?.textContent ?? null,
-      overlayProgress: Number.parseFloat(overlayProgress?.textContent ?? 'NaN'),
+      activeSceneId: controller?.dataset.activeScene ?? null,
       controllerStatus: controller?.dataset.storyController ?? null,
-      dataActiveChapter: controller?.dataset.activeChapter ?? null,
-      dataProgress: controller?.dataset.scrollProgress ?? null,
+      dataProgress: Number.parseFloat(controller?.dataset.scrollProgress ?? 'NaN'),
+      railActive: railActive?.getAttribute('data-chapter-link') ?? null,
+      stageCount: document.querySelectorAll('[data-story-stage]').length,
+      canvasCount: document.querySelectorAll('canvas[data-stage-canvas]').length,
     } satisfies HarnessState;
   });
 }
 
-/** Scroll the chapter's top edge well past its `top center` start. */
+/** Scroll so the chapter top crosses the director's `top center` start. */
 async function scrollToChapter(page: Page, id: string): Promise<void> {
-  await page.evaluate((chapterId) => {
+  const target = await page.evaluate((chapterId) => {
     const element = document.getElementById(chapterId);
     if (!element) throw new Error(`Missing chapter ${chapterId}`);
-    window.scrollTo(0, element.offsetTop + 60);
+    const top = element.getBoundingClientRect().top + window.scrollY - window.innerHeight / 2 + 40;
+    const clamped = Math.max(0, top);
+    const html = document.documentElement;
+    const previous = html.style.scrollBehavior;
+    html.style.scrollBehavior = 'auto';
+    window.scrollTo(0, clamped);
+    html.style.scrollBehavior = previous;
+    return clamped;
   }, id);
 
+  await page.waitForFunction((top) => Math.abs(window.scrollY - top) <= 2, target);
+
   await page.waitForFunction((chapterId) => {
-    return window.__scrollDirector?.debugState().activeChapterId === chapterId;
+    return (
+      window.__scrollDirector?.debugState().activeChapterId === chapterId &&
+      document.querySelector<HTMLElement>('[data-story-controller]')?.dataset.activeChapter ===
+        chapterId
+    );
   }, id);
 }
 
@@ -93,8 +107,10 @@ async function waitForScrollSettled(page: Page): Promise<number> {
   return previous;
 }
 
-test.describe('ScrollDirector and Lenis', () => {
-  test('scrolling updates the active chapter, progress, and the dev overlay', async ({ page }) => {
+test.describe('ScrollDirector and Lenis on the story runtime', () => {
+  test('scrolling updates the active chapter, progress, and the progress rail', async ({
+    page,
+  }) => {
     const errors = watchErrors(page);
     await page.goto(HARNESS);
     await waitForDirector(page);
@@ -103,38 +119,39 @@ test.describe('ScrollDirector and Lenis', () => {
     expect(initial.driver).toBe('gsap.ticker');
     expect(initial.triggerCount).toBe(4);
     expect(initial.scrollTriggerCount).toBe(4);
-    expect(initial.activeChapterId).toBe('chapter-1');
+    expect(initial.activeChapterId).toBe('the-moving-point');
 
-    const overlay = await readHarnessState(page);
-    expect(overlay.controllerStatus).toBe('ready');
-    expect(overlay.overlayActive).toBe('chapter-1');
-    expect(overlay.overlayProgress).toBeGreaterThanOrEqual(0);
-    expect(overlay.overlayProgress).toBeLessThanOrEqual(1);
+    const view = await readHarnessState(page);
+    expect(view.controllerStatus).toBe('ready');
+    expect(view.activeChapterId).toBe('the-moving-point');
+    expect(view.activeSceneId).toBe('overview');
+    expect(view.stageCount).toBe(1);
+    expect(view.canvasCount).toBe(1);
+    expect(view.railActive).toBe('the-moving-point');
 
-    for (const id of ['chapter-2', 'chapter-3', 'chapter-4']) {
+    for (const id of ['a-closer-look', 'the-turn', 'pulling-back']) {
       await scrollToChapter(page, id);
 
       const state = await readDebug(page);
       expect(state.activeChapterId, `active chapter after scrolling to ${id}`).toBe(id);
       expect(state.chapters.find((chapter) => chapter.id === id)?.active).toBe(true);
 
-      const view = await readHarnessState(page);
-      expect(view.overlayActive, `overlay after scrolling to ${id}`).toBe(id);
-      expect(view.dataActiveChapter).toBe(id);
-      expect(view.overlayProgress).toBeGreaterThanOrEqual(0);
-      expect(view.overlayProgress).toBeLessThanOrEqual(1);
-      expect(Number(view.dataProgress)).toBeCloseTo(view.overlayProgress, 3);
+      const next = await readHarnessState(page);
+      expect(next.activeChapterId, `controller after scrolling to ${id}`).toBe(id);
+      expect(next.railActive, `rail after scrolling to ${id}`).toBe(id);
+      expect(next.dataProgress).toBeGreaterThanOrEqual(0);
+      expect(next.dataProgress).toBeLessThanOrEqual(1);
     }
 
     // Progress within one chapter must advance without a chapter change.
-    await scrollToChapter(page, 'chapter-2');
+    await scrollToChapter(page, 'a-closer-look');
     const early = await readDebug(page);
     const earlyProgress =
-      early.chapters.find((chapter) => chapter.id === 'chapter-2')?.progress ?? Number.NaN;
+      early.chapters.find((chapter) => chapter.id === 'a-closer-look')?.progress ?? Number.NaN;
     const chapterTwo = await page.evaluate(() => {
-      const element = document.getElementById('chapter-2');
-      if (!element) throw new Error('Missing chapter-2');
-      return element.offsetTop;
+      const element = document.getElementById('a-closer-look');
+      if (!element) throw new Error('Missing a-closer-look');
+      return element.getBoundingClientRect().top + window.scrollY;
     });
     await scrollToAbsolute(page, chapterTwo + 320);
 
@@ -146,17 +163,16 @@ test.describe('ScrollDirector and Lenis', () => {
           .chapters.find((candidate) => candidate.id === id);
         return chapter !== undefined && chapter.progress > min;
       },
-      { id: 'chapter-2', min: earlyProgress },
+      { id: 'a-closer-look', min: earlyProgress },
     );
 
     const late = await readDebug(page);
-
-    expect(late.activeChapterId).toBe('chapter-2');
+    expect(late.activeChapterId).toBe('a-closer-look');
     const lateProgress =
-      late.chapters.find((chapter) => chapter.id === 'chapter-2')?.progress ?? Number.NaN;
+      late.chapters.find((chapter) => chapter.id === 'a-closer-look')?.progress ?? Number.NaN;
     expect(lateProgress).toBeGreaterThan(earlyProgress);
-    const lateOverlay = await readHarnessState(page);
-    expect(Number(lateOverlay.dataProgress)).toBeCloseTo(lateProgress, 3);
+    const lateView = await readHarnessState(page);
+    expect(lateView.dataProgress).toBeCloseTo(lateProgress, 3);
 
     expect(errors).toEqual([]);
   });
@@ -256,7 +272,7 @@ test.describe('ScrollDirector and Lenis', () => {
     expect(root.reason).toBe('reduced-motion');
     expect(root.hasLenisClass).toBe(false);
 
-    await scrollToChapter(page, 'chapter-3');
+    await scrollToChapter(page, 'the-turn');
     expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
     expect(errors).toEqual([]);
   });
@@ -281,7 +297,7 @@ test.describe('ScrollDirector and Lenis', () => {
     expect(root.reason).toBe('test-mode');
     expect(root.hasLenisClass).toBe(false);
 
-    await scrollToChapter(page, 'chapter-2');
+    await scrollToChapter(page, 'a-closer-look');
     expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
     expect(errors).toEqual([]);
   });
@@ -289,7 +305,7 @@ test.describe('ScrollDirector and Lenis', () => {
   test('an authored data-lenis="off" marker is test mode', async ({ page }) => {
     const errors = watchErrors(page);
 
-    await page.route('**/dev/scroll-smoke', async (route) => {
+    await page.route('**/dev/story-smoke', async (route) => {
       const response = await route.fetch();
       const body = (await response.text()).replace(
         '<html lang="en"',
@@ -307,7 +323,7 @@ test.describe('ScrollDirector and Lenis', () => {
     expect(state.lenis.testMode).toBe(true);
     expect(await page.evaluate(() => document.documentElement.dataset.lenis)).toBe('off');
 
-    await scrollToChapter(page, 'chapter-2');
+    await scrollToChapter(page, 'a-closer-look');
     expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
     expect(errors).toEqual([]);
   });
@@ -396,7 +412,7 @@ test.describe('ScrollDirector and Lenis', () => {
     expect(errors).toEqual([]);
   });
 
-  test('ten navigations leave exactly one director and one trigger set', async ({ page }) => {
+  test('ten navigations leave exactly one director, stage, and trigger set', async ({ page }) => {
     const errors = watchErrors(page);
 
     for (let iteration = 0; iteration < 10; iteration += 1) {
@@ -408,10 +424,10 @@ test.describe('ScrollDirector and Lenis', () => {
         const state = window.__scrollDirector?.debugState() ?? null;
         return {
           mounts: window.__scrollDirectorMounts,
-          controllers: document.querySelectorAll('.story-controller').length,
-          readyControllers: document.querySelectorAll(
-            '.story-controller[data-story-controller="ready"]',
-          ).length,
+          controllers: document.querySelectorAll('[data-story-controller]').length,
+          readyControllers: document.querySelectorAll('[data-story-controller="ready"]').length,
+          stages: document.querySelectorAll('[data-story-stage]').length,
+          canvases: document.querySelectorAll('canvas[data-stage-canvas]').length,
           triggerCount: state?.triggerCount,
           scrollTriggerCount: state?.scrollTriggerCount,
           dataTriggers: document.documentElement.dataset.scrollTriggers,
@@ -423,6 +439,8 @@ test.describe('ScrollDirector and Lenis', () => {
       expect(snapshot.mounts, `mount count at navigation ${iteration + 1}`).toBe(1);
       expect(snapshot.controllers, `controller count at navigation ${iteration + 1}`).toBe(1);
       expect(snapshot.readyControllers).toBe(1);
+      expect(snapshot.stages, `stage count at navigation ${iteration + 1}`).toBe(1);
+      expect(snapshot.canvases, `canvas count at navigation ${iteration + 1}`).toBe(1);
       expect(snapshot.triggerCount).toBe(4);
       expect(snapshot.scrollTriggerCount).toBe(4);
       expect(snapshot.dataTriggers).toBe('4');
@@ -439,24 +457,24 @@ test.describe('ScrollDirector and Lenis', () => {
     await page.goto('/');
     await page.goto(HARNESS);
     await waitForDirector(page);
-    await scrollToChapter(page, 'chapter-3');
+    await scrollToChapter(page, 'the-turn');
 
     await page.goto('/');
     await expect(page.getByRole('heading', { level: 1, name: 'Algorithm Stories' })).toBeVisible();
 
     await page.goBack();
-    await expect(page).toHaveURL(/\/dev\/scroll-smoke$/);
+    await expect(page).toHaveURL(/\/dev\/story-smoke$/);
     await waitForDirector(page);
-    await scrollToChapter(page, 'chapter-2');
+    await scrollToChapter(page, 'a-closer-look');
 
     await page.goForward();
     await expect(page).toHaveURL(/\/$/);
     await expect(page.getByRole('heading', { level: 1, name: 'Algorithm Stories' })).toBeVisible();
 
     await page.goBack();
-    await expect(page).toHaveURL(/\/dev\/scroll-smoke$/);
+    await expect(page).toHaveURL(/\/dev\/story-smoke$/);
     await waitForDirector(page);
-    await scrollToChapter(page, 'chapter-4');
+    await scrollToChapter(page, 'pulling-back');
 
     expect(errors).toEqual([]);
   });

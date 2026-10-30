@@ -32,8 +32,9 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
         <code>tests/e2e/canvas-stage.spec.ts</code>.
       </p>
       <p>
-        The page stays in the production build as the Step 1.4 fixture so Playwright tests the same
-        artifact that ships. Step 1.5 replaces it with <code>/dev/story-smoke</code>.
+        This page stays in the production build as the renderer-lifecycle fixture so Playwright
+        tests the same artifact that ships. The story runtime fixture lives at
+        <code>/dev/story-smoke</code>; this page deliberately has no scroll owner.
       </p>
       <p class="canvas-smoke-page__spacer" aria-hidden="true"></p>
       <p>

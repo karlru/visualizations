@@ -1,0 +1,60 @@
+---
+/**
+ * A narrative chapter.
+ *
+ * The element owns a stable id, a real heading, and optional presentation
+ * metadata. Prose is an Astro slot, so it ships as server-rendered HTML and
+ * remains readable while the island hydrates (and when JavaScript fails).
+ *
+ * `data-scene` and `data-scene-overrides` are the controller's contract:
+ * `StoryController` registers every `[data-story-chapter]` element with
+ * `ScrollDirector` and composes the named scene using the chapter's progress.
+ * Overrides are presentation-only; engine parameters stay in `StoryConfig`.
+ */
+
+import {
+  type ChapterSceneOverrides,
+  serializeChapterSceneOverrides,
+} from '../../lib/chapter-metadata';
+
+interface Props {
+  /** Stable, human-readable fragment id. Deep links use `#id`. */
+  id: string;
+  /** Chapter heading text. */
+  title: string;
+  /** Scene id from the story's `StoryConfig.scenes`. */
+  scene: string;
+  /** Optional eyebrow label, for example "Chapter 02". */
+  eyebrow?: string;
+  /** Optional presentation overrides for this chapter only. */
+  sceneOverrides?: ChapterSceneOverrides;
+  /** Heading level. Chapters are h2 under the story's h1. */
+  level?: 2 | 3;
+}
+
+const { id, title, scene, eyebrow, sceneOverrides, level = 2 }: Props = Astro.props;
+const overridesJson = serializeChapterSceneOverrides(sceneOverrides);
+const headingId = `${id}-title`;
+---
+
+<section
+  id={id}
+  class="story-chapter"
+  data-story-chapter
+  data-scene={scene}
+  data-chapter-title={title}
+  data-scene-overrides={overridesJson}
+  aria-labelledby={headingId}
+>
+  {eyebrow && <p class="story-chapter__index">{eyebrow}</p>}
+  {
+    level === 3 ? (
+      <h3 id={headingId} class="story-chapter__title">{title}</h3>
+    ) : (
+      <h2 id={headingId} class="story-chapter__title">{title}</h2>
+    )
+  }
+  <div class="story-chapter__prose">
+    <slot />
+  </div>
+</section>

@@ -172,6 +172,9 @@ git --version
 │  │     └─ theme.ts
 │  ├─ stories/
 │  │  ├─ registry.ts
+│  │  ├─ dev/
+│  │  │  ├─ config.ts
+│  │  │  └─ canvas-smoke-engine.ts
 │  │  ├─ aco/
 │  │  │  ├─ config.ts
 │  │  │  ├─ scenes.ts
@@ -185,6 +188,8 @@ git --version
 │  │  ├─ seo.ts
 │  │  ├─ clipboard.ts
 │  │  ├─ persistence.ts
+│  │  ├─ chapter-metadata.ts
+│  │  ├─ scene-composition.ts
 │  │  └─ scroll-director.ts
 │  └─ styles/
 │     ├─ tokens.css
@@ -198,6 +203,7 @@ git --version
    │  ├─ rng.test.ts
    │  ├─ clock.test.ts
    │  ├─ url-state.test.ts
+   │  ├─ scene-composition.test.ts
    │  ├─ aco.test.ts
    │  ├─ randu.test.ts
    │  ├─ import-boundaries.test.ts
@@ -645,22 +651,22 @@ Verified 2026-10-30 with `pnpm lint`, `pnpm test`, `pnpm build`, and `CI=1 pnpm 
 - [x] Destroying the component removes all observers and listeners.
 - [x] No per-frame allocations occur in the steady-state draw path beyond documented buffers.
 
-Verified 2026-10-30 with `pnpm lint`, `pnpm test`, `pnpm build`, and `CI=1 pnpm test:e2e`. `tests/e2e/canvas-stage.spec.ts` covers hydration with no console errors, CSS/backing-store sizing at DPR 1 and 3 (cap 2), resize-while-paused, offscreen and hidden pause/resume, a real CDP touch gesture on a coarse pointer (vertical scroll remains native, horizontal orbit changes rotation, zoom buttons work), a synthetic `visualViewport` resize, and teardown plus ten reloads with one canvas. `tests/unit/canvas2d.test.ts` covers camera projection/unprojection/matrix, DPR sizing, theme token mapping, and primitive call sequences. The iOS criterion is verified in Chromium through the actual `visualViewport` handler and CSS `100svh`/`100dvh` rules; a real-device Safari pass remains part of the Step 3.6 responsive gate. The per-frame rule is a source audit, not a measurement: the draw path reuses one frame object, camera matrix, and point, and touches the DOM only every fifteenth frame for `data-frames` (plus `data-draws`/camera debug every thirtieth renderer draw). The `/dev/canvas-smoke` fixture stays in the production build until Step 1.5 replaces it with `/dev/story-smoke`.
+Verified 2026-10-30 with `pnpm lint`, `pnpm test`, `pnpm build`, and `CI=1 pnpm test:e2e`. `tests/e2e/canvas-stage.spec.ts` covers hydration with no console errors, CSS/backing-store sizing at DPR 1 and 3 (cap 2), resize-while-paused, offscreen and hidden pause/resume, a real CDP touch gesture on a coarse pointer (vertical scroll remains native, horizontal orbit changes rotation, zoom buttons work), a synthetic `visualViewport` resize, and teardown plus ten reloads with one canvas. `tests/unit/canvas2d.test.ts` covers camera projection/unprojection/matrix, DPR sizing, theme token mapping, and primitive call sequences. The iOS criterion is verified in Chromium through the actual `visualViewport` handler and CSS `100svh`/`100dvh` rules; a real-device Safari pass remains part of the Step 3.6 responsive gate. The per-frame rule is a source audit, not a measurement: the draw path reuses one frame object, camera matrix, and point, and touches the DOM only every fifteenth frame for `data-frames` (plus `data-draws`/camera debug every thirtieth renderer draw). The `/dev/canvas-smoke` fixture remains in the production build as the renderer-lifecycle fixture; Step 1.5 added `/dev/story-smoke` for the complete story runtime.
 
-### Step 1.5 — Story controller, chapters, and progress rail
+### (DONE) Step 1.5 — Story controller, chapters, and progress rail
 
 **Goal:** A complete scroll-story skeleton driven by MDX chapters.
 
 **Tasks**
 
-1. Create the `Chapter.astro` component with a stable `id`, title, and optional scene overrides.
-2. Create `StoryController.svelte` to load a story config, build the engine, mount the renderer, and register chapters.
-3. Create `ProgressRail.svelte` with chapter links, current position, and keyboard access.
-4. Create `StageChrome.svelte` for play/pause, replay, speed, and settings.
-5. Implement chapter entry, progress, and exit semantics.
-6. Create a hidden development story page with at least four chapters and a simple moving object.
-7. Keep the development page in the production build with `noindex`, no navigation link, and an explicit sitemap exclusion. This lets Playwright test the built preview against the same artifact that ships.
-8. Ensure deep links to `#chapter-id` activate the correct scene after the pin offset is measured.
+1. (DONE) Create the `Chapter.astro` component with a stable `id`, title, and optional scene overrides.
+2. (DONE) Create `StoryController.svelte` to load a story config, build the engine, mount the renderer, and register chapters.
+3. (DONE) Create `ProgressRail.svelte` with chapter links, current position, and keyboard access.
+4. (DONE) Create `StageChrome.svelte` for play/pause, replay, speed, and settings.
+5. (DONE) Implement chapter entry, progress, and exit semantics.
+6. (DONE) Create a hidden development story page with at least four chapters and a simple moving object.
+7. (DONE) Keep the development page in the production build with `noindex`, no navigation link, and an explicit sitemap exclusion. This lets Playwright test the built preview against the same artifact that ships.
+8. (DONE) Ensure deep links to `#chapter-id` activate the correct scene after the pin offset is measured.
 
 **Files**
 
@@ -668,19 +674,27 @@ Verified 2026-10-30 with `pnpm lint`, `pnpm test`, `pnpm build`, and `CI=1 pnpm 
 - `src/components/story/StoryController.svelte`
 - `src/components/story/ProgressRail.svelte`
 - `src/components/story/StageChrome.svelte`
+- `src/lib/chapter-metadata.ts`
+- `src/lib/scene-composition.ts`
+- `src/stories/dev/config.ts`
 - `src/pages/dev/story-smoke.astro`
 - `src/stories/registry.ts`
+- `tests/unit/scene-composition.test.ts`
+- `tests/e2e/story-runtime.spec.ts`
+- `tests/e2e/scroll.spec.ts`
 
 **Acceptance criteria**
 
-- [ ] The development story scrolls through four chapters.
-- [ ] Each chapter activates its scene.
-- [ ] Deep-linking to `#chapter-id` works.
-- [ ] The progress rail reflects the active chapter.
-- [ ] The stage remains pinned during the narrative.
-- [ ] The page has a single stage element.
-- [ ] The development page is not linked from the production navigation, is `noindex`, and is excluded from the sitemap.
-- [ ] The runtime E2E suite runs against the built preview, including the development page.
+- [x] The development story scrolls through four chapters.
+- [x] Each chapter activates its scene.
+- [x] Deep-linking to `#chapter-id` works.
+- [x] The progress rail reflects the active chapter.
+- [x] The stage remains pinned during the narrative.
+- [x] The page has a single stage element.
+- [x] The development page is not linked from the production navigation, is `noindex`, and is excluded from the sitemap.
+- [x] The runtime E2E suite runs against the built preview, including the development page.
+
+Verified 2026-10-30 with `pnpm lint`, `pnpm test`, `pnpm build`, `pnpm check:links`, and `CI=1 pnpm test:e2e`. `/dev/story-smoke` renders four `Chapter.astro` sections inside the `StoryController` island and reuses `StoryStage` + `Canvas2DRenderer`; `StoryController` registers the chapter elements with `ScrollDirector` and owns the fixed-step clock and engine. Chapter entry resets the run and applies typed defaults; progress composes camera, layer opacity, highlights, and reveal through `composeSceneState` without touching engine parameters; exit settles the crossed edge. Deep links are resolved after `ScrollDirector.refresh()` and again after fonts settle. The renderer factory is constructed inside the island (Astro cannot pass functions across hydration) and remains the single concrete factory until Step 4.1 adds a renderer-id registry. `tests/e2e/story-runtime.spec.ts` covers four chapter/scene activations, deep links and reload, rail keyboard/click navigation, a pinned stage at 360 px and 1440 px, one stage/canvas, noindex/unlinked/sitemap exclusion, play/pause, 1×/4× simulated time, replay, and teardown. `tests/e2e/scroll.spec.ts` now targets `/dev/story-smoke` and keeps the Step 1.3 trigger-count, native-scroll, keyboard, Lenis-policy, ten-navigation, and back/forward assertions. `/dev/scroll-smoke` was removed; `/dev/canvas-smoke` remains as the renderer-lifecycle fixture.
 
 ### Step 1.6 — Controls, keyboard support, and metrics
 

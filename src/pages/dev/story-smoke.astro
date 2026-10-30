@@ -1,0 +1,119 @@
+---
+/**
+ * Internal story-runtime fixture.
+ *
+ * This page is a real story: it uses the production `Chapter.astro`,
+ * `StoryController`, `ProgressRail`, `StageChrome`, `StoryStage`, and
+ * `Canvas2DRenderer`. It stays in the production build so Playwright tests the
+ * same artifact that ships, but it is noindex, absent from the sitemap, and
+ * never linked from the public navigation.
+ */
+
+import Chapter from '../../components/story/Chapter.astro';
+import StoryController from '../../components/story/StoryController.svelte';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { devStoryConfig } from '../../stories/dev/config';
+
+const prose = [
+  'The stage on the left is sticky, not scroll-jacked. The document remains the scroller, so the native scrollbar, PageDown, arrow keys, Home, and End all keep working while the point moves.',
+  'This chapter changes the camera and the visible layers. The simulation itself keeps running: scroll decides what the reader sees, never how the algorithm behaves.',
+  'Presentation overrides are published as chapter metadata. The controller reads them from the DOM, composes the scene, and leaves the engine parameters untouched.',
+  'The final chapter pulls back to the whole field. Replay resets the simulation, play/pause freezes it, and the speed control changes the clock, not the scene.',
+];
+
+const chapters = devStoryConfig.chapters.map((chapter, index) => ({
+  ...chapter,
+  eyebrow: `Chapter ${String(index + 1).padStart(2, '0')}`,
+  body: prose[index] ?? '',
+}));
+---
+
+<BaseLayout
+  title="Story runtime smoke test"
+  description="Internal development fixture for the Algorithm Stories story controller, chapters, progress rail, and stage controls."
+  noindex
+>
+  <div class="story-smoke page-shell">
+    <header class="story-smoke__intro">
+      <p class="eyebrow">Internal · not indexed</p>
+      <h1 class="story-smoke__title">Story runtime smoke test</h1>
+      <p class="story-smoke__dek">
+        Four chapters, one persistent Canvas 2D stage, and a single GSAP ticker. The stage stays
+        pinned while the prose scrolls past. Chapter fragments are canonical:
+        <code>#the-turn</code> opens the third chapter directly.
+      </p>
+    </header>
+
+    <StoryController client:load>
+      {
+        chapters.map((chapter) => (
+          <Chapter
+            id={chapter.id}
+            title={chapter.title}
+            scene={chapter.scene}
+            eyebrow={chapter.eyebrow}
+            sceneOverrides={chapter.sceneOverrides}
+          >
+            <p>{chapter.body}</p>
+            <p>
+              The chapter id is stable and deep-linkable. Scroll a little, then a little more: the
+              camera, reveal, and highlighted layer interpolate deterministically, and the progress
+              rail follows the active chapter.
+            </p>
+          </Chapter>
+        ))
+      }
+    </StoryController>
+
+    <section class="story-smoke__outro" aria-labelledby="outro-title">
+      <p class="eyebrow">End of fixture</p>
+      <h2 id="outro-title" class="story-smoke__outro-title">Native scroll to the end</h2>
+      <p>
+        This block gives the document extra length so Home and End have unambiguous extremes.
+        Leaving the stage viewport pauses rendering and simulation; returning resumes both. The
+        fixture is exercised by <code>tests/e2e/story-runtime.spec.ts</code> and
+        <code>tests/e2e/scroll.spec.ts</code>.
+      </p>
+      <p><a href="/">Back to the home page</a></p>
+    </section>
+  </div>
+</BaseLayout>
+
+<style>
+  .story-smoke {
+    padding-block: var(--space-2xl) var(--space-3xl);
+  }
+
+  .story-smoke__intro {
+    max-inline-size: var(--measure-prose);
+    padding-block-end: var(--space-2xl);
+  }
+
+  .story-smoke__title {
+    margin-block-start: var(--space-sm);
+    font-size: var(--text-h1);
+    letter-spacing: var(--tracking-tighter);
+  }
+
+  .story-smoke__dek {
+    margin-block-start: var(--space-md);
+    color: var(--color-paper-muted);
+    font-size: var(--text-lead);
+    line-height: var(--leading-relaxed);
+  }
+
+  .story-smoke__outro {
+    max-inline-size: var(--measure-prose);
+    padding-block: var(--space-3xl) var(--space-2xl);
+    border-block-start: var(--hairline) solid var(--color-rule-paper);
+  }
+
+  .story-smoke__outro-title {
+    margin-block: var(--space-sm) var(--space-md);
+    font-size: var(--text-h2);
+  }
+
+  .story-smoke__outro p + p {
+    margin-block-start: var(--space-md);
+  }
+</style>

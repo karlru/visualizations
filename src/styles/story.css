@@ -114,6 +114,18 @@
   line-height: var(--leading-relaxed);
 }
 
+.story-chapter__prose {
+  display: grid;
+  gap: var(--space-md);
+  max-inline-size: var(--measure-prose);
+  color: var(--color-paper-muted);
+  line-height: var(--leading-relaxed);
+}
+
+.story-chapter__prose > * {
+  margin: 0;
+}
+
 .story-stage__surface {
   display: grid;
   align-content: center;
@@ -229,69 +241,6 @@
   .story-stage__canvas {
     cursor: default;
   }
-}
-
-.story-stage__readout {
-  font-family: var(--font-mono);
-  font-size: var(--text-h3);
-  letter-spacing: var(--tracking-tight);
-}
-
-/* ── Development scroll overlay ───────────────────────────────────────── */
-.scroll-debug {
-  position: fixed;
-  inset-block-end: var(--space-sm);
-  inset-inline-end: var(--space-sm);
-  z-index: var(--z-overlay);
-  display: grid;
-  gap: var(--space-2xs);
-  inline-size: min(calc(var(--space-5xl) + var(--space-3xl)), calc(100vw - 2 * var(--space-sm)));
-  padding: var(--space-sm);
-  border: var(--hairline) solid var(--color-rule-stage);
-  border-radius: var(--radius-md);
-  background-color: var(--color-stage);
-  color: var(--color-stage-ink);
-  font-family: var(--font-mono);
-  font-size: var(--text-2xs);
-  pointer-events: none;
-  box-shadow: var(--shadow-panel);
-}
-
-.scroll-debug__row {
-  display: flex;
-  gap: var(--space-sm);
-  align-items: baseline;
-  justify-content: space-between;
-  margin: 0;
-}
-
-.scroll-debug__label {
-  color: var(--color-stage-muted);
-  letter-spacing: var(--tracking-wider);
-  text-transform: uppercase;
-}
-
-.scroll-debug__value {
-  overflow: hidden;
-  color: var(--color-stage-ink);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.scroll-debug__track {
-  block-size: var(--space-3xs);
-  overflow: hidden;
-  border-radius: var(--radius-pill);
-  background-color: var(--color-stage-raised);
-}
-
-.scroll-debug__bar {
-  display: block;
-  block-size: 100%;
-  inline-size: 100%;
-  transform-origin: left center;
-  background-color: var(--color-accent-stage);
-  transition: transform var(--duration-instant) linear;
 }
 
 /* ── Lenis ────────────────────────────────────────────────────────────── */
@@ -428,6 +377,12 @@ html.lenis body {
 }
 
 /* ── Responsive stage ─────────────────────────────────────────────────── */
+/*
+ * Below the two-column breakpoint the stage stays sticky rather than becoming
+ * static. It reserves its own row, so chapters scroll past it without the
+ * document losing its native scroller. The cap leaves room for prose while
+ * keeping the stage large enough to read.
+ */
 @media (max-width: 60rem) {
   .story-layout {
     grid-template-columns: minmax(0, 1fr);
@@ -435,22 +390,27 @@ html.lenis body {
   }
 
   .story-layout__stage {
-    position: static;
+    position: sticky;
+    inset-block-start: var(--space-2xs);
+    z-index: var(--z-sticky);
+    padding-block-end: var(--space-2xs);
+    background-color: var(--color-paper);
+  }
+
+  .story-stage {
+    --story-stage-max-block: 55svh;
+  }
+
+  @supports (block-size: 100dvh) {
+    .story-stage {
+      --story-stage-max-block: 55dvh;
+    }
   }
 }
 
 /* ── Reduced motion ───────────────────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
-  .story-layout__stage {
-    position: relative;
-    inset-block-start: auto;
-  }
-
   .story-chapter {
     scroll-margin-block-start: var(--space-lg);
-  }
-
-  .scroll-debug__bar {
-    transition: none;
   }
 }
