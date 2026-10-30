@@ -9,7 +9,10 @@
  * The component adds no client script.
  *
  * The SVG carries its own `<title>` and `<desc>`, so the frame is not labelled a
- * second time; the caption supplies the readable argument and the numbers.
+ * second time; the caption supplies the readable argument and the numbers. On
+ * narrow screens the drawing's internal annotations would shrink below a
+ * readable size, so they are hidden and the caption carries their content. The
+ * drawing itself stays full width, with no horizontal page overflow.
  */
 
 interface Props {
@@ -57,6 +60,18 @@ const { svg, title, caption, source, id, name } = Astro.props;
     display: block;
     width: 100%;
     height: auto;
+  }
+
+  /*
+   * The 960 × 600 drawing's labels are ~15 px at full size; below the prose
+   * breakpoint they would render at four or five pixels. Hide only the text
+   * nodes there. The route, halo, dash pattern, and square markers stay
+   * visible, and the caption repeats every number the labels carried.
+   */
+  @media (max-width: 48rem) {
+    .figure__frame :global(svg text) {
+      display: none;
+    }
   }
 
   .figure__caption {

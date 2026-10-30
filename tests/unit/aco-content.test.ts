@@ -135,6 +135,8 @@ describe('ACO story prose contract', () => {
     expect(chapterBody('the-problem')).toMatch(/traveling salesman problem/i);
     expect(chapterBody('the-problem')).toMatch(/cycle/i);
     expect(chapterBody('the-problem')).toMatch(/return edge/i);
+    expect(chapterBody('the-problem')).toMatch(/29! orders/);
+    expect(chapterBody('the-problem')).not.toMatch(/29 orders/);
     expect(chapterBody('the-problem')).toMatch(/29!\/2/);
 
     // 03 — one ant's choice: allowed set, focal city, top N and other (Σ),
@@ -166,6 +168,9 @@ describe('ACO story prose contract', () => {
     expect(chapterBody('emergence')).toMatch(/mean/i);
     expect(chapterBody('emergence')).toMatch(/entropy/i);
     expect(chapterBody('emergence')).toMatch(/4\.91/);
+    expect(chapterBody('emergence')).toMatch(/6\.12/);
+    expect(chapterBody('emergence')).not.toMatch(/6\.36/);
+    expect(chapterBody('emergence')).toMatch(/4\.91 record is shorter/i);
     expect(chapterBody('emergence')).toMatch(/<Figure\b/);
 
     // 08 — tuning: all four presets with their documented values.
@@ -195,7 +200,13 @@ describe('ACO story prose contract', () => {
     expect(chapterBody('the-lab')).toMatch(/seed/i);
     expect(chapterBody('the-lab')).toMatch(/share link/i);
     expect(chapterBody('the-lab')).toMatch(/not encoded in a share URL/i);
+    expect(chapterBody('the-lab')).toMatch(/playback, replay, speed, and share/);
+    expect(chapterBody('the-lab')).toMatch(
+      /share link records the seed.*structural parameters.*speed.*chapter/is,
+    );
+    expect(chapterBody('the-lab')).toMatch(/parameter panel, presets, city editor, and reset/);
     expect(chapterBody('the-lab')).toMatch(/not part of this chapter yet/i);
+    expect(chapterBody('the-lab')).not.toMatch(/share button belong/i);
   });
 
   it('includes two native predictions, four callouts, and one static figure', () => {
