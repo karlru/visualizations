@@ -507,7 +507,7 @@ The story runtime is built once and used by both stories. It is tested with a hi
 3. (DONE) Define `StageRenderer<P, S>` with async `mount`, `resize`, `setScene`, `setParams`, `setPaused`, and `dispose`.
 4. (DONE) Define `StoryConfig` with slug, engine factory, defaults, presets, scenes, and URL parameter schema.
 5. (DONE) Define `ChapterSpec` with id, title, scene overrides, `pseudocodeLine`, `annotations`, `reducedMotionSteps`, and `tourAct`.
-6. Add an import-boundary lint rule or test that engines do not import UI or renderer code.
+6. (DONE) Add an import-boundary lint rule or test that engines do not import UI or renderer code.
 7. Add a fake-3D contract test: async mount, a 3D camera pose, and label registration. This must pass before Phase 4.
 
 **Files**
