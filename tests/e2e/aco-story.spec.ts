@@ -111,6 +111,16 @@ async function scrollToChapter(page: Page, id: string): Promise<void> {
   );
 }
 
+/** Wait for fragment resolution to settle after hydration or reload. */
+async function waitForChapter(page: Page, id: string): Promise<void> {
+  await page.waitForFunction(
+    (chapterId) =>
+      document.querySelector<HTMLElement>('[data-story-controller]')?.dataset.activeChapter ===
+      chapterId,
+    id,
+  );
+}
+
 test.describe('ACO story route', () => {
   test('renders one live stage, ten chapters, the rail, and colony metrics', async ({ page }) => {
     const errors = watchErrors(page);
@@ -177,6 +187,7 @@ test.describe('ACO story route', () => {
 
     await page.goto(`${STORY}#emergence`);
     await waitForRuntime(page);
+    await waitForChapter(page, 'emergence');
 
     const deepLinked = await readStory(page);
     expect(deepLinked.activeChapter).toBe('emergence');
@@ -194,11 +205,7 @@ test.describe('ACO story route', () => {
 
     await page.reload();
     await waitForRuntime(page);
-    await page.waitForFunction(
-      () =>
-        document.querySelector<HTMLElement>('[data-story-controller]')?.dataset.activeChapter ===
-        'emergence',
-    );
+    await waitForChapter(page, 'emergence');
     const reloaded = await readStory(page);
     expect(reloaded.activeChapter).toBe('emergence');
     expect(reloaded.activeScene).toBe('emergence');
@@ -266,6 +273,7 @@ test.describe('ACO story route', () => {
     // chapter fragment without double-applying anything.
     await page.goto(`${STORY}?speed=4#emergence`);
     await waitForRuntime(page);
+    await waitForChapter(page, 'emergence');
     const restored = await readStory(page);
     expect(restored.speed).toBe(4);
     expect(restored.params.speed).toBe(4);

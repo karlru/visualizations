@@ -184,6 +184,8 @@
   let urlChapter: string | null = null;
   let chapterIds: readonly string[] = [];
   let urlSyncTimer: number | null = null;
+  /** Previous browser scroll-restoration mode, restored on cleanup. */
+  let previousScrollRestoration: ScrollRestoration | null = null;
 
   /**
    * Deterministic starting state for the most recent chapter entry. It is
@@ -1051,6 +1053,14 @@
 
     if (typeof window === 'undefined' || typeof document === 'undefined') return;
 
+    // The story owns chapter scroll. Automatic restoration would race the
+    // deep-link resolution on reload, especially once the stage changes the
+    // article's height.
+    if (previousScrollRestoration !== null) {
+      window.history.scrollRestoration = previousScrollRestoration;
+      previousScrollRestoration = null;
+    }
+
     listeners?.abort();
     listeners = null;
 
@@ -1189,14 +1199,11 @@
     // Article mode persists across reloads by simply never turning this on for
     // the stage layout.
     enhanced = true;
-    if (!articleMode) {
-      // The two-column/sticky layout changes chapter heights after Svelte
-      // flushes. Registering the stage also refreshes; this covers article
-      // readers who keep the compact layout.
-      requestAnimationFrame(() => {
-        if (mounted) instance.refresh();
-      });
-    }
+    requestAnimationFrame(() => {
+      if (!mounted) return;
+      instance.refresh();
+      if (initialHash.length > 0) resolveHash();
+    });
 
     void document.fonts.ready.then(() => {
       if (!mounted) return;
@@ -1240,6 +1247,14 @@
     // frame can advance between hydration and the first reader input.
     paused = systemReducedMotion || manualReducedMotion;
     document.documentElement.dataset.reducedMotion = paused ? 'true' : 'false';
+
+    // Deep links and chapter entry own vertical position. Leaving browser
+    // restoration on lets a reload restore a stale offset after the stage has
+    // changed the document height, racing the fragment resolution.
+    if ('scrollRestoration' in window.history) {
+      previousScrollRestoration = window.history.scrollRestoration;
+      window.history.scrollRestoration = 'manual';
+    }
 
     document.addEventListener('astro:before-swap', handleBeforeSwap, { signal });
     window.addEventListener('pagehide', handlePageHide, { signal });
