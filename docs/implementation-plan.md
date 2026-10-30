@@ -899,10 +899,10 @@ Verified 2026-10-30 with `pnpm lint` and `pnpm test` (225 passing, 1 existing to
 **Tasks**
 
 1. (DONE) Define parameters: city count, ant count, `α`, `β`, `ρ`, speed, seed. `Q` is fixed at `1` in release 1.
-2. Initialize pheromone to a small positive value.
-3. Construct one tour per ant using the probabilistic transition rule, falling back to a uniform choice when all weights are zero.
-4. Deposit pheromone proportional to inverse tour length.
-5. Evaporate and update pheromone, allowing values to reach zero but never negative or non-finite.
+2. (DONE) Initialize pheromone to a small positive value.
+3. (DONE) Construct one tour per ant using the probabilistic transition rule, falling back to a uniform choice when all weights are zero.
+4. (DONE) Deposit pheromone proportional to inverse tour length.
+5. (DONE) Evaporate and update pheromone, allowing values to reach zero but never negative or non-finite.
 6. Track best tour, best length, mean length, iteration, and normalized pheromone entropy using the formula in `docs/stories.md` §2.6.
 7. Support `stepIteration()` for deterministic tests and `step(dt)` for the clock.
 8. Restart the run at iteration 0 when a structural parameter or the city set changes; invalidate best/mean history.
@@ -918,10 +918,10 @@ Verified 2026-10-30 with `pnpm lint` and `pnpm test` (225 passing, 1 existing to
 
 **Acceptance criteria**
 
-- [ ] The engine constructs valid tours.
-- [ ] Transition probabilities are normalized over the allowed set.
-- [ ] All-zero transition weights fall back to a uniform choice.
-- [ ] Pheromone remains non-negative and finite, including `ρ = 1`.
+- [x] The engine constructs valid tours.
+- [x] Transition probabilities are normalized over the allowed set.
+- [x] All-zero transition weights fall back to a uniform choice.
+- [x] Pheromone remains non-negative and finite, including `ρ = 1`.
 - [ ] The best length never increases for a fixed city set since the last reset.
 - [ ] The entropy metric is normalized to `[0, 1]`.
 - [ ] A fixed run identity produces identical results.
