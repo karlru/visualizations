@@ -37,5 +37,88 @@ references:
 status: "initial-release"
 ---
 
-Placeholder entry. The ten-chapter narrative, formulas, figures, and lab arrive in Phase 3;
-this body exists only so the content collection and schema can be validated in Phase 0.
+import Chapter from '../../../components/story/Chapter.astro';
+
+{/* Placeholder prose for the route/runtime session. Step 3.3's prose session
+    replaces these bodies with the narrative, callouts, figures, and citations;
+    the ids, titles, and scenes are already the contract from `ACO_CHAPTERS`. */}
+
+<Chapter id="the-colony" title="The colony" scene="colony-overview" eyebrow="Chapter 01">
+
+The colony has no leader and no map. Each ant sees only the city it stands in and the trails
+left by the ants before it.
+
+</Chapter>
+
+<Chapter id="the-problem" title="The problem" scene="tour-problem" eyebrow="Chapter 02">
+
+The task is to visit every city once and return to the start. A short tour is hard to find
+because the number of possible orderings grows very quickly.
+
+</Chapter>
+
+<Chapter id="one-ants-choice" title="One ant's choice" scene="focal-choice" eyebrow="Chapter 03">
+
+Watch one ant at a focal city. Its next move depends on two local signals: how much pheromone
+an edge carries and how far away its other end is.
+
+</Chapter>
+
+<Chapter
+  id="the-probability-rule"
+  title="The probability rule"
+  scene="probability-rule"
+  eyebrow="Chapter 04"
+>
+
+An ant does not pick the shortest edge outright. It samples from a probability distribution
+shaped by pheromone and distance, so every allowed city keeps a chance.
+
+</Chapter>
+
+<Chapter id="leaving-a-trace" title="Leaving a trace" scene="deposit" eyebrow="Chapter 05">
+
+When an ant completes a tour, it adds pheromone to the edges it used. Shorter tours leave a
+stronger trace than longer ones.
+
+</Chapter>
+
+<Chapter id="forgetting" title="Forgetting" scene="evaporation" eyebrow="Chapter 06">
+
+Pheromone does not accumulate forever. Evaporation removes a fraction of every trail each
+iteration, so stale choices lose their advantage.
+
+</Chapter>
+
+<Chapter id="emergence" title="Emergence" scene="emergence" eyebrow="Chapter 07">
+
+No ant plans the whole route, yet the colony's best tour improves. The result emerges from
+repeated local choices and a shared environment.
+
+</Chapter>
+
+<Chapter
+  id="tuning-the-colony"
+  title="Tuning the colony"
+  scene="tuning"
+  eyebrow="Chapter 08"
+>
+
+The weights α and β change how strongly the colony trusts pheromone or distance, while ρ sets
+how quickly old trails fade.
+
+</Chapter>
+
+<Chapter id="when-it-fails" title="When it fails" scene="limits" eyebrow="Chapter 09">
+
+Ant System is a heuristic, not a guarantee. It can settle on a mediocre tour, and its cost
+grows with the size of the problem.
+
+</Chapter>
+
+<Chapter id="the-lab" title="The lab" scene="lab" eyebrow="Chapter 10">
+
+The final chapter is a place to experiment. Change the colony's parameters and watch how the
+same local rules produce a different search.
+
+</Chapter>

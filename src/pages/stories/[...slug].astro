@@ -1,0 +1,60 @@
+---
+/**
+ * Public story route.
+ *
+ * One generic route renders every content entry whose slug has a registered
+ * story module. `getStaticPaths` filters on that list, so the RANDU placeholder
+ * cannot produce a broken page before Phase 5.
+ *
+ * The MDX body is rendered to HTML by Astro and passed as the controller's
+ * children. That keeps the article as the server-rendered default: chapter
+ * prose, headings, figures, and citations exist before the island hydrates, and
+ * the stage is added only when the controller enhances the page.
+ */
+
+import { type CollectionEntry, getCollection, render } from 'astro:content';
+import StoryController from '../../components/story/StoryController.svelte';
+import StoryLayout from '../../layouts/StoryLayout.astro';
+import { isStorySlug, loadStoryModule } from '../../stories/loader';
+
+export async function getStaticPaths() {
+  const entries = await getCollection('stories');
+  return entries
+    .filter((entry) => isStorySlug(entry.data.slug))
+    .map((entry) => ({
+      params: { slug: entry.data.slug },
+      props: { entry },
+    }));
+}
+
+interface Props {
+  entry: CollectionEntry<'stories'>;
+}
+
+const { entry } = Astro.props;
+const { Content } = await render(entry);
+
+// The module view is the single source of chapter order and titles. The same
+// list renders the rail before hydration and is replaced by measured DOM ids.
+const storyModule = await loadStoryModule(entry.data.slug);
+const initialChapters = storyModule.view.chapters.map((chapter, index) => ({
+  id: chapter.id,
+  title: chapter.title,
+  number: index + 1,
+}));
+
+const stageLabel = `${entry.data.title} interactive stage`;
+const stageDescription = `${entry.data.title}: an interactive ${entry.data.category.toLowerCase()} visualization. The canvas is decorative; the chapter prose, stage labels, and metrics carry the meaning.`;
+---
+
+<StoryLayout {entry}>
+  <StoryController
+    client:load
+    storyKey={storyModule.view.slug}
+    {initialChapters}
+    {stageLabel}
+    {stageDescription}
+  >
+    <Content />
+  </StoryController>
+</StoryLayout>
