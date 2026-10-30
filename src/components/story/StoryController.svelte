@@ -54,6 +54,7 @@
     readPreference,
     writePreference,
   } from '../../lib/persistence';
+  import { setPseudocodeActiveLine } from '../../lib/pseudocode-dom';
   import { composeSceneState } from '../../lib/scene-composition';
   import { type ScrollChapterEvent, ScrollDirector } from '../../lib/scroll-director';
   import type { SceneState } from '../../render/types';
@@ -99,6 +100,11 @@
     stageLabel?: string;
     /** Low-frequency text alternative for the canvas content. */
     stageDescription?: string;
+    /**
+     * Build-time highlighted pseudocode for the stage panel. The page supplies
+     * static HTML; the island never imports Shiki or the highlighter.
+     */
+    pseudocodeHtml?: string;
     /** Prose chapters. They are server-rendered and remain readable without JS. */
     children?: Snippet;
   }
@@ -109,6 +115,7 @@
     initialChapters = [],
     stageLabel = 'Interactive story stage',
     stageDescription = 'A deterministic simulation whose camera, visible layers, and highlights follow the active chapter. The canvas is decorative; chapter prose and stage labels carry the meaning.',
+    pseudocodeHtml,
     children,
   }: Props = $props();
 
@@ -250,6 +257,37 @@
   let activeSceneStepCount = $derived(
     sceneStepCountFor(activeChapterId === null ? undefined : runtimeChapters.get(activeChapterId)),
   );
+  /** Highlighted pseudocode panel, mounted only in the enhanced stage layout. */
+  let pseudocodePanel = $state<HTMLElement | null>(null);
+  /**
+   * The line the active chapter introduces. Read from the typed chapter spec;
+   * a chapter without one leaves the panel unmarked instead of guessing.
+   */
+  let activePseudocodeLine = $derived.by((): number | null => {
+    if (activeChapterId === null) return null;
+    const line = runtimeChapters.get(activeChapterId)?.spec?.pseudocodeLine;
+    return typeof line === 'number' && Number.isInteger(line) ? line : null;
+  });
+
+  /**
+   * Chapter-level line highlight. This effect depends on the active chapter and
+   * stage visibility only — never on scroll progress — so the DOM moves at most
+   * once per chapter entry. It runs after Svelte has rendered the panel; the
+   * static listing already owns `data-line` spans, so no re-highlighting occurs.
+   */
+  $effect(() => {
+    const panel = pseudocodePanel;
+    const html = pseudocodeHtml ?? null;
+    const line = activePseudocodeLine;
+    const visible = showStage;
+    if (!visible || panel === null || html === null) return;
+
+    const marked = setPseudocodeActiveLine(panel, line);
+    if (root !== null) {
+      if (marked === null) delete root.dataset.pseudocodeLine;
+      else root.dataset.pseudocodeLine = String(marked);
+    }
+  });
 
   /**
    * The story module owns the concrete renderer factory. The controller only
@@ -1324,7 +1362,10 @@
 
   <div class="story-layout" data-story-layout>
     {#if showStage}
-      <div class="story-layout__stage">
+      <div
+        class="story-layout__stage"
+        class:story-layout__stage--with-pseudocode={pseudocodeHtml !== undefined}
+      >
         <StoryStage
           {createRenderer}
           {scene}
@@ -1364,6 +1405,26 @@
             onShare={shareCurrentState}
           />
         </StoryStage>
+
+        <!--
+          The pseudocode panel is an enhancement: it exists only while the
+          interactive stage does, never in article mode or the no-JS document.
+          The listing itself is build-time HTML from the page; this island only
+          moves the active line on chapter entry.
+        -->
+        {#if pseudocodeHtml}
+          <section class="story-pseudocode" aria-labelledby="story-pseudocode-title" data-pseudocode-panel>
+            <div class="story-pseudocode__head">
+              <h2 class="story-controls__title" id="story-pseudocode-title">The algorithm</h2>
+              <p class="story-pseudocode__note" id="story-pseudocode-note">
+                The highlighted line follows the chapter you are reading, not the scroll position.
+              </p>
+            </div>
+            <div class="story-pseudocode__body" bind:this={pseudocodePanel}>
+              {@html pseudocodeHtml}
+            </div>
+          </section>
+        {/if}
       </div>
     {/if}
 

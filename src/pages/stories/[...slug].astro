@@ -15,6 +15,7 @@
 import { type CollectionEntry, getCollection, render } from 'astro:content';
 import StoryController from '../../components/story/StoryController.svelte';
 import StoryLayout from '../../layouts/StoryLayout.astro';
+import { renderStoryPseudocodeHtml } from '../../lib/story-pseudocode';
 import { isStorySlug, loadStoryModule } from '../../stories/loader';
 
 export async function getStaticPaths() {
@@ -45,6 +46,11 @@ const initialChapters = storyModule.view.chapters.map((chapter, index) => ({
 
 const stageLabel = `${entry.data.title} interactive stage`;
 const stageDescription = `${entry.data.title}: an interactive ${entry.data.category.toLowerCase()} visualization. The canvas is decorative; the chapter prose, stage labels, and metrics carry the meaning.`;
+
+// Highlighted once for the whole build. Shiki stays in this server-side module
+// and is never imported by the island; stories without a listing simply omit
+// the stage panel.
+const pseudocodeHtml = await renderStoryPseudocodeHtml(entry.data.slug);
 ---
 
 <StoryLayout {entry}>
@@ -54,6 +60,7 @@ const stageDescription = `${entry.data.title}: an interactive ${entry.data.categ
     {initialChapters}
     {stageLabel}
     {stageDescription}
+    pseudocodeHtml={pseudocodeHtml}
   >
     <Content />
   </StoryController>
