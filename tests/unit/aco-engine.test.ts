@@ -28,8 +28,22 @@ import type { AcoParams } from '../../src/engines/aco/types';
  * normalized transition probabilities, the uniform fallback, pheromone bounds
  * (including rho = 1), best-length monotonicity, the entropy formula, run
  * determinism, structural-versus-presentation resets, snapshot reuse, and the
- * fixed-step iteration budget. Step 2.3 expands the property and edge-case
- * matrix; every seed here is fixed so the file is fast and repeatable.
+ * fixed-step iteration budget. Step 2.3 expands the property, invariants, and
+ * edge-case matrix; every seed here is fixed so the file is fast and
+ * repeatable.
+ *
+ * ACO invariant matrix from `docs/requirements.md` §4.1 (test names below):
+ *
+ * | Invariant | Test |
+ * |---|---|
+ * | ACO-INV-01 | `ACO-INV-01: constructs a permutation tour and closes it for arbitrary layouts` |
+ * | ACO-INV-02 | `ACO-INV-02: transition probabilities are non-negative and sum to 1` |
+ * | ACO-INV-03 | `ACO-INV-03: pheromone stays non-negative and finite for all valid parameters` |
+ * | ACO-INV-04 | `ACO-INV-04: rho = 1 clears every unused edge before deposit` |
+ * | ACO-INV-05 | `ACO-INV-05: a fixed run identity reproduces tours, pheromone, and metrics` |
+ * | ACO-INV-06 | `ACO-INV-06: the best length never increases and the best tour is retained` |
+ * | ACO-INV-07 | `ACO-INV-07: coincident cities and zero weights stay finite with a uniform fallback` |
+ * | ACO-INV-08 | `ACO-INV-08: entropy is 1 for uniform pheromone and 0 for a single edge` |
  */
 
 const DEFAULTS: AcoParams = {
@@ -102,6 +116,18 @@ function assertValidTours(engine: AcoEngine, instance = instanceFor()): void {
 
 function tourList(engine: AcoEngine): number[][] {
   return engine.snapshot().ants.map((ant) => Array.from(ant.tour));
+}
+
+/** Both directed keys for every undirected edge in a closed tour. */
+function usedEdgeSet(tour: readonly number[], size: number): Set<number> {
+  const used = new Set<number>();
+  for (let position = 0; position < tour.length; position += 1) {
+    const from = tour[position];
+    const to = tour[(position + 1) % tour.length];
+    used.add(from * size + to);
+    used.add(to * size + from);
+  }
+  return used;
 }
 
 describe('parameters, constants, and presets', () => {
@@ -1012,5 +1038,144 @@ describe('workload cap and backlog', () => {
     }
     expect(engine.metrics().droppedIterations).toBe(dropped);
     expect(engine.metrics().pendingIterations).toBeLessThanOrEqual(MAX_PENDING_ITERATIONS);
+  });
+});
+
+describe('known small instances', () => {
+  it('plans both two-city tours with the hand-computed doubled distance', () => {
+    const cities = [
+      { x: 0, y: 0 },
+      { x: 0.25, y: 0 },
+    ];
+    const engine = engineWith({ cityCount: 2, antCount: 2, seed: 7 });
+    engine.setCities(cities);
+    engine.stepIteration();
+
+    const instance = createTspInstanceFromCities(cities);
+    const tours = engine.snapshot().ants.map((ant) => Array.from(ant.tour));
+
+    // Ant k starts at city k mod n, and a two-city instance has no choice, so
+    // both tours are known without inspecting the random stream.
+    expect(tours).toEqual([
+      [0, 1],
+      [1, 0],
+    ]);
+    expect(tourLength(instance, [0, 1])).toBeCloseTo(0.5, 12);
+    expect(engine.snapshot().bestLength).toBeCloseTo(0.5, 12);
+    expect(engine.snapshot().meanLength).toBeCloseTo(0.5, 12);
+  });
+
+  it('gives the optimal square tour the hand-computed perimeter', () => {
+    const cities = [
+      { x: 0, y: 0 },
+      { x: 1, y: 0 },
+      { x: 1, y: 1 },
+      { x: 0, y: 1 },
+    ];
+    const instance = createTspInstanceFromCities(cities);
+    const engine = engineWith({ cityCount: 4, antCount: 3, seed: 11 });
+    engine.setCities(cities);
+
+    // From city 0 the candidates are 1 away (cities 1 and 3) and sqrt(2) away
+    // (city 2). With equal pheromone and beta = 2 the weights are 1, 0.5, 1,
+    // so the probabilities are exactly 0.4, 0.2, 0.4.
+    const first = transitionProbabilities(
+      instance,
+      uniformPheromone(4, 0.1),
+      0,
+      allowedMask(4),
+      1,
+      2,
+    );
+    expect(Array.from(first.cities.slice(0, first.count))).toEqual([1, 2, 3]);
+    expect(first.probabilities[0]).toBeCloseTo(0.4, 12);
+    expect(first.probabilities[1]).toBeCloseTo(0.2, 12);
+    expect(first.probabilities[2]).toBeCloseTo(0.4, 12);
+
+    engine.stepIteration();
+    const snapshot = engine.snapshot();
+    const bestTour = snapshot.bestTour as readonly number[];
+
+    expect(snapshot.bestLength).toBeCloseTo(4, 12);
+    expect(validateTour(instance, bestTour)).toEqual({ valid: true });
+    expect(tourLength(instance, bestTour)).toBeCloseTo(4, 12);
+
+    // Every reported ant length must match the same closed-tour measure.
+    const lengths = snapshot.ants.map((ant) => tourLength(instance, Array.from(ant.tour)));
+    for (const [index, ant] of snapshot.ants.entries()) {
+      expect(ant.tourLength).toBeCloseTo(lengths[index], 12);
+    }
+    expect(snapshot.meanLength).toBeCloseTo(
+      lengths.reduce((sum, value) => sum + value, 0) / lengths.length,
+      12,
+    );
+  });
+
+  it('uses the triangle perimeter because every three-city tour uses all edges', () => {
+    const cities = [
+      { x: 0, y: 0 },
+      { x: 0.3, y: 0.4 },
+      { x: 0.6, y: 0 },
+    ];
+    const instance = createTspInstanceFromCities(cities);
+    const perimeter =
+      instance.distanceMatrix.distance(0, 1) +
+      instance.distanceMatrix.distance(1, 2) +
+      instance.distanceMatrix.distance(2, 0);
+    expect(perimeter).toBeCloseTo(1.6, 12);
+
+    const engine = engineWith({ cityCount: 3, antCount: 5, seed: 3 });
+    engine.setCities(cities);
+    engine.stepIteration();
+
+    expect(engine.snapshot().bestLength).toBeCloseTo(1.6, 12);
+    expect(engine.snapshot().meanLength).toBeCloseTo(1.6, 12);
+    for (const ant of engine.snapshot().ants) {
+      expect(ant.tourLength).toBeCloseTo(1.6, 12);
+    }
+  });
+
+  it('assigns hand-computed probabilities for controlled distance and pheromone', () => {
+    // Distance-only case: equal pheromone and beta = 1, so p is proportional
+    // to 1 / d. The candidates are 0.1 and 0.9 away, giving exactly 0.9/0.1.
+    const collinear = createTspInstanceFromCities([
+      { x: 0, y: 0 },
+      { x: 0.1, y: 0 },
+      { x: 0.9, y: 0 },
+    ]);
+    const distanceDriven = transitionProbabilities(
+      collinear,
+      uniformPheromone(3, 1),
+      0,
+      allowedMask(3),
+      1,
+      1,
+    );
+    expect(Array.from(distanceDriven.cities.slice(0, distanceDriven.count))).toEqual([1, 2]);
+    expect(distanceDriven.probabilities[0]).toBeCloseTo(0.9, 12);
+    expect(distanceDriven.probabilities[1]).toBeCloseTo(0.1, 12);
+
+    // Pheromone-only case: beta = 0 and equal distances, so p is proportional
+    // to tau.
+    const symmetric = createTspInstanceFromCities([
+      { x: 0, y: 0 },
+      { x: 0.5, y: 0 },
+      { x: 0, y: 0.5 },
+    ]);
+    const pheromone = new Float64Array(9);
+    pheromone[0 * 3 + 1] = 0.2;
+    pheromone[1 * 3 + 0] = 0.2;
+    pheromone[0 * 3 + 2] = 0.8;
+    pheromone[2 * 3 + 0] = 0.8;
+    const pheromoneDriven = transitionProbabilities(
+      symmetric,
+      pheromone,
+      0,
+      allowedMask(3),
+      1,
+      0,
+    );
+    expect(pheromoneDriven.probabilities[0]).toBeCloseTo(0.2, 12);
+    expect(pheromoneDriven.probabilities[1]).toBeCloseTo(0.8, 12);
   });
 });

@@ -936,7 +936,7 @@ Verified 2026-10-30 with `pnpm lint`, `pnpm test` (281 passing, 1 existing todo;
 
 **Tasks**
 
-1. Add deterministic unit tests for known small instances.
+1. (DONE) Add deterministic unit tests for known small instances.
 2. Add property-based tests for tour validity and probability normalization.
 3. Add edge-case tests for all parameters.
 4. Add a test that a larger `β` makes the next-city choice more distance-sensitive on a controlled instance.
