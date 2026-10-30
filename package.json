@@ -19,6 +19,7 @@
     "test:a11y": "playwright test tests/e2e/a11y.spec.ts",
     "test:visual": "playwright test tests/e2e/visual.spec.ts",
     "check:links": "node scripts/check-links.mjs",
+    "capture:runtime": "node scripts/capture-runtime.mjs",
     "check:bundle": "node scripts/check-bundle-size.mjs",
     "lighthouse": "lhci autorun && lhci autorun --config=lighthouserc.mobile.json",
     "deploy": "pnpm build && wrangler deploy",
