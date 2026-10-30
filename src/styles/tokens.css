@@ -1,0 +1,156 @@
+/*
+ * Design tokens — the single source of truth for the paper + stage visual system.
+ *
+ * Colour values and contrast ratios are normative: docs/technology.md §3.21.
+ * Motion follows the same section: long, calm ease-out curves in the
+ * 400–900 ms range for explanatory content, with shorter durations reserved
+ * for direct UI feedback. Components must consume these custom properties
+ * instead of raw colour, size, spacing, radius, shadow, or timing values.
+ *
+ * Verified contrast (tests/unit/tokens.test.ts):
+ *   paper muted / paper        5.87:1
+ *   accent on paper / paper    5.20:1
+ *   ink / paper               16.02:1
+ *   stage ink / stage         17.02:1
+ *   stage muted / stage        6.50:1
+ *   accent on stage / stage    5.31:1
+ *   focus / paper              4.62:1 (UI, 3:1 minimum)
+ *   focus / stage              3.68:1 (UI, 3:1 minimum)
+ *   accent on stage / paper    3.20:1 (large text and graphics only)
+ *   warm amber / stage        10.98:1 (graphics and large text)
+ *   cool accent / stage       14.64:1 (graphics and large text)
+ */
+
+:root {
+  /* ── Colour: paper ───────────────────────────────────────────────────── */
+  --color-paper: #f2efe6;
+  --color-paper-raised: #faf8f2;
+  --color-paper-inset: #e9e5da;
+  --color-ink: #141414;
+  --color-paper-muted: #5f5b54;
+  --color-accent-paper: #b23a1a;
+  --color-rule-paper: rgb(20 20 20 / 14%);
+
+  /* ── Colour: stage ───────────────────────────────────────────────────── */
+  --color-stage: #0b0c0e;
+  --color-stage-raised: #15171b;
+  --color-stage-inset: #060708;
+  --color-stage-ink: #f2efe6;
+  --color-stage-muted: #9a948a;
+  --color-accent-stage: #e4572e;
+  --color-rule-stage: rgb(242 239 230 / 18%);
+
+  /* ── Colour: UI and data ─────────────────────────────────────────────── */
+  --color-focus: #3a6ea5;
+  --color-amber: #ffb25e;
+  --color-cool: #7cf5c4;
+  --color-selection-bg: var(--color-accent-paper);
+  --color-selection-ink: var(--color-paper);
+
+  /* ── Typography: families ────────────────────────────────────────────── */
+  /* The *Fallback families are metric-matched local faces declared in
+     base.css. They keep line breaks and block heights close while the
+     self-hosted woff2 files load. */
+  --font-display: "Instrument Serif", "Instrument Serif Fallback", "Times New Roman", serif;
+  --font-body: "Geist", "Geist Fallback", Arial, system-ui, sans-serif;
+  --font-mono:
+    "JetBrains Mono", "JetBrains Mono Fallback", ui-monospace, "SFMono-Regular", Menlo, Consolas,
+    monospace;
+
+  /* ── Typography: scale ───────────────────────────────────────────────── */
+  --text-2xs: 0.6875rem;
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-body: clamp(1.0625rem, 1rem + 0.18vw, 1.125rem);
+  --text-lead: clamp(1.25rem, 1.1rem + 0.7vw, 1.5rem);
+  --text-h3: clamp(1.5rem, 1.25rem + 1.1vw, 2rem);
+  --text-h2: clamp(2rem, 1.5rem + 2.2vw, 3.25rem);
+  --text-h1: clamp(2.75rem, 1.75rem + 4.2vw, 5.25rem);
+  --text-display: clamp(3.5rem, 1.6rem + 8vw, 8rem);
+
+  /* ── Typography: weights, leading, tracking ──────────────────────────── */
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+
+  --leading-none: 0.92;
+  --leading-tight: 1.02;
+  --leading-snug: 1.18;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.68;
+
+  --tracking-tighter: -0.035em;
+  --tracking-tight: -0.018em;
+  --tracking-normal: 0em;
+  --tracking-wide: 0.06em;
+  --tracking-wider: 0.12em;
+
+  /* ── Measure and page frame ──────────────────────────────────────────── */
+  --measure-prose: 66ch;
+  --measure-narrow: 48ch;
+  --page-max: 80rem;
+  --page-gutter: clamp(1.25rem, 4vw, 4rem);
+  --header-height: 4.5rem;
+  --hairline: 1px;
+  --rule-strong: 2px;
+  --tap-target: 44px;
+
+  /* ── Spacing scale ───────────────────────────────────────────────────── */
+  --space-3xs: 0.25rem;
+  --space-2xs: 0.5rem;
+  --space-xs: 0.75rem;
+  --space-sm: 1rem;
+  --space-md: 1.5rem;
+  --space-lg: 2rem;
+  --space-xl: 3rem;
+  --space-2xl: 4rem;
+  --space-3xl: 6rem;
+  --space-4xl: 8rem;
+  --space-5xl: 12rem;
+
+  /* ── Radii ───────────────────────────────────────────────────────────── */
+  --radius-xs: 2px;
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 16px;
+  --radius-xl: 28px;
+  --radius-pill: 999px;
+
+  /* ── Shadows ─────────────────────────────────────────────────────────── */
+  --shadow-paper: 0 1px 2px rgb(20 20 20 / 6%), 0 18px 50px rgb(20 20 20 / 8%);
+  --shadow-panel: inset 0 1px 0 rgb(242 239 230 / 6%), 0 24px 80px rgb(0 0 0 / 45%);
+  --shadow-focus: 0 0 0 4px rgb(58 110 165 / 30%);
+
+  /* ── Focus ───────────────────────────────────────────────────────────── */
+  --focus-ring-width: 3px;
+  --focus-ring-offset: 3px;
+
+  /* ── Z-index ─────────────────────────────────────────────────────────── */
+  --z-base: 0;
+  --z-raised: 10;
+  --z-sticky: 20;
+  --z-header: 30;
+  --z-overlay: 40;
+  --z-skip-link: 100;
+
+  /* ── Motion ──────────────────────────────────────────────────────────── */
+  --duration-instant: 120ms;
+  --duration-quick: 220ms;
+  --duration-calm: 480ms;
+  --duration-slow: 720ms;
+  --duration-act: 900ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-calm: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-instant: 1ms;
+    --duration-quick: 1ms;
+    --duration-calm: 1ms;
+    --duration-slow: 1ms;
+    --duration-act: 1ms;
+  }
+}

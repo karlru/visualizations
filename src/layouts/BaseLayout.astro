@@ -1,0 +1,116 @@
+---
+import '../styles/tokens.css';
+import '../styles/base.css';
+import '../styles/story.css';
+
+interface NavItem {
+  label: string;
+  href: string;
+}
+
+export interface Props {
+  /** Page title without the site suffix. */
+  title?: string;
+  /** Meta description; keep it specific to the page. */
+  description?: string;
+  /** Keep development and utility pages out of search indexes. */
+  noindex?: boolean;
+  /** Extra primary-nav entries. Later steps pass story and about routes. */
+  nav?: NavItem[];
+}
+
+const SITE_NAME = 'Algorithm Stories';
+const DEFAULT_DESCRIPTION =
+  'Interactive, scroll-driven visual essays that explain algorithms from the inside.';
+
+const {
+  title = SITE_NAME,
+  description = DEFAULT_DESCRIPTION,
+  noindex = false,
+  nav = [],
+} = Astro.props;
+
+const documentTitle = title === SITE_NAME ? SITE_NAME : `${title} — ${SITE_NAME}`;
+
+// The only routes that exist in Phase 0 are the home page and the dev
+// specimen. `/#stories` is a real fragment target on the home page; the story
+// index replaces it once `/stories` ships.
+const navItems: NavItem[] = [
+  { label: 'Index', href: '/' },
+  { label: 'Essays', href: '/#stories' },
+  ...nav,
+].filter((item, index, all) => all.findIndex((candidate) => candidate.href === item.href) === index);
+
+const isCurrent = (href: string): boolean => {
+  if (href.startsWith('/#')) return false;
+  if (href === '/') return Astro.url.pathname === '/';
+  return Astro.url.pathname === href || Astro.url.pathname.startsWith(`${href}/`);
+};
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="generator" content={Astro.generator} />
+    <meta name="description" content={description} />
+    {noindex && <meta name="robots" content="noindex, nofollow" />}
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
+    <link
+      rel="preload"
+      href="/fonts/geist-latin-wght-normal.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <link
+      rel="preload"
+      href="/fonts/instrument-serif-latin-400-normal.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <title>{documentTitle}</title>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+
+    <header class="site-header">
+      <div class="site-header__inner page-shell">
+        <a class="wordmark" href="/">{SITE_NAME}</a>
+        <nav class="site-nav" aria-label="Primary">
+          <ul class="site-nav__list">
+            {
+              navItems.map((item) => (
+                <li>
+                  <a href={item.href} aria-current={isCurrent(item.href) ? 'page' : undefined}>
+                    {item.label}
+                  </a>
+                </li>
+              ))
+            }
+          </ul>
+        </nav>
+      </div>
+    </header>
+
+    <main id="main" tabindex="-1">
+      <slot />
+    </main>
+
+    <footer class="site-footer">
+      <div class="site-footer__inner page-shell">
+        <p>
+          An editorial laboratory for algorithms. Static, self-hosted, and free of tracking.
+        </p>
+        <nav aria-label="Footer">
+          <ul class="site-footer__list">
+            <li><a href="#main">Back to top</a></li>
+          </ul>
+        </nav>
+      </div>
+    </footer>
+  </body>
+</html>

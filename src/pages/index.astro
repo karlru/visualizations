@@ -1,23 +1,138 @@
 ---
+import BaseLayout from '../layouts/BaseLayout.astro';
 ---
 
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="icon" href="/favicon.ico" />
-    <meta name="viewport" content="width=device-width" />
-    <meta name="generator" content={Astro.generator} />
-    <meta
-      name="description"
-      content="Interactive visual essays that explain algorithms from the inside."
-    />
-    <title>Algorithm Stories</title>
-  </head>
-  <body>
-    <main>
-      <h1>Algorithm Stories</h1>
-      <p>Interactive visual essays that explain algorithms from the inside.</p>
-    </main>
-  </body>
-</html>
+<BaseLayout>
+  <section class="hero page-shell" aria-labelledby="hero-title">
+    <p class="eyebrow">Visual essays · Release 1</p>
+    <h1 class="hero__title" id="hero-title">Algorithm Stories</h1>
+    <p class="hero__dek">
+      Interactive visual essays that explain algorithms from the inside.
+    </p>
+    <p class="hero__note">
+      Each story is a scroll-driven argument: a running system on a dark stage, prose on warm
+      paper, and the formulas and pseudocode that connect the two. Read it straight through, or
+      stop and take the controls.
+    </p>
+  </section>
+
+  <section class="stories page-shell" id="stories" aria-labelledby="stories-title">
+    <div class="stories__head">
+      <h2 class="stories__title" id="stories-title">The first two essays</h2>
+      <p class="eyebrow">In production</p>
+    </div>
+
+    <ol class="story-list">
+      <li class="story-card">
+        <p class="story-card__index">01</p>
+        <h3 class="story-card__title">The Colony That Finds a Short Route</h3>
+        <p class="story-card__dek">
+          Ant Colony Optimization on a traveling salesman problem, drawn in Canvas 2D.
+        </p>
+        <p class="story-card__meta">Optimization · Emergence · 2D canvas</p>
+      </li>
+      <li class="story-card">
+        <p class="story-card__index">02</p>
+        <h3 class="story-card__title">Fifteen Planes: How RANDU Broke Randomness</h3>
+        <p class="story-card__dek">
+          Linear congruential generators, the lattice failure of RANDU, and the point clouds that
+          gave it away.
+        </p>
+        <p class="story-card__meta">Randomness · Data · 3D WebGL</p>
+      </li>
+    </ol>
+  </section>
+</BaseLayout>
+
+<style>
+  .hero {
+    padding-block: clamp(var(--space-2xl), 10vw, var(--space-5xl)) var(--space-2xl);
+  }
+
+  .hero__title {
+    max-inline-size: 12ch;
+    margin-block-start: var(--space-sm);
+    font-size: var(--text-display);
+    line-height: var(--leading-none);
+    letter-spacing: var(--tracking-tighter);
+  }
+
+  .hero__dek {
+    max-inline-size: var(--measure-narrow);
+    margin-block-start: var(--space-md);
+    font-family: var(--font-display);
+    font-size: var(--text-lead);
+    line-height: var(--leading-snug);
+    letter-spacing: var(--tracking-tight);
+  }
+
+  .hero__note {
+    max-inline-size: var(--measure-prose);
+    margin-block-start: var(--space-lg);
+    color: var(--color-paper-muted);
+    line-height: var(--leading-relaxed);
+  }
+
+  .stories {
+    padding-block-start: var(--space-xl);
+    border-block-start: var(--hairline) solid var(--color-rule-paper);
+  }
+
+  .stories__head {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+    align-items: baseline;
+    justify-content: space-between;
+  }
+
+  .stories__title {
+    font-size: var(--text-h2);
+  }
+
+  .story-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+    gap: var(--space-lg);
+    margin-block-start: var(--space-lg);
+    padding: 0;
+    list-style: none;
+  }
+
+  .story-list li + li {
+    margin-block-start: 0;
+  }
+
+  .story-card {
+    padding-block-start: var(--space-md);
+    border-block-start: var(--rule-strong) solid var(--color-ink);
+  }
+
+  .story-card__index {
+    color: var(--color-accent-paper);
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    letter-spacing: var(--tracking-wide);
+  }
+
+  .story-card__title {
+    margin-block-start: var(--space-2xs);
+    font-size: var(--text-h3);
+  }
+
+  .story-card__dek {
+    margin-block-start: var(--space-xs);
+    max-inline-size: 38ch;
+    color: var(--color-paper-muted);
+    line-height: var(--leading-relaxed);
+  }
+
+  .story-card__meta {
+    margin-block-start: var(--space-md);
+    color: var(--color-paper-muted);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+  }
+</style>
