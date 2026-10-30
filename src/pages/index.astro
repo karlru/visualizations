@@ -1,5 +1,4 @@
 ---
-import TempCounter from '../components/TempCounter.svelte';
 ---
 
 <html lang="en">
@@ -9,10 +8,16 @@ import TempCounter from '../components/TempCounter.svelte';
     <link rel="icon" href="/favicon.ico" />
     <meta name="viewport" content="width=device-width" />
     <meta name="generator" content={Astro.generator} />
+    <meta
+      name="description"
+      content="Interactive visual essays that explain algorithms from the inside."
+    />
     <title>Algorithm Stories</title>
   </head>
   <body>
-    <h1>Algorithm Stories</h1>
-    <TempCounter client:load />
+    <main>
+      <h1>Algorithm Stories</h1>
+      <p>Interactive visual essays that explain algorithms from the inside.</p>
+    </main>
   </body>
 </html>

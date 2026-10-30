@@ -261,7 +261,7 @@ Astro's dev server runs in the background; check it with `pnpm astro dev status`
 - [x] `package.json` has a `packageManager` field or the CI workflow passes an explicit pnpm version.
 - [x] The existing `README.md` and `docs/` are preserved.
 
-### Step 0.2 — Add Svelte, MDX, sitemap, and strict checks
+### (DONE) Step 0.2 — Add Svelte, MDX, sitemap, and strict checks
 
 **Goal:** The project supports interactive islands, MDX content, sitemap generation, and type checking.
 
@@ -272,7 +272,7 @@ Astro's dev server runs in the background; check it with `pnpm astro dev status`
 3. (DONE) Set a provisional production `site` URL in `astro.config.mjs`; replace it with the deployed workers.dev URL at Step 0.6.
 4. (DONE) Add `astro check` to the build script.
 5. (DONE) Create a temporary Svelte island on the home page and a temporary MDX page to prove both work.
-6. Remove the temporary examples after verification.
+6. (DONE) Remove the temporary examples after verification.
 
 **Commands**
 
