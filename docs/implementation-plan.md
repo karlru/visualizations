@@ -608,21 +608,21 @@ The `/dev/scroll-smoke` harness is the Step 1.3 test fixture. Step 1.5 replaces 
 
 Verified 2026-10-30 with `pnpm lint`, `pnpm test`, `pnpm build`, and `CI=1 pnpm test:e2e`. The scroll suite covers chapter/progress reporting, native document scrolling, all five keyboard controls, reduced motion, coarse-pointer detection, `?lenis=off`, idempotent destroy (0 remaining triggers), ten navigations, and back/forward. `debugState()` and `data-scroll-triggers` are the leak detectors.
 
-### Step 1.4 — Stage shell and Canvas 2D renderer
+### (DONE) Step 1.4 — Stage shell and Canvas 2D renderer
 
 **Goal:** A persistent stage that mounts, resizes, renders layers, pauses offscreen, and disposes cleanly.
 
 **Tasks**
 
-1. Create `StoryStage.svelte` with a container, canvas, and overlay slot; mount it as a client-only island or guard all browser APIs inside `onMount`.
-2. Implement `Canvas2DRenderer` with a 2D camera and layer list.
-3. Handle `ResizeObserver`, device pixel ratio, and canvas backing-store size.
-4. Implement a single RAF loop driven by the story controller.
-5. Add `IntersectionObserver` and `visibilitychange` pause behavior.
-6. Add layer primitives for lines, points, arcs, text-free shapes, and gradients.
-7. Add the coarse-pointer touch rule: vertical page scroll stays native; one-finger horizontal drag or an explicit Orbit mode handles orbit; zoom buttons provide a single-pointer alternative.
-8. Handle iOS Safari viewport resizing with `100dvh`/`visualViewport` and debounced `ScrollTrigger.refresh()`.
-9. Dispose the canvas, observers, and RAF loop on destroy.
+1. (DONE) Create `StoryStage.svelte` with a container, canvas, and overlay slot; mount it as a client-only island or guard all browser APIs inside `onMount`.
+2. (DONE) Implement `Canvas2DRenderer` with a 2D camera and layer list.
+3. (DONE) Handle `ResizeObserver`, device pixel ratio, and canvas backing-store size.
+4. (DONE) Implement a single RAF loop driven by the story controller.
+5. (DONE) Add `IntersectionObserver` and `visibilitychange` pause behavior.
+6. (DONE) Add layer primitives for lines, points, arcs, text-free shapes, and gradients.
+7. (DONE) Add the coarse-pointer touch rule: vertical page scroll stays native; one-finger horizontal drag or an explicit Orbit mode handles orbit; zoom buttons provide a single-pointer alternative.
+8. (DONE) Handle iOS Safari viewport resizing with `100dvh`/`visualViewport` and debounced `ScrollTrigger.refresh()`.
+9. (DONE) Dispose the canvas, observers, and RAF loop on destroy.
 
 **Files**
 
@@ -634,16 +634,18 @@ Verified 2026-10-30 with `pnpm lint`, `pnpm test`, `pnpm build`, and `CI=1 pnpm 
 
 **Acceptance criteria**
 
-- [ ] The build succeeds without evaluating canvas or `window` code during static generation.
-- [ ] The canvas fills the stage without distortion.
-- [ ] The backing store matches CSS size × capped DPR.
-- [ ] Resizing updates the drawing immediately.
-- [ ] The loop pauses when the stage leaves the viewport or the tab is hidden.
-- [ ] The loop resumes correctly.
-- [ ] On coarse pointers, vertical drag scrolls the page; orbit is explicit or horizontal-only.
-- [ ] iOS viewport resize does not break the pinned stage.
-- [ ] Destroying the component removes all observers and listeners.
-- [ ] No per-frame allocations occur in the steady-state draw path beyond documented buffers.
+- [x] The build succeeds without evaluating canvas or `window` code during static generation.
+- [x] The canvas fills the stage without distortion.
+- [x] The backing store matches CSS size × capped DPR.
+- [x] Resizing updates the drawing immediately.
+- [x] The loop pauses when the stage leaves the viewport or the tab is hidden.
+- [x] The loop resumes correctly.
+- [x] On coarse pointers, vertical drag scrolls the page; orbit is explicit or horizontal-only.
+- [x] iOS viewport resize does not break the pinned stage.
+- [x] Destroying the component removes all observers and listeners.
+- [x] No per-frame allocations occur in the steady-state draw path beyond documented buffers.
+
+Verified 2026-10-30 with `pnpm lint`, `pnpm test`, `pnpm build`, and `CI=1 pnpm test:e2e`. `tests/e2e/canvas-stage.spec.ts` covers hydration with no console errors, CSS/backing-store sizing at DPR 1 and 3 (cap 2), resize-while-paused, offscreen and hidden pause/resume, a real CDP touch gesture on a coarse pointer (vertical scroll remains native, horizontal orbit changes rotation, zoom buttons work), a synthetic `visualViewport` resize, and teardown plus ten reloads with one canvas. `tests/unit/canvas2d.test.ts` covers camera projection/unprojection/matrix, DPR sizing, theme token mapping, and primitive call sequences. The iOS criterion is verified in Chromium through the actual `visualViewport` handler and CSS `100svh`/`100dvh` rules; a real-device Safari pass remains part of the Step 3.6 responsive gate. The per-frame rule is a source audit, not a measurement: the draw path reuses one frame object, camera matrix, and point, and touches the DOM only every fifteenth frame for `data-frames` (plus `data-draws`/camera debug every thirtieth renderer draw). The `/dev/canvas-smoke` fixture stays in the production build until Step 1.5 replaces it with `/dev/story-smoke`.
 
 ### Step 1.5 — Story controller, chapters, and progress rail
 

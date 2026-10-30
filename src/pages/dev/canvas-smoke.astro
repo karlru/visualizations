@@ -1,0 +1,98 @@
+---
+import CanvasSmokeHarness from '../../components/story/CanvasSmokeHarness.svelte';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+---
+
+<BaseLayout
+  title="Canvas 2D stage smoke test"
+  description="Internal fixture for the StoryStage shell and Canvas2DRenderer lifecycle."
+  noindex
+>
+  <div class="canvas-smoke-page page-shell">
+    <header class="canvas-smoke-page__intro">
+      <p class="eyebrow">Internal · not indexed</p>
+      <h1 class="canvas-smoke-page__title">Canvas 2D stage smoke test</h1>
+      <p class="canvas-smoke-page__dek">
+        A real <code>Canvas2DRenderer</code> inside <code>StoryStage</code>: layered primitives,
+        a moving engine snapshot, DOM labels, and the single GSAP ticker. Append
+        <code>?lenis=off</code> or <code>?debug=1</code> only if you also mount the scroll controller;
+        this fixture deliberately has no scroll owner.
+      </p>
+    </header>
+
+    <CanvasSmokeHarness client:load />
+
+    <section class="canvas-smoke-page__outro" aria-labelledby="outro-title">
+      <p class="eyebrow">Lifecycle fixture</p>
+      <h2 id="outro-title" class="canvas-smoke-page__outro-title">Scroll the stage away</h2>
+      <p>
+        This block exists so the stage can leave the viewport. The frame counter should stop while
+        it is offscreen, resume when it returns, and survive a viewport resize without a distorted
+        backing store. Navigation and teardown are covered by
+        <code>tests/e2e/canvas-stage.spec.ts</code>.
+      </p>
+      <p>
+        The page stays in the production build as the Step 1.4 fixture so Playwright tests the same
+        artifact that ships. Step 1.5 replaces it with <code>/dev/story-smoke</code>.
+      </p>
+      <p class="canvas-smoke-page__spacer" aria-hidden="true"></p>
+      <p>
+        <a href="/">Back to the home page</a>
+      </p>
+    </section>
+  </div>
+</BaseLayout>
+
+<style>
+  .canvas-smoke-page {
+    padding-block: var(--space-2xl) var(--space-3xl);
+  }
+
+  .canvas-smoke-page__intro {
+    max-inline-size: var(--measure-prose);
+    padding-block-end: var(--space-lg);
+  }
+
+  .canvas-smoke-page__title {
+    margin-block-start: var(--space-sm);
+    font-size: var(--text-h1);
+    letter-spacing: var(--tracking-tighter);
+  }
+
+  .canvas-smoke-page__dek {
+    margin-block-start: var(--space-md);
+    color: var(--color-paper-muted);
+    font-size: var(--text-lead);
+    line-height: var(--leading-relaxed);
+  }
+
+  .canvas-smoke-page__outro {
+    max-inline-size: var(--measure-prose);
+    margin-block-start: var(--space-2xl);
+    padding-block-start: var(--space-xl);
+    border-block-start: var(--hairline) solid var(--color-rule-paper);
+  }
+
+  .canvas-smoke-page__outro-title {
+    margin-block: var(--space-sm) var(--space-md);
+    font-size: var(--text-h2);
+  }
+
+  .canvas-smoke-page__outro p {
+    line-height: var(--leading-relaxed);
+  }
+
+  .canvas-smoke-page__outro p + p {
+    margin-block-start: var(--space-md);
+  }
+
+  .canvas-smoke-page__spacer {
+    min-block-size: 150svh;
+  }
+
+  @supports (block-size: 100dvh) {
+    .canvas-smoke-page__spacer {
+      min-block-size: 150dvh;
+    }
+  }
+</style>

@@ -122,6 +122,115 @@
   padding: clamp(var(--space-md), 4vw, var(--space-xl));
 }
 
+/* ── Canvas stage shell ───────────────────────────────────────────────── */
+/*
+ * The stage owns the viewport-height budget, not the canvas. `100svh` is the
+ * smallest stable viewport (no iOS toolbar jump); `@supports` upgrades to
+ * `100dvh` where the browser can report the dynamic viewport. The canvas then
+ * fills whatever box remains, so a visualViewport resize can never leave a
+ * stale backing store behind.
+ */
+.story-stage {
+  --story-stage-max-block: calc(100svh - var(--header-height) - var(--space-xl));
+  position: relative;
+}
+
+@supports (block-size: 100dvh) {
+  .story-stage {
+    --story-stage-max-block: calc(100dvh - var(--header-height) - var(--space-xl));
+  }
+}
+
+.story-stage__surface {
+  position: relative;
+  max-block-size: var(--story-stage-max-block);
+}
+
+.story-stage__canvas {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-base);
+  display: block;
+  width: 100%;
+  height: 100%;
+  /* Vertical gestures belong to the page. Horizontal drags reach the camera
+     as pointer events; the renderer never calls preventDefault(). */
+  touch-action: pan-y;
+  cursor: grab;
+  outline: none;
+}
+
+.story-stage__canvas:active {
+  cursor: grabbing;
+}
+
+.story-stage__labels {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-raised);
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.story-label {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-start: 0;
+  max-inline-size: min(24ch, 60%);
+  padding: var(--space-3xs) var(--space-2xs);
+  border: var(--hairline) solid var(--color-rule-stage);
+  border-radius: var(--radius-sm);
+  background-color: color-mix(in srgb, var(--color-stage) 82%, transparent);
+  color: var(--color-stage-ink);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  line-height: var(--leading-normal);
+  letter-spacing: var(--tracking-tight);
+  pointer-events: auto;
+  user-select: text;
+  white-space: nowrap;
+  will-change: transform;
+}
+
+.story-label[hidden] {
+  display: none;
+}
+
+.story-stage__overlay {
+  position: absolute;
+  inset: 0;
+  z-index: calc(var(--z-raised) + 1);
+  pointer-events: none;
+}
+
+.story-stage__overlay button,
+.story-stage__overlay a,
+.story-stage__overlay input,
+.story-stage__overlay select {
+  pointer-events: auto;
+}
+
+.story-stage__error {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline: var(--space-md);
+  margin: 0;
+  padding: var(--space-sm);
+  border: var(--hairline) solid var(--color-rule-stage);
+  border-radius: var(--radius-md);
+  background-color: var(--color-stage-raised);
+  color: var(--color-stage-ink);
+  font-size: var(--text-sm);
+  text-align: center;
+  transform: translateY(-50%);
+}
+
+@media (pointer: coarse) {
+  .story-stage__canvas {
+    cursor: default;
+  }
+}
+
 .story-stage__readout {
   font-family: var(--font-mono);
   font-size: var(--text-h3);
