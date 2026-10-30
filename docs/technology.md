@@ -215,6 +215,7 @@ The project needs scales, color interpolation, line/area generators, and simple 
 | `d3-scale` | Linear axes for the ACO convergence chart. | Yes, in the story island. |
 | `d3-shape` | Best/mean line generators for the convergence chart. | Yes, in the story island. |
 | `d3-color` | Parses token colours and builds the cached pheromone intensity ramp on the canvas. | Yes, in the ACO island. |
+| `@types/d3-color`, `@types/d3-scale`, `@types/d3-shape` (dev) | Type declarations for the three d3 modules; the runtime packages do not bundle them. | No. |
 | `tsx` (dev) | Runs `scripts/build-figures.mjs` with its TypeScript engine imports at build time. | No; never in a browser bundle. |
 
 No charting framework, DOM-join library, or global state library is added.
