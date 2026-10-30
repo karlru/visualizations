@@ -97,6 +97,25 @@ export interface ChapterSpec<P extends object> {
 }
 
 /**
+ * How the stage Speed control drives playback.
+ *
+ * - `clock` (the default when omitted) keeps the existing development
+ *   behaviour: the control writes the fixed-step clock's playback rate and the
+ *   engine's presentation multiplier stays at its parameter value.
+ * - `engine` hands the control to a presentation parameter instead. The clock
+ *   stays at 1× and the control writes `params[param]`, which the engine applies
+ *   without restarting the run. This avoids applying the multiplier twice.
+ *
+ * ACO uses `engine` so its `speed` URL parameter (0.5×/1×/2×/4×) is the single
+ * source of presentation rate. `clock` remains the fallback for stories whose
+ * `speed` parameter means something else or does not exist, so existing configs
+ * need no change.
+ */
+export type SpeedControl<P extends object> =
+  | { readonly kind: 'clock' }
+  | { readonly kind: 'engine'; readonly param: keyof P & string };
+
+/**
  * Complete runtime description of a story.
  *
  * `defaults` is the sole source of starting parameter values. `presets` apply
@@ -113,6 +132,11 @@ export interface StoryConfig<P extends object, S, M> {
   readonly scenes: Readonly<Record<SceneId, SceneDefinition<P>>>;
   readonly chapters: readonly ChapterSpec<P>[];
   readonly urlParams: UrlParameterSchema<P>;
+  /**
+   * Speed-control wiring. Omitted means `{ kind: 'clock' }`; steps 3.3/3.5
+   * consume this field when the controller and lab controls are wired.
+   */
+  readonly speedControl?: SpeedControl<P>;
 }
 
 /**

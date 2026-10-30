@@ -964,13 +964,13 @@ Verified 2026-10-30 with `pnpm lint`, `pnpm test` (308 passing, 1 existing todo;
 
 **Tasks**
 
-1. Create `src/stories/aco/config.ts` with defaults, presets, and the engine factory.
+1. (DONE) Create `src/stories/aco/config.ts` with defaults, presets, and the engine factory.
 2. (DONE) Create `src/stories/aco/scenes.ts` with one scene per chapter.
 3. (DONE) Define camera moves: overview, zoom to a city, follow the best tour, pull back for convergence.
 4. (DONE) Define visible layers per scene: graph, pheromone, ants, best tour, probability fan, convergence chart.
 5. (DONE) Define annotations per scene.
-6. Set defaults: 30 cities, 40 ants, `α = 1`, `β = 2`, `ρ = 0.5`, `Q = 1`, speed `1×`, seed `42`.
-7. Add presets: balanced, greedy, stagnant, forgetful.
+6. (DONE) Set defaults: 30 cities, 40 ants, `α = 1`, `β = 2`, `ρ = 0.5`, `Q = 1`, speed `1×`, seed `42`.
+7. (DONE) Add presets: balanced, greedy, stagnant, forgetful.
 
 **Files**
 
