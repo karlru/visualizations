@@ -324,6 +324,25 @@ test.describe('ACO story route', () => {
     await scrollToChapter(page, 'forgetting');
     await expect(panel.locator('[data-line="6"][aria-current="step"]')).toHaveCount(1);
 
+    // The stage panel also stays inside the page at 320 px.
+    await page.setViewportSize({ width: 320, height: 720 });
+    await page.waitForFunction(() => document.documentElement.clientWidth === 320);
+    await expect(panel).toBeVisible();
+    const stageOverflow = await page.evaluate(() => {
+      const pre = document.querySelector<HTMLElement>(
+        '[data-pseudocode-panel] pre[data-pseudocode]',
+      );
+      if (!pre) throw new Error('Missing stage pseudocode');
+      return {
+        document: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        body: document.body.scrollWidth - document.body.clientWidth,
+        preRight: pre.getBoundingClientRect().right,
+      };
+    });
+    expect(stageOverflow.document).toBeLessThanOrEqual(0);
+    expect(stageOverflow.body).toBeLessThanOrEqual(0);
+    expect(stageOverflow.preRight).toBeLessThanOrEqual(320);
+
     // The article copy and the panel must not share ids.
     const duplicateIds = await page.evaluate(() => {
       const ids = Array.from(
