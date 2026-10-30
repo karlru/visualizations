@@ -111,7 +111,7 @@ The detailed, canonical tree is in [`docs/implementation-plan.md`](docs/implemen
 
 ## Local development
 
-The project is documented but not yet scaffolded. Once the implementation plan has been executed, the expected commands are:
+The project is scaffolded and the shared story runtime is complete. The expected commands are:
 
 ```bash
 pnpm install
@@ -135,53 +135,54 @@ The site is fully static. Cloudflare Workers static assets serve the build outpu
 
 Deployment is automated from the `main` branch with GitHub Actions and Wrangler. Pull requests do not deploy. The configuration lives in [`wrangler.jsonc`](wrangler.jsonc), [`public/_headers`](public/_headers), and [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml).
 
-The repository is configured but **has not been deployed yet**: the Cloudflare API token, account ID, and resulting `workers.dev` URL are still outstanding. Until the first deploy, `SITE_URL` in `src/config/site.ts` is the provisional `https://algorithm-stories.example.com`; do not treat it as the live origin.
+The site is live at <https://visualizations.ruul.ee>. The `ruul.ee` zone is on Cloudflare, and `visualizations.ruul.ee` is attached as a Workers custom domain in [`wrangler.jsonc`](wrangler.jsonc): Wrangler creates the DNS record and certificate on deploy. `workers_dev` is disabled, so the custom domain is the only canonical origin. `SITE_URL` in `src/config/site.ts` is the matching build-time origin used by canonicals, Open Graph tags, the sitemap, and share links.
 
 ### One-time setup
 
-1. Create a Cloudflare account on the free plan (no paid service is required for static assets).
-2. Create an API token in the Cloudflare dashboard under **My Profile → API Tokens** using the **Edit Cloudflare Workers** template, scoped to the account that will host the site.
+1. Keep the domain's zone active in the same Cloudflare account that hosts the Worker. The custom domain must belong to that account.
+2. Create an account-owned API token under **Manage Account → API Tokens → Create Token**, starting from the **Edit Cloudflare Workers** template. It needs:
+   - Account → **Workers Scripts: Edit**
+   - Zone → **Workers Routes: Edit**, scoped to the zone that owns the custom domain
+   - Zone → **DNS: Edit**, used to create the custom-domain record
 3. Copy the account ID from the Workers overview (or the dashboard URL).
 4. Add both values as repository secrets under **Settings → Secrets and variables → Actions**:
    - `CLOUDFLARE_API_TOKEN`
    - `CLOUDFLARE_ACCOUNT_ID`
 
-### First manual deploy
+`wrangler login` uses an OAuth flow that does not support granular permissions. For a local deploy, export the same token and account ID instead.
 
-Authenticate Wrangler locally, then deploy. The deploy script builds first, so the uploaded `dist/` is always current.
+### First deploy and verification
+
+Deployment runs automatically on every push to `main`, or manually from **Actions → Deploy → Run workflow**. To deploy from a workstation:
 
 ```bash
-pnpm install
-pnpm exec wrangler login
+export CLOUDFLARE_API_TOKEN=...
+export CLOUDFLARE_ACCOUNT_ID=...
 pnpm deploy
 ```
 
-`wrangler deploy` prints the assigned `https://algorithm-stories.<account-subdomain>.workers.dev` URL. Do not guess or hard-code this URL before it exists.
+The deploy script builds first, so the uploaded `dist/` is always current. The first deploy creates the custom-domain DNS record and certificate; issuance can take a minute or two.
 
-Verify the live deployment before relying on CI:
-
-```bash
-curl -I https://algorithm-stories.<account-subdomain>.workers.dev/
-curl -I https://algorithm-stories.<account-subdomain>.workers.dev/stories
-curl -I https://algorithm-stories.<account-subdomain>.workers.dev/this-route-does-not-exist
-```
-
-The first two requests must return `200` without a trailing-slash redirect, the third must return `404` with the custom page, and all three must include the security headers from `public/_headers`.
-
-### Record the production URL
-
-After the first deploy, replace `SITE_URL` in `src/config/site.ts` with the real `workers.dev` origin, then rebuild and redeploy:
+Verify the live deployment:
 
 ```bash
-pnpm build
-pnpm deploy
+curl -sI https://visualizations.ruul.ee/ | head -20
+curl -sI https://visualizations.ruul.ee/stories
+curl -sI https://visualizations.ruul.ee/stories/
+curl -s -o /dev/null -w '%{http_code}\n' https://visualizations.ruul.ee/this-route-does-not-exist
 ```
 
-This updates canonical URLs, Open Graph URLs, and the sitemap. Commit the `SITE_URL` change with the deployment. Step 8.3 replaces the `workers.dev` URL with the custom domain.
+The first two requests must return `200` without a trailing-slash redirect, `/stories/` must redirect to `/stories`, the unknown route must return `404` with the custom page, and every response must include the security headers from [`public/_headers`](public/_headers).
+
+If the zone's **SSL/TLS → Overview** mode is *Flexible*, switch it to **Full (strict)**; proxied Workers custom domains can redirect-loop under Flexible.
+
+### Production URL
+
+`SITE_URL` in `src/config/site.ts` and the `routes` entry in `wrangler.jsonc` must name the same host. To change domains, update both, rebuild, and redeploy so canonical URLs, Open Graph URLs, and the sitemap follow. Do not point `SITE_URL` at a `workers.dev` host: that route is disabled.
 
 ### Continuous deployment
 
-Once the secrets exist, every push to `main` runs the `Deploy` workflow: install with a frozen lockfile, lint, unit test, build, check internal links and bundle budgets, then deploy with `cloudflare/wrangler-action`. The workflow can also be run manually from the Actions tab; it only deploys when the selected ref is `main`.
+Every push to `main` runs the `Deploy` workflow: install with a frozen lockfile, lint, unit test, build, check internal links and bundle budgets, then deploy with `cloudflare/wrangler-action`. The workflow can also be run manually from the Actions tab; it only deploys when the selected ref is `main`.
 
 To reproduce the edge behavior locally before pushing:
 
@@ -197,7 +198,7 @@ Release 1 has no analytics beacon and no tracking cookies. Reader preferences ar
 ## Status
 
 - Documentation: implementation-ready for the initial two-story release.
-- Implementation: not started.
+- Implementation: Phase 1 complete; the story runtime is in place and the ACO/RANDU stories are next.
 - Scope: ant colony optimization and LCG/RANDU only. Additional stories are listed in the backlog but are not part of the first release.
 
 ## Contributing and authoring

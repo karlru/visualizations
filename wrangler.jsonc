@@ -3,6 +3,17 @@
   "name": "algorithm-stories",
   // Keep this current: Cloudflare applies runtime defaults up to this date.
   "compatibility_date": "2026-10-30",
+  // The custom domain is the single canonical origin. Attaching it here makes
+  // Wrangler create the DNS record and certificate on deploy, and setting a
+  // route already implies workers_dev = false; state it explicitly so a later
+  // config edit cannot silently re-enable the workers.dev route.
+  "workers_dev": false,
+  "routes": [
+    {
+      "pattern": "visualizations.ruul.ee",
+      "custom_domain": true
+    }
+  ],
   "assets": {
     "directory": "./dist",
     // Match Astro's `trailingSlash: 'never'` so `/stories` is served directly

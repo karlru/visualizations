@@ -453,9 +453,9 @@ pnpm add -D subfont
 2. (DONE) Add `public/_headers` with baseline security headers, immutable caching for hashed assets, and explicit cache rules for `/fonts/*` and `/og/*`.
 3. (DONE) Add an internal link checker that fails on broken relative links.
 4. (DONE) Create a GitHub Actions workflow that installs dependencies, lints, tests, builds, checks links, checks bundles, and deploys.
-5. Store `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` as repository secrets. — blocked: requires Cloudflare/GitHub credentials.
-6. Deploy once manually to verify the account and permissions. — blocked: requires Cloudflare credentials.
-7. Record the production workers.dev URL in the repository documentation and set Astro's `site` to it. Replace it with the custom domain at Step 8.3. — blocked: requires a live deployment URL.
+5. (DONE) Store `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` as repository secrets.
+6. Deploy once manually to verify the account and permissions. — pending the first live deploy from the workflow.
+7. (DONE) Record the production custom-domain URL (`https://visualizations.ruul.ee`) in the repository documentation and set Astro's `site` to it. The custom domain is attached in `wrangler.jsonc`, so Step 8.3 only re-verifies it.
 
 **Files**
 
@@ -472,6 +472,13 @@ pnpm add -D subfont
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "algorithm-stories",
   "compatibility_date": "<current-date>",
+  "workers_dev": false,
+  "routes": [
+    {
+      "pattern": "<custom-domain>",
+      "custom_domain": true
+    }
+  ],
   "assets": {
     "directory": "./dist",
     "html_handling": "drop-trailing-slash",
@@ -504,7 +511,7 @@ pnpm add -D subfont
 - [x] `pnpm build` completes without errors.
 - [x] `pnpm exec wrangler deploy --dry-run` succeeds.
 - [ ] The production deployment returns 200 for `/` and `/stories` without a trailing-slash redirect. — blocked: requires a live deployment; locally, `wrangler dev` returned 200 for both and a 307 from `/stories/` to `/stories`.
-- [ ] `site` is set to the deployed workers.dev URL, not `example.com`. — blocked: no deployed URL exists yet; `SITE_URL` remains the provisional placeholder.
+- [x] `site` is set to the deployed origin (`https://visualizations.ruul.ee`), not `example.com`.
 - [x] The custom 404 is served for an unknown route. (verified locally with `wrangler dev --local`, not yet against production)
 - [x] `curl -I` shows the security headers. (verified locally with `wrangler dev --local`)
 - [x] Hashed assets show the immutable cache header; fonts and OG images show their explicit cache rules. (verified locally; the `/og/*` rule used a temporary probe file that was removed)
@@ -1853,6 +1860,8 @@ pnpm add astro-og-canvas @astrojs/rss
 ### Step 8.3 — Custom domain and final verification
 
 **Goal:** A branded, secure URL and a final verification against the canonical domain.
+
+The custom domain (`https://visualizations.ruul.ee`) was attached in Step 0.6, `SITE_URL` already uses it, and `workers_dev` is disabled. Tasks 1–5 below are therefore already satisfied; what remains is the post-launch re-verification once all content is final.
 
 **Tasks**
 
