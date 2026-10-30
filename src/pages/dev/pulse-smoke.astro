@@ -1,0 +1,151 @@
+---
+/**
+ * Second story-runtime fixture.
+ *
+ * It is a different story config with its own engine, scenes, chapter map, and
+ * defaults. The page renders it through the same `StoryController` as
+ * `/dev/story-smoke`; no controller internals change. Like the first fixture it
+ * is noindex, absent from the sitemap, and never linked from public navigation.
+ */
+
+import Chapter from '../../components/story/Chapter.astro';
+import StoryController from '../../components/story/StoryController.svelte';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { pulseStoryConfig } from '../../stories/dev/pulse-config';
+
+const prose = [
+  'This second fixture reads the same runtime contract through a different config. Its engine produces a deterministic square-wave pulse instead of an orbit, and its scenes give the four chapters their own cameras, layers, and labels. Nothing in the controller knows which engine is running.',
+  'The interval chapter zooms toward the pulse source. Scroll still belongs to presentation only: entering this chapter resets the run, applies the chapter parameters, and composes the scene without letting scroll progress touch the engine.',
+  'The lattice chapter rotates the camera. The same persistent stage, progress rail, transport controls, and share action work here because they are runtime features, not story features. The story supplies data and prose; the runtime supplies behaviour.',
+  'The final chapter pulls back to the whole field. Replay, pause, speed, article mode, reduced motion, deep links, and share behave exactly as they do in the first fixture. A new story is a config module and a page, not a controller edit.',
+];
+
+const chapters = pulseStoryConfig.chapters.map((chapter, index) => ({
+  ...chapter,
+  eyebrow: `Pulse chapter ${String(index + 1).padStart(2, '0')}`,
+  body: prose[index] ?? '',
+}));
+
+const initialChapters = pulseStoryConfig.chapters.map((chapter, index) => ({
+  id: chapter.id,
+  title: chapter.title,
+  number: index + 1,
+}));
+---
+
+<BaseLayout
+  title="Second story runtime fixture"
+  description="Internal development fixture proving that the story runtime is reusable by adding a story config and a page."
+  noindex
+>
+  <div class="pulse-smoke page-shell">
+    <header class="pulse-smoke__intro">
+      <p class="eyebrow">Internal · not indexed</p>
+      <h1 class="pulse-smoke__title">Second story runtime fixture</h1>
+      <p class="pulse-smoke__dek">
+        Four chapters, one persistent Canvas 2D stage, and the same controller as
+        <code>/dev/story-smoke</code>. Its story config swaps the engine, scenes, defaults, presets,
+        and URL schema. Chapter fragments are canonical: <code>#the-lattice</code> opens the third
+        chapter directly.
+      </p>
+      <p class="pulse-smoke__note">
+        The <strong>Simulation controls</strong> panel changes live parameters. Focus the stage
+        region with <kbd>Tab</kbd> and use <kbd>Space</kbd>, the arrow keys, or <kbd>Escape</kbd>;
+        shortcuts never apply while a button, slider, or input has focus.
+      </p>
+    </header>
+
+    <StoryController
+      client:load
+      storyKey="pulse-smoke"
+      stageLabel="Second development story stage"
+      stageDescription="A deterministic pulse expands around a focal city while four chapters change the camera, layers, and highlighted object. The canvas is decorative; chapter prose and stage labels carry the meaning."
+      {initialChapters}
+    >
+      {
+        chapters.map((chapter) => (
+          <Chapter
+            id={chapter.id}
+            title={chapter.title}
+            scene={chapter.scene}
+            eyebrow={chapter.eyebrow}
+            sceneOverrides={chapter.sceneOverrides}
+          >
+            <p>{chapter.body}</p>
+            <p>
+              The chapter id is stable and deep-linkable, and the progress rail follows the active
+              chapter while the stage stays pinned.
+            </p>
+          </Chapter>
+        ))
+      }
+    </StoryController>
+
+    <section class="pulse-smoke__outro" aria-labelledby="pulse-outro-title">
+      <p class="eyebrow">End of fixture</p>
+      <h2 id="pulse-outro-title" class="pulse-smoke__outro-title">Native scroll to the end</h2>
+      <p>
+        This block gives the document extra length so Home and End have unambiguous extremes.
+        Leaving the stage viewport pauses rendering and simulation; returning resumes both. No link
+        from another page points here, and the sitemap excludes every <code>/dev/</code> route.
+      </p>
+      <p><a href="/">Back to the home page</a></p>
+    </section>
+  </div>
+</BaseLayout>
+
+<style>
+  .pulse-smoke {
+    padding-block: var(--space-2xl) var(--space-3xl);
+  }
+
+  .pulse-smoke__intro {
+    max-inline-size: var(--measure-prose);
+    padding-block-end: var(--space-2xl);
+  }
+
+  .pulse-smoke__title {
+    margin-block-start: var(--space-sm);
+    font-size: var(--text-h1);
+    letter-spacing: var(--tracking-tighter);
+  }
+
+  .pulse-smoke__dek {
+    margin-block-start: var(--space-md);
+    color: var(--color-paper-muted);
+    font-size: var(--text-lead);
+    line-height: var(--leading-relaxed);
+  }
+
+  .pulse-smoke__note {
+    margin-block-start: var(--space-md);
+    color: var(--color-paper-muted);
+    font-size: var(--text-sm);
+    line-height: var(--leading-relaxed);
+  }
+
+  .pulse-smoke__note kbd {
+    padding: 0.1em 0.35em;
+    border: var(--hairline) solid var(--color-rule-paper);
+    border-radius: var(--radius-xs);
+    background-color: var(--color-paper-inset);
+    color: var(--color-ink);
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+  }
+
+  .pulse-smoke__outro {
+    max-inline-size: var(--measure-prose);
+    padding-block: var(--space-3xl) var(--space-2xl);
+    border-block-start: var(--hairline) solid var(--color-rule-paper);
+  }
+
+  .pulse-smoke__outro-title {
+    margin-block: var(--space-sm) var(--space-md);
+    font-size: var(--text-h2);
+  }
+
+  .pulse-smoke__outro p + p {
+    margin-block-start: var(--space-md);
+  }
+</style>

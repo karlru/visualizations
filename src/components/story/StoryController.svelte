@@ -57,14 +57,13 @@
   } from '../../lib/persistence';
   import { composeSceneState } from '../../lib/scene-composition';
   import { type ScrollChapterEvent, ScrollDirector } from '../../lib/scroll-director';
-  import { Canvas2DRenderer } from '../../render/canvas2d/Canvas2DRenderer';
   import type { SceneState } from '../../render/types';
   import type {
     SmokeMetrics,
     SmokeParams,
     SmokeSnapshot,
   } from '../../stories/dev/canvas-smoke-engine';
-  import { devStoryConfig } from '../../stories/dev/config';
+  import { type FixtureStoryConfig, loadStoryConfig } from '../../stories/loader';
   import type { ChapterSpec } from '../../stories/registry';
   import Metrics from '../controls/Metrics.svelte';
   import type { MetricItem } from '../controls/metrics-types';
@@ -73,13 +72,22 @@
   import Slider from '../controls/Slider.svelte';
   import Toggle from '../controls/Toggle.svelte';
   import ArticleModeToggle from './ArticleModeToggle.svelte';
-  import { createSmokeLayers } from './canvas-smoke-layers';
   import ProgressRail from './ProgressRail.svelte';
+  import { createStoryRenderer } from './renderer-factory';
   import StageChrome from './StageChrome.svelte';
   import StoryStage from './StoryStage.svelte';
+  import type {
+    StoryRuntimeDebugState,
+    StoryRuntimeEntryState,
+  } from './story-runtime-debug';
   import type { StoryStageHandle } from './story-stage-types';
 
   interface Props {
+    /**
+     * Key into the story-config registry. The controller loads this config with
+     * a dynamic import; it never imports a concrete story itself.
+     */
+    storyKey: string;
     /** CSS selector for chapter elements. One director owns every match. */
     chapterSelector?: string;
     /**
@@ -88,15 +96,31 @@
      * with the measured DOM ids, which remain the runtime source of truth.
      */
     initialChapters?: readonly RailChapterInfo[];
+    /** Accessible name for the focusable stage region. */
+    stageLabel?: string;
+    /** Low-frequency text alternative for the canvas content. */
+    stageDescription?: string;
     /** Prose chapters. They are server-rendered and remain readable without JS. */
     children?: Snippet;
   }
 
   let {
+    storyKey,
     chapterSelector = '[data-story-chapter]',
     initialChapters = [],
+    stageLabel = 'Interactive story stage',
+    stageDescription = 'A deterministic simulation whose camera, visible layers, and highlights follow the active chapter. The canvas is decorative; chapter prose and stage labels carry the meaning.',
     children,
   }: Props = $props();
+
+  /** Server-safe defaults before the story module resolves in onMount. */
+  const PLACEHOLDER_PARAMS: SmokeParams = {
+    speed: 1,
+    orbit: 1,
+    trails: true,
+    seed: 0,
+    variant: 'orbit',
+  };
 
   interface RuntimeChapter {
     readonly id: string;
@@ -107,7 +131,6 @@
     readonly spec: ChapterSpec<SmokeParams> | undefined;
   }
 
-  const story = devStoryConfig;
   const EMPTY_SNAPSHOT: SmokeSnapshot = { time: 0, phase: 0, pulse: 0, orbit: 1 };
   const clamp01 = (value: number): number => Math.max(0, Math.min(1, value));
   /** Backward stepping replays from reset; cap the work a long run can cause. */
@@ -117,7 +140,8 @@
 
   let root: HTMLElement | null = null;
 
-  let status = $state<'pending' | 'ready' | 'destroyed'>('pending');
+  let story = $state<FixtureStoryConfig | null>(null);
+  let status = $state<'pending' | 'ready' | 'error' | 'destroyed'>('pending');
   let activeChapterId = $state<string | null>(null);
   let activeSceneId = $state<string | null>(null);
   let activeChapterTitle = $state('');
@@ -126,9 +150,9 @@
   let paused = $state(false);
   let speed = $state(1);
   let scene = $state<SceneState | null>(null);
-  let params = $state<SmokeParams>({ ...story.defaults });
+  let params = $state<SmokeParams>({ ...PLACEHOLDER_PARAMS });
   let chapters = $state<readonly RailChapterInfo[]>(initialChapters);
-  let selectedPreset = $state<string | null>('default');
+  let selectedPreset = $state<string | null>(null);
   /**
    * Enhancement marker. False on the server and during hydration, so the
    * server-rendered document is the article layout. It flips only in onMount.
@@ -145,8 +169,8 @@
   let metricItems = $state<readonly MetricItem[]>([
     { id: 'sim-time', label: 'Simulated time', value: '0.0 s' },
     { id: 'steps', label: 'Fixed steps', value: '0' },
-    { id: 'orbit', label: 'Orbit radius', value: `${story.defaults.orbit.toFixed(2)} ×` },
-    { id: 'seed', label: 'Seed', value: String(story.defaults.seed) },
+    { id: 'orbit', label: 'Orbit radius', value: `${PLACEHOLDER_PARAMS.orbit.toFixed(2)} ×` },
+    { id: 'seed', label: 'Seed', value: String(PLACEHOLDER_PARAMS.seed) },
   ]);
 
   let director: ScrollDirector | null = null;
@@ -169,6 +193,15 @@
   let urlChapter: string | null = null;
   let chapterIds: readonly string[] = [];
   let urlSyncTimer: number | null = null;
+
+  /**
+   * Deterministic starting state for the most recent chapter entry. It is
+   * recorded after the run has been reset and before any frame can advance, so
+   * deep links, forward scroll, reverse scroll, and reload can be compared
+   * without racing the simulation clock.
+   */
+  let entryState = $state<StoryRuntimeEntryState | null>(null);
+  let entryCount = 0;
 
   /** Query fields that may stay in the address bar but are never story state. */
   const RESERVED_QUERY_KEYS: ReadonlySet<string> = new Set([
@@ -201,15 +234,18 @@
   );
 
   /**
-   * The renderer factory is created here, inside the island. Astro cannot pass
-   * a function across hydration, and a story config must not import a renderer.
-   * Step 4.1 replaces this single concrete factory with a renderer-id registry.
+   * Renderer selection is by config `rendererId`, never by the controller. The
+   * factory is constructed inside the island because Astro cannot pass a
+   * function across hydration. The config has already loaded before the stage
+   * mounts, so the key is available here.
    */
-  const createRenderer = (): Canvas2DRenderer<SmokeParams, SmokeSnapshot> =>
-    new Canvas2DRenderer<SmokeParams, SmokeSnapshot>({
-      layers: createSmokeLayers(),
-      dprCap: 2,
-    });
+  const createRenderer = () => {
+    const currentStory = story;
+    if (currentStory === null) {
+      throw new Error('The story config has not loaded yet.');
+    }
+    return createStoryRenderer(currentStory.rendererId);
+  };
 
   const getSnapshot = (): Readonly<SmokeSnapshot> => engine?.snapshot() ?? EMPTY_SNAPSHOT;
 
@@ -247,15 +283,22 @@
       ).filter((id) => id.length > 0);
       if (ids.length > 0) return ids;
     }
-    return story.chapters.map((chapter) => chapter.id);
+    return story?.chapters.map((chapter) => chapter.id) ?? [];
   }
 
   /** The canonical story query + fragment for the current state. */
   function canonicalUrlState() {
-    return serializeUrlState(story.urlParams, params, activeChapterId ?? urlChapter, {
-      defaults: story.defaults,
-      chapterIds,
-    });
+    const currentStory = story;
+    if (currentStory === null) return { query: '', fragment: '' };
+    return serializeUrlState(
+      currentStory.urlParams,
+      params,
+      activeChapterId ?? urlChapter,
+      {
+        defaults: currentStory.defaults,
+        chapterIds,
+      },
+    );
   }
 
   /**
@@ -265,6 +308,8 @@
    */
   function syncUrlNow(): void {
     if (!mounted) return;
+    const currentStory = story;
+    if (currentStory === null) return;
     if (urlSyncTimer !== null) {
       window.clearTimeout(urlSyncTimer);
       urlSyncTimer = null;
@@ -272,7 +317,7 @@
 
     const serialized = canonicalUrlState();
     const merged = new URLSearchParams(serialized.query);
-    const knownQueries = new Set(story.urlParams.params.map((param) => param.query));
+    const knownQueries = new Set(currentStory.urlParams.params.map((param) => param.query));
     for (const [key, value] of new URLSearchParams(window.location.search)) {
       if (knownQueries.has(key) || RESERVED_QUERY_KEYS.has(key)) continue;
       merged.append(key, value);
@@ -310,7 +355,7 @@
   }
 
   async function shareCurrentState(): Promise<void> {
-    if (sharing) return;
+    if (sharing || story === null) return;
     sharing = true;
     const absolute = canonicalAbsoluteUrl();
     const result = await shareUrl(absolute);
@@ -318,7 +363,7 @@
       ? {
           ok: true,
           message:
-            'Link copied. It restores this chapter, seed, orbit, variant, and trail setting. City-map edits stay local.',
+            'Link copied. It restores this chapter, seed, and structural parameters at step 0. Canvas and map edits stay local.',
         }
       : {
           ok: false,
@@ -330,6 +375,7 @@
 
   function writeDebug(): void {
     if (root === null) return;
+    root.dataset.storyKey = storyKey;
     root.dataset.simTime = simulatedSeconds.toFixed(3);
     root.dataset.simFrames = String(frameCount);
     root.dataset.simSteps = String(stepCount);
@@ -348,9 +394,56 @@
     root.dataset.sceneStep = String(sceneStep);
     root.dataset.sceneStepCount = String(activeSceneStepCount);
     root.dataset.persistence = persistenceAvailable ? 'available' : 'unavailable';
+    root.dataset.entryCount = String(entryCount);
+    if (entryState !== null) {
+      root.dataset.entryChapter = entryState.chapter;
+      root.dataset.entryScene = entryState.scene;
+      root.dataset.entrySeed = String(entryState.seed);
+      root.dataset.entryStructural = JSON.stringify(entryState.structural);
+      root.dataset.entrySteps = String(entryState.steps);
+      root.dataset.entrySimTime = entryState.simulatedSeconds.toFixed(3);
+      root.dataset.entrySceneStep = String(entryState.sceneStep);
+    } else {
+      delete root.dataset.entryChapter;
+      delete root.dataset.entryScene;
+      delete root.dataset.entrySeed;
+      delete root.dataset.entryStructural;
+      delete root.dataset.entrySteps;
+      delete root.dataset.entrySimTime;
+      delete root.dataset.entrySceneStep;
+    }
     // The manual preference also disables CSS smooth scrolling when the OS
     // allows motion. Lenis is handled by ScrollDirector's override.
     document.documentElement.dataset.reducedMotion = reducedMotion ? 'true' : 'false';
+  }
+
+  function metricsFor(
+    values: SmokeParams,
+    simulated: number = simulatedSeconds,
+    steps: number = stepCount,
+  ): readonly MetricItem[] {
+    return [
+      {
+        id: 'sim-time',
+        label: 'Simulated time',
+        value: `${simulated.toFixed(1)} s`,
+      },
+      {
+        id: 'steps',
+        label: 'Fixed steps',
+        value: String(steps),
+      },
+      {
+        id: 'orbit',
+        label: 'Orbit radius',
+        value: `${values.orbit.toFixed(2)} ×`,
+      },
+      {
+        id: 'seed',
+        label: 'Seed',
+        value: String(values.seed),
+      },
+    ];
   }
 
   /**
@@ -359,28 +452,7 @@
    * from `handleFrame`.
    */
   function sampleMetrics(force = false): void {
-    const next: readonly MetricItem[] = [
-      {
-        id: 'sim-time',
-        label: 'Simulated time',
-        value: `${simulatedSeconds.toFixed(1)} s`,
-      },
-      {
-        id: 'steps',
-        label: 'Fixed steps',
-        value: String(stepCount),
-      },
-      {
-        id: 'orbit',
-        label: 'Orbit radius',
-        value: `${params.orbit.toFixed(2)} ×`,
-      },
-      {
-        id: 'seed',
-        label: 'Seed',
-        value: String(params.seed),
-      },
-    ];
+    const next = metricsFor(params, simulatedSeconds, stepCount);
 
     const signature = next.map((item) => `${item.id}=${item.value}`).join('|');
     if (!force && signature === metricSignature) return;
@@ -393,7 +465,8 @@
     // Parameter changes happen on chapter entry only, never on progress. Reader
     // control overrides sit on top so a slider or toggle does not get wiped out
     // when the next chapter applies its own typed defaults.
-    const base = overrides === undefined ? { ...story.defaults } : { ...story.defaults, ...overrides };
+    const defaults = story?.defaults ?? PLACEHOLDER_PARAMS;
+    const base = overrides === undefined ? { ...defaults } : { ...defaults, ...overrides };
     return { ...base, ...readerParams };
   }
 
@@ -401,7 +474,8 @@
     readonly runtime: readonly RuntimeChapter[];
     readonly rail: readonly RailChapterInfo[];
   } {
-    if (root === null) return { runtime: [], rail: [] };
+    const currentStory = story;
+    if (root === null || currentStory === null) return { runtime: [], rail: [] };
 
     const elements = Array.from(root.querySelectorAll<HTMLElement>(chapterSelector));
     const runtime: RuntimeChapter[] = [];
@@ -416,9 +490,10 @@
         throw new Error('Every story chapter needs a stable id for its deep link.');
       }
 
-      const spec = story.chapters.find((candidate) => candidate.id === id);
+      const spec = currentStory.chapters.find((candidate) => candidate.id === id);
       const sceneId = element.dataset.scene ?? spec?.scene;
-      const definition = sceneId === undefined ? undefined : story.scenes[sceneId];
+      const definition =
+        sceneId === undefined ? undefined : currentStory.scenes[sceneId];
       if (definition === undefined) {
         throw new Error(`Chapter "${id}" references an unknown scene.`);
       }
@@ -450,7 +525,9 @@
   }
 
   function applySceneAt(chapter: RuntimeChapter, progress: number): void {
-    const definition = story.scenes[chapter.sceneId];
+    const currentStory = story;
+    if (currentStory === null) return;
+    const definition = currentStory.scenes[chapter.sceneId];
     if (definition === undefined) return;
 
     const next = composeSceneState(definition, chapter.overrides, progress);
@@ -508,6 +585,21 @@
         // Enter the chapter on its settled keyframe. Reduced-motion readers can
         // then step backwards through the discrete states, never scrub.
         sceneStep = sceneStepCountFor(chapter) - 1;
+        // Capture the deterministic starting state before any frame can run.
+        // This is the hook the acceptance gate uses to compare deep-link,
+        // forward-scroll, reverse-scroll, and reload entry.
+        entryCount += 1;
+        entryState = {
+          storyKey,
+          chapter: chapter.id,
+          scene: chapter.sceneId,
+          seed: params.seed,
+          params: { ...params },
+          structural: { variant: params.variant },
+          steps: 0,
+          simulatedSeconds: 0,
+          sceneStep,
+        };
         sampleMetrics(true);
         writeDebug();
         urlChapter = chapter.id;
@@ -632,7 +724,9 @@
   }
 
   function applyPreset(id: string): void {
-    const preset = story.presets.find((candidate) => candidate.id === id);
+    const currentStory = story;
+    if (currentStory === null) return;
+    const preset = currentStory.presets.find((candidate) => candidate.id === id);
     if (preset === undefined) return;
 
     selectedPreset = id;
@@ -640,7 +734,7 @@
     // variant are the reader's run identity, not preset fields; keep both
     // across preset changes.
     const base: SmokeParams = {
-      ...story.defaults,
+      ...currentStory.defaults,
       ...preset.params,
       seed: params.seed,
       variant: params.variant,
@@ -904,6 +998,33 @@
     cleanup();
   };
 
+  /** Publish the test/development hook once; its methods read live state. */
+  function publishDebug(): void {
+    if (typeof window === 'undefined') return;
+    window.__storyRuntimeDebug = {
+      storyKey,
+      entryState: () => entryState,
+      debugState: (): StoryRuntimeDebugState => ({
+        storyKey,
+        status,
+        ready: status === 'ready',
+        entry: entryState,
+        entryCount,
+        chapter: activeChapterId,
+        scene: activeSceneId,
+        steps: stepCount,
+        simulatedSeconds,
+        paused,
+        speed,
+        stageCount: root?.querySelectorAll('[data-story-stage]').length ?? 0,
+        metricTimerActive: metricTimer !== null,
+        listenersActive: listeners !== null && !listeners.signal.aborted,
+        stageLive: window.__storyStageLive ?? 0,
+        mounts: window.__storyRuntimeMounts ?? 0,
+      }),
+    };
+  }
+
   function cleanup(): void {
     if (cleanupDone) return;
     cleanupDone = true;
@@ -942,55 +1063,52 @@
     runtimeChapters = new Map();
     scene = null;
     status = 'destroyed';
+    publishDebug();
 
     delete document.documentElement.dataset.storyRuntime;
     delete document.documentElement.dataset.scrollController;
     delete document.documentElement.dataset.reducedMotion;
   }
 
-  onMount(() => {
-    mounted = true;
-    cleanupDone = false;
-    listeners = new AbortController();
-    const signal = listeners.signal;
+  /**
+   * Resolve the config module, parse the shared state, then build the runtime.
+   * Everything before this point is synchronous and safe on the server; the
+   * article layout remains untouched while the story chunk loads.
+   */
+  async function initialize(): Promise<void> {
+    let loaded: FixtureStoryConfig;
+    try {
+      loaded = await loadStoryConfig(storyKey);
+    } catch (error) {
+      if (!mounted) return;
+      status = 'error';
+      if (root !== null) {
+        root.dataset.storyError = error instanceof Error ? error.message : 'Unknown story.';
+      }
+      publishDebug();
+      return;
+    }
 
-    // A second controller on the same page must not leave a second trigger set.
-    window.__scrollDirector?.destroy();
-    window.__scrollDirectorMounts = (window.__scrollDirectorMounts ?? 0) + 1;
-
-    // Preferences are best-effort. The article layout and full motion remain
-    // usable when storage is missing or throws.
-    persistenceAvailable = isPersistenceAvailable();
-    motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
-    systemReducedMotion = motionQuery.matches;
-    manualReducedMotion = parseStoredMotionPreference(
-      readPreference(PREFERENCE_KEYS.reducedMotion),
-    );
-    articleMode = readPreference(PREFERENCE_KEYS.articleMode) === 'article';
-    // Reduced motion never autoplays. Set this before the clock exists so no
-    // frame can advance between hydration and the first reader input.
-    paused = systemReducedMotion || manualReducedMotion;
-    document.documentElement.dataset.reducedMotion = paused ? 'true' : 'false';
+    if (!mounted) return;
+    story = loaded;
+    selectedPreset = loaded.presets[0]?.id ?? null;
+    params = { ...loaded.defaults };
+    metricItems = metricsFor(params, 0, 0);
 
     // Parse the shareable starting state before constructing the engine. The
     // URL describes the run's start, never a mid-run frame: values are clamped
     // or rejected with notices here, and chapter entry below resets to step 0.
     chapterIds = readChapterIds();
-    const parsedUrl = parseUrlState(
-      story.urlParams,
-      story.defaults,
-      window.location.href,
-      { chapterIds },
-    );
+    const parsedUrl = parseUrlState(loaded.urlParams, loaded.defaults, window.location.href, {
+      chapterIds,
+    });
     urlNotices = parsedUrl.notices;
     urlChapter = parsedUrl.chapter;
-    params = { ...story.defaults, ...parsedUrl.explicit };
+    params = { ...loaded.defaults, ...parsedUrl.explicit };
     readerParams = { ...parsedUrl.explicit };
 
-    engine = story.createEngine(params);
+    engine = loaded.createEngine(params);
     clock = new FixedStepClock({ paused, speed });
-    writeDebug();
-    sampleMetrics(true);
 
     const instance = new ScrollDirector();
     director = instance;
@@ -1010,11 +1128,16 @@
         });
       }
     } catch (error) {
+      if (root !== null) {
+        root.dataset.storyError = error instanceof Error ? error.message : 'Invalid chapter map.';
+      }
       cleanup();
-      throw error;
+      status = 'error';
+      publishDebug();
+      return;
     }
 
-    motionQuery.addEventListener('change', handleMotionQueryChange);
+    motionQuery?.addEventListener('change', handleMotionQueryChange);
 
     // Measure the chapter ranges before resolving a fragment. This is the
     // "after the pin offset is known" step: the stage is sticky, and chapter
@@ -1053,19 +1176,51 @@
       if (initialHash.length > 0 && activeChapterId !== initialHash) resolveHash();
     });
 
-    document.addEventListener('astro:before-swap', handleBeforeSwap, { signal });
-    window.addEventListener('pagehide', handlePageHide, { signal });
-    window.addEventListener('hashchange', handleHashChange, { signal });
-    window.addEventListener('popstate', handlePopState, { signal });
-    window.addEventListener('pageshow', handlePageShow, { signal });
-
     status = 'ready';
+    writeDebug();
+    sampleMetrics(true);
+    publishDebug();
 
     // Metrics are sampled at UI frequency, never from the ticker. One second is
     // below the 2 Hz ceiling and keeps the polite live region quiet.
     metricTimer = setInterval(() => {
       if (mounted) sampleMetrics();
     }, 1_000);
+  }
+
+  onMount(() => {
+    mounted = true;
+    cleanupDone = false;
+    listeners = new AbortController();
+    const signal = listeners.signal;
+
+    // A second controller on the same page must not leave a second trigger set.
+    window.__scrollDirector?.destroy();
+    window.__scrollDirectorMounts = (window.__scrollDirectorMounts ?? 0) + 1;
+    window.__storyRuntimeMounts = (window.__storyRuntimeMounts ?? 0) + 1;
+
+    // Preferences are best-effort. The article layout and full motion remain
+    // usable when storage is missing or throws.
+    persistenceAvailable = isPersistenceAvailable();
+    motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+    systemReducedMotion = motionQuery.matches;
+    manualReducedMotion = parseStoredMotionPreference(
+      readPreference(PREFERENCE_KEYS.reducedMotion),
+    );
+    articleMode = readPreference(PREFERENCE_KEYS.articleMode) === 'article';
+    // Reduced motion never autoplays. Set this before the clock exists so no
+    // frame can advance between hydration and the first reader input.
+    paused = systemReducedMotion || manualReducedMotion;
+    document.documentElement.dataset.reducedMotion = paused ? 'true' : 'false';
+
+    document.addEventListener('astro:before-swap', handleBeforeSwap, { signal });
+    window.addEventListener('pagehide', handlePageHide, { signal });
+    window.addEventListener('hashchange', handleHashChange, { signal });
+    window.addEventListener('popstate', handlePopState, { signal });
+    window.addEventListener('pageshow', handlePageShow, { signal });
+
+    publishDebug();
+    void initialize();
 
     return cleanup;
   });
@@ -1079,6 +1234,7 @@
   class:story-controller--enhanced={enhanced}
   class:story-controller--article={articleMode}
   data-story-controller={status}
+  data-story-key={storyKey}
   data-story-enhanced={enhanced ? 'true' : undefined}
   data-article-mode={articleMode ? 'true' : 'false'}
   data-motion={reducedMotion ? 'reduced' : 'full'}
@@ -1096,6 +1252,14 @@
   data-engine-seed={params.seed}
   data-engine-variant={params.variant}
   data-preset={selectedPreset ?? 'custom'}
+  data-entry-count={entryCount}
+  data-entry-chapter={entryState?.chapter}
+  data-entry-scene={entryState?.scene}
+  data-entry-seed={entryState?.seed}
+  data-entry-structural={entryState === null ? undefined : JSON.stringify(entryState.structural)}
+  data-entry-steps={entryState?.steps}
+  data-entry-sim-time={entryState?.simulatedSeconds.toFixed(3)}
+  data-entry-scene-step={entryState?.sceneStep}
   data-sim-time="0.000"
   data-sim-frames="0"
   data-sim-steps="0"
@@ -1127,8 +1291,8 @@
           {paused}
           dprCap={2}
           testId="story-stage"
-          ariaLabel="Development story stage"
-          description="A moving point orbits a focal city while four chapters change the camera, layers, and highlighted object. The canvas is decorative; chapter prose and stage labels carry the meaning."
+          ariaLabel={stageLabel}
+          description={stageDescription}
           interactive
           roledescription="interactive simulation stage"
           describedBy="story-shortcuts"
@@ -1139,6 +1303,7 @@
           <StageChrome
             {paused}
             {speed}
+            rendererId={story?.rendererId ?? 'canvas2d'}
             chapterTitle={activeChapterTitle}
             sceneId={activeSceneId}
             {reducedMotion}
@@ -1191,8 +1356,8 @@
               the orbit and trail controls never recreate the runtime.
             </p>
             <p class="story-controls__note" data-share-scope>
-              <strong>Share links</strong> carry the chapter fragment, seed, orbit, variant, and trail
-              setting. They restart at iteration 0. Canvas and city-map edits stay local and are not
+              <strong>Share links</strong> carry the chapter fragment, seed, and structural parameters.
+              They restart the run at step 0. Canvas and city-map edits stay local and are not
               included.
             </p>
           </div>
@@ -1220,7 +1385,7 @@
 
             <PresetPicker
               id="preset"
-              presets={story.presets}
+              presets={story?.presets ?? []}
               selected={selectedPreset}
               onSelect={applyPreset}
             />

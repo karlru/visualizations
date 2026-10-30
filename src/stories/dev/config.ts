@@ -18,23 +18,7 @@ import {
   type SmokeParams,
   type SmokeSnapshot,
 } from './canvas-smoke-engine';
-
-const LAYER_ORDER = ['backdrop', 'graph', 'pheromone', 'ants', 'best-tour'] as const;
-
-type DevLayerId = (typeof LAYER_ORDER)[number];
-
-function layers(
-  visible: Partial<Record<DevLayerId, number>>,
-): readonly { id: string; visible: boolean; opacity: number }[] {
-  return LAYER_ORDER.map((id) => {
-    const opacity = visible[id];
-    return {
-      id,
-      visible: opacity !== undefined && opacity > 0,
-      opacity: opacity ?? 0,
-    };
-  });
-}
+import { devLayers as layers } from './scene-layers';
 
 export const devStoryConfig = defineStoryConfig<SmokeParams, SmokeSnapshot, SmokeMetrics>({
   slug: 'story-smoke',

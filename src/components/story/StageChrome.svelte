@@ -11,6 +11,8 @@
   interface Props {
     readonly paused: boolean;
     readonly speed: number;
+    /** Active renderer, used only for the human-readable details note. */
+    readonly rendererId?: string;
     readonly chapterTitle?: string;
     readonly sceneId?: string | null;
     /** Effective reduced-motion state (OS or reader choice). */
@@ -35,6 +37,7 @@
   let {
     paused,
     speed,
+    rendererId = 'canvas2d',
     chapterTitle,
     sceneId,
     reducedMotion = false,
@@ -59,6 +62,12 @@
 
   function formatSpeed(value: number): string {
     return value === 1 ? '1×' : `${value}×`;
+  }
+
+  function formatRenderer(value: string): string {
+    if (value === 'canvas2d') return 'Canvas 2D';
+    if (value === 'three') return 'WebGL 2 / Three.js';
+    return value;
   }
 
   function handleSpeed(event: Event): void {
@@ -227,9 +236,9 @@
         </div>
       </dl>
       <p class="stage-chrome__note">
-        Canvas 2D · DPR capped at 2 · simulation pauses when the stage leaves the viewport.
-        Share links carry the chapter, seed, orbit, variant, and trail setting; canvas map edits
-        stay local.
+        {formatRenderer(rendererId)} · DPR capped at 2 · simulation pauses when the stage leaves the
+        viewport. Share links carry the chapter, seed, and structural parameters; canvas and map
+        edits stay local.
       </p>
     </div>
   </details>

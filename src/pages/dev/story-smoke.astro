@@ -60,7 +60,13 @@ const initialChapters = devStoryConfig.chapters.map((chapter, index) => ({
       </p>
     </header>
 
-    <StoryController client:load {initialChapters}>
+    <StoryController
+      client:load
+      storyKey="story-smoke"
+      stageLabel="Development story stage"
+      stageDescription="A moving point orbits a focal city while four chapters change the camera, layers, and highlighted object. The canvas is decorative; chapter prose and stage labels carry the meaning."
+      {initialChapters}
+    >
       {
         chapters.map((chapter) => (
           <Chapter
