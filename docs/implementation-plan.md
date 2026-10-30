@@ -898,7 +898,7 @@ Verified 2026-10-30 with `pnpm lint` and `pnpm test` (225 passing, 1 existing to
 
 **Tasks**
 
-1. Define parameters: city count, ant count, `α`, `β`, `ρ`, speed, seed. `Q` is fixed at `1` in release 1.
+1. (DONE) Define parameters: city count, ant count, `α`, `β`, `ρ`, speed, seed. `Q` is fixed at `1` in release 1.
 2. Initialize pheromone to a small positive value.
 3. Construct one tour per ant using the probabilistic transition rule, falling back to a uniform choice when all weights are zero.
 4. Deposit pheromone proportional to inverse tour length.
