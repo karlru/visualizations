@@ -11,7 +11,12 @@ import {
   transitionProbabilities,
 } from '../../src/engines/aco/engine';
 import { ACO_PRESETS } from '../../src/engines/aco/presets';
-import { createTspInstance, tourLength, validateTour } from '../../src/engines/aco/tsp';
+import {
+  createTspInstance,
+  createTspInstanceFromCities,
+  tourLength,
+  validateTour,
+} from '../../src/engines/aco/tsp';
 import type { AcoParams } from '../../src/engines/aco/types';
 
 /**
@@ -717,5 +722,98 @@ describe('fixed-step time budget', () => {
         Array.from(states[0].snapshot().pheromone),
       );
     }
+  });
+});
+describe('structural and presentation changes', () => {
+  it('does not reset for a same-value setParams call or a speed change', () => {
+    const engine = run(engineWith(), 3);
+    const before = engine.metrics();
+
+    engine.setParams(params());
+    expect(engine.metrics()).toEqual(before);
+
+    engine.setParams(params({ speed: 4 }));
+    expect(engine.snapshot().iteration).toBe(3);
+    expect(engine.snapshot().bestLength).toBe(before.bestLength);
+    expect(engine.snapshot().speed).toBe(4);
+    expect(engine.metrics().pendingIterations).toBe(before.pendingIterations);
+  });
+
+  it('restarts at iteration 0 and clears history for every structural parameter', () => {
+    const changes: Partial<AcoParams>[] = [
+      { antCount: 12 },
+      { alpha: 0 },
+      { beta: 0 },
+      { rho: 1 },
+      { seed: 7 },
+      { cityCount: 20 },
+    ];
+
+    for (const change of changes) {
+      const engine = run(engineWith(), 3);
+      expect(engine.snapshot().iteration).toBe(3);
+      engine.setParams(params(change));
+
+      expect(engine.snapshot().iteration).toBe(0);
+      expect(engine.snapshot().bestLength).toBeNull();
+      expect(engine.snapshot().bestTour).toBeNull();
+      expect(engine.snapshot().meanLength).toBeNull();
+      expect(engine.snapshot().entropy).toBe(1);
+      expect(engine.metrics().pendingIterations).toBe(0);
+    }
+  });
+
+  it('rebuilds the city set from setCities and invalidates best/mean history', () => {
+    const engine = run(engineWith({ cityCount: 10 }), 3);
+    const cities = [
+      { x: 0.1, y: 0.1 },
+      { x: 0.9, y: 0.1 },
+      { x: 0.5, y: 0.9 },
+    ];
+
+    engine.setCities(cities);
+
+    expect(engine.snapshot().cityCount).toBe(3);
+    expect(engine.snapshot().cities).toEqual(cities);
+    expect(engine.snapshot().iteration).toBe(0);
+    expect(engine.snapshot().bestLength).toBeNull();
+    expect(engine.snapshot().meanLength).toBeNull();
+    expect(engine.snapshot().pheromone).toHaveLength(9);
+
+    run(engine, 2);
+    assertValidTours(engine, createTspInstanceFromCities(cities));
+  });
+
+  it('keeps an explicit city set when only the seed changes', () => {
+    const cities = [
+      { x: 0.1, y: 0.1 },
+      { x: 0.7, y: 0.2 },
+      { x: 0.4, y: 0.8 },
+      { x: 0.9, y: 0.9 },
+    ];
+    const engine = new AcoEngine(params({ cityCount: 4, seed: 11 }));
+    engine.setCities(cities);
+    run(engine, 2);
+
+    engine.setParams(params({ cityCount: 4, seed: 12 }));
+
+    expect(engine.snapshot().cities).toEqual(cities);
+    expect(engine.snapshot().params.seed).toBe(12);
+    expect(engine.snapshot().iteration).toBe(0);
+  });
+
+  it('replaces an explicit city set when the city count changes', () => {
+    const engine = new AcoEngine(params({ cityCount: 4 }));
+    engine.setCities([
+      { x: 0.1, y: 0.1 },
+      { x: 0.9, y: 0.1 },
+      { x: 0.5, y: 0.9 },
+      { x: 0.2, y: 0.8 },
+    ]);
+
+    engine.setParams(params({ cityCount: 6 }));
+
+    expect(engine.snapshot().cityCount).toBe(6);
+    expect(engine.snapshot().cities).toEqual(createTspInstance(DEFAULTS.seed, 6).cities);
   });
 });
