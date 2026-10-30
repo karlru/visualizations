@@ -817,3 +817,100 @@ describe('structural and presentation changes', () => {
     expect(engine.snapshot().cities).toEqual(createTspInstance(DEFAULTS.seed, 6).cities);
   });
 });
+describe('parameter edge cases', () => {
+  const cases: Array<{ name: string; overrides: Partial<AcoParams> }> = [
+    { name: 'alpha = 0', overrides: { alpha: 0 } },
+    { name: 'beta = 0', overrides: { beta: 0 } },
+    { name: 'rho = 1', overrides: { rho: 1 } },
+    { name: 'one ant', overrides: { antCount: 1 } },
+    { name: 'two cities', overrides: { cityCount: 2, antCount: 2 } },
+    { name: 'one city', overrides: { cityCount: 1, antCount: 3 } },
+    { name: 'alpha = beta = 0', overrides: { alpha: 0, beta: 0 } },
+  ];
+
+  for (const testCase of cases) {
+    it(`runs ${testCase.name} without NaN, Infinity, or empty tours`, () => {
+      const engine = run(engineWith(testCase.overrides), 8);
+      const snapshot = engine.snapshot();
+
+      assertFinitePheromone(engine);
+      expect(snapshot.iteration).toBe(8);
+      expect(snapshot.bestLength).not.toBeNull();
+      expect(Number.isFinite(snapshot.bestLength as number)).toBe(true);
+      expect(Number.isFinite(snapshot.meanLength as number)).toBe(true);
+      expect(snapshot.entropy).toBeGreaterThanOrEqual(0);
+      expect(snapshot.entropy).toBeLessThanOrEqual(1);
+
+      const instance = instanceFor(testCase.overrides);
+      for (const ant of snapshot.ants) {
+        const tour = Array.from(ant.tour);
+        expect(tour).toHaveLength(instance.cityCount);
+        expect(validateTour(instance, tour)).toEqual({ valid: true });
+      }
+    });
+  }
+
+  it('handles collinear cities', () => {
+    const engine = engineWith({ antCount: 5, seed: 0 });
+    engine.setCities([
+      { x: 0, y: 0.5 },
+      { x: 0.2, y: 0.5 },
+      { x: 0.4, y: 0.5 },
+      { x: 0.6, y: 0.5 },
+      { x: 0.8, y: 0.5 },
+      { x: 1, y: 0.5 },
+    ]);
+
+    run(engine, 10);
+
+    assertFinitePheromone(engine);
+    assertValidTours(
+      engine,
+      createTspInstanceFromCities([
+        { x: 0, y: 0.5 },
+        { x: 0.2, y: 0.5 },
+        { x: 0.4, y: 0.5 },
+        { x: 0.6, y: 0.5 },
+        { x: 0.8, y: 0.5 },
+        { x: 1, y: 0.5 },
+      ]),
+    );
+  });
+
+  it('handles coincident cities with finite distances and tours', () => {
+    const point = { x: 0.5, y: 0.5 };
+    const cities = [point, point, point, point];
+    const engine = run(engineWith({ antCount: 4 }), 2);
+    engine.setCities(cities);
+
+    run(engine, 5);
+
+    assertFinitePheromone(engine);
+    const instance = createTspInstanceFromCities(cities);
+    for (const ant of engine.snapshot().ants) {
+      expect(validateTour(instance, Array.from(ant.tour))).toEqual({ valid: true });
+      expect(Number.isFinite(ant.tourLength)).toBe(true);
+    }
+    expect(Number.isFinite(engine.metrics().meanLength as number)).toBe(true);
+  });
+
+  it('builds a deterministic nearest-neighbor baseline for comparison outside the engine', () => {
+    // The engine initializes best from the first iteration's minimum; the
+    // greedy baseline is a separate model helper and is not injected into
+    // best-length history.
+    const settings = params({ cityCount: 20, antCount: 10 });
+    const engine = run(new AcoEngine(settings), 1);
+    const first = engine.snapshot();
+    const minimum = Math.min(...first.ants.map((ant) => ant.tourLength));
+
+    expect(first.bestLength).toBeCloseTo(minimum, 12);
+  });
+
+  it('accepts the smallest and largest permitted ant counts', () => {
+    for (const antCount of [ACO_LIMITS.antCount.min, ACO_LIMITS.antCount.max]) {
+      const engine = run(engineWith({ cityCount: 6, antCount }), 2);
+      expect(engine.snapshot().ants).toHaveLength(antCount);
+      assertFinitePheromone(engine);
+    }
+  });
+});

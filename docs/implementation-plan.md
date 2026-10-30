@@ -906,7 +906,7 @@ Verified 2026-10-30 with `pnpm lint` and `pnpm test` (225 passing, 1 existing to
 6. (DONE) Track best tour, best length, mean length, iteration, and normalized pheromone entropy using the formula in `docs/stories.md` §2.6.
 7. (DONE) Support `stepIteration()` for deterministic tests and `step(dt)` for the clock.
 8. (DONE) Restart the run at iteration 0 when a structural parameter or the city set changes; invalidate best/mean history.
-9. Handle edge cases: `α = 0`, `β = 0`, `ρ = 1`, one ant, two cities, collinear cities.
+9. (DONE) Handle edge cases: `α = 0`, `β = 0`, `ρ = 1`, one ant, two cities, collinear cities.
 10. Expose a snapshot suitable for rendering without copying the entire graph every frame.
 11. Cap simulated iterations per frame at the worst-case workload.
 
