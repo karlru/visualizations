@@ -940,7 +940,7 @@ Verified 2026-10-30 with `pnpm lint`, `pnpm test` (281 passing, 1 existing todo;
 2. (DONE) Add property-based tests for tour validity and probability normalization.
 3. (DONE) Add edge-case tests for all parameters.
 4. (DONE) Add a test that a larger `β` makes the next-city choice more distance-sensitive on a controlled instance.
-5. Add a test that evaporation reduces pheromone when no deposit occurs.
+5. (DONE) Add a test that evaporation reduces pheromone when no deposit occurs.
 6. Add a test that the best tour is preserved across iterations.
 
 **Files**

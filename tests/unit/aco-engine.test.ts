@@ -1528,3 +1528,82 @@ describe('beta distance sensitivity', () => {
     expect(countNear(8)).toBeGreaterThan(countNear(0));
   });
 });
+
+describe('evaporation without deposit', () => {
+  it('reduces pheromone on every edge that no ant uses', () => {
+    const settings = params({ cityCount: 8, antCount: 1, rho: 0.4, seed: 5 });
+    const engine = new AcoEngine(settings);
+    const size = engine.snapshot().cityCount;
+    const before = Float64Array.from(engine.snapshot().pheromone);
+
+    engine.stepIteration();
+
+    const snapshot = engine.snapshot();
+    const used = usedEdgeSet(Array.from(snapshot.ants[0].tour), size);
+    let unusedEdges = 0;
+
+    for (let from = 0; from < size; from += 1) {
+      for (let to = from + 1; to < size; to += 1) {
+        const beforeValue = before[from * size + to];
+        const afterValue = snapshot.pheromone[from * size + to];
+
+        if (used.has(from * size + to)) {
+          expect(afterValue).toBeGreaterThan((1 - settings.rho) * beforeValue);
+        } else {
+          expect(afterValue).toBeCloseTo((1 - settings.rho) * beforeValue, 12);
+          expect(afterValue).toBeLessThan(beforeValue);
+          unusedEdges += 1;
+        }
+      }
+    }
+
+    expect(unusedEdges).toBeGreaterThan(0);
+  });
+
+  it('leaves unused edges unchanged at rho = 0 and clears them at rho = 1', () => {
+    for (const [rho, expected] of [
+      [0, INITIAL_PHEROMONE],
+      [1, 0],
+    ] as const) {
+      const engine = new AcoEngine(params({ cityCount: 6, antCount: 1, rho, seed: 13 }));
+      engine.stepIteration();
+
+      const snapshot = engine.snapshot();
+      const used = usedEdgeSet(Array.from(snapshot.ants[0].tour), 6);
+      let checked = 0;
+
+      for (let from = 0; from < 6; from += 1) {
+        for (let to = from + 1; to < 6; to += 1) {
+          if (!used.has(from * 6 + to)) {
+            expect(snapshot.pheromone[from * 6 + to]).toBeCloseTo(expected, 12);
+            checked += 1;
+          }
+        }
+      }
+
+      expect(checked).toBeGreaterThan(0);
+    }
+  });
+
+  it('adds exactly Q / L to each used edge when rho = 0', () => {
+    const engine = new AcoEngine(params({ cityCount: 5, antCount: 1, rho: 0, seed: 21 }));
+    engine.stepIteration();
+
+    const snapshot = engine.snapshot();
+    const size = snapshot.cityCount;
+    const ant = snapshot.ants[0];
+    const used = usedEdgeSet(Array.from(ant.tour), size);
+    const deposit = ACO_DEPOSIT_CONSTANT / ant.tourLength;
+
+    for (let from = 0; from < size; from += 1) {
+      for (let to = from + 1; to < size; to += 1) {
+        const value = snapshot.pheromone[from * size + to];
+        if (used.has(from * size + to)) {
+          expect(value).toBeCloseTo(INITIAL_PHEROMONE + deposit, 12);
+        } else {
+          expect(value).toBeCloseTo(INITIAL_PHEROMONE, 12);
+        }
+      }
+    }
+  });
+});
