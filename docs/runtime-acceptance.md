@@ -4,27 +4,40 @@ Step 1.9 proves the shared story runtime on the built preview before Phase 2
 starts. This note maps every `FR-STORY-*` requirement in
 [`requirements.md`](./requirements.md) §2.2 to the browser tests that verify it.
 All rows were run on 2026-10-30 with `pnpm lint`, `pnpm test`, `pnpm build`,
-`pnpm check:links`, and `CI=1 pnpm test:e2e`.
+`pnpm check:links`, and `CI=1 pnpm test:e2e`. Step 3.3 added the public ACO
+route; `tests/e2e/aco-story.spec.ts` extends the same runtime checks to the real
+story and its ten chapters.
 
 ## Runtime architecture
 
-- `src/stories/loader.ts` is the story-config registry. It accepts a story key
-  (`story-smoke`, `pulse-smoke`) and dynamic-imports the matching config module.
-  A page passes `storyKey` to `StoryController`; the controller never imports a
-  concrete story.
-- `src/components/story/renderer-factory.ts` selects a renderer by
-  `StoryConfig.rendererId` (`canvas2d` today). A config never imports a
-  renderer. Step 4.1 extends this map with Three.js.
+- `src/stories/loader.ts` is the story-module registry. It accepts a slug
+  (`ant-colony-optimization`, `story-smoke`, `pulse-smoke`) and dynamic-imports
+  the matching module. A page passes `storyKey` to `StoryController`; the
+  controller never imports a concrete story, engine, or renderer.
+- `src/stories/runtime.ts` closes over a story's concrete `P`/`S`/`M` types and
+  exposes a non-generic `StoryModuleView` plus `StoryRuntime`. The controller
+  works with primitive `StoryParamBag` params and a
+  `StageRenderer<StoryParamBag, object>` facade; the adapter owns every cast and
+  the engine snapshot is taken inside the facade, so no `unknown` reaches a
+  renderer.
+- Each story module supplies its renderer factory and metric/structural
+  describer. `src/stories/aco/module.ts` is the only place that names
+  `AcoEngine`, `Canvas2DRenderer`, and `createAcoLayers()`; the development
+  modules keep the fixture renderer and `controlPanel: 'fixture'` panel.
+- `src/layouts/StoryLayout.astro` and `src/pages/stories/[...slug].astro` render
+  a content entry whose slug has a module. The MDX body is passed to the
+  controller as server-rendered children, so the article is always the default.
 - A second fixture, `/dev/pulse-smoke`, has its own engine, defaults, presets,
   scenes, chapter map, URL schema, and page. It reuses the same controller,
-  `Chapter.astro`, rail, chrome, and renderer. Adding it required no controller
+  `Chapter.astro`, rail, chrome, and runtime. Adding it required no controller
   internals.
 - Every chapter entry resets the engine, clock, step counter, and simulated
   time, then records a deterministic entry snapshot before the next frame. The
   hook is exposed as `window.__storyRuntimeDebug.entryState()` and mirrored to
   `data-entry-*` attributes on `[data-story-controller]`.
 - Both development pages stay in the production build for Playwright, but are
-  `noindex`, unlinked, and filtered out of the sitemap.
+  `noindex`, unlinked, and filtered out of the sitemap. The ACO route is public
+  and appears in the sitemap.
 
 ## Requirement → test
 

@@ -495,6 +495,8 @@ interface ChapterSpec {
 
 The story controller passes typed params and a discriminated camera state; `unknown` is not used at the renderer boundary.
 
+Story modules close over the concrete types in `src/stories/runtime.ts`. Each module supplies a renderer factory and metric/structural describer, then exposes a non-generic `StoryRuntime` whose public params are a primitive `StoryParamBag`. The controller consumes a `StageRenderer<StoryParamBag, object>` facade: `setParams` converts the bag back to the concrete `P`, and `render` supplies the engine's typed snapshot internally, so the adapter owns every cast and no untyped value crosses into renderer code.
+
 ### 4.4 Scroll semantics
 
 - Chapter entry sets parameters, resets the run deterministically, eases the camera, and starts the scene.
