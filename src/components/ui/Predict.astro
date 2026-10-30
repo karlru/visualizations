@@ -1,0 +1,108 @@
+---
+/**
+ * Predict, then reveal.
+ *
+ * Built on native `<details>/<summary>` so the answer opens without any
+ * JavaScript, without a click handler, and without a hydration boundary. The
+ * question is part of the summary, so the control has a useful accessible name
+ * before it is expanded.
+ */
+
+interface Props {
+  /** The prompt the reader should think about before revealing the answer. */
+  question: string;
+  /** Optional short label; defaults to "Predict, then reveal". */
+  label?: string;
+}
+
+const { question, label = 'Predict, then reveal' } = Astro.props;
+---
+
+<details class="predict" data-predict>
+  <summary class="predict__summary">
+    <span class="predict__label">{label}</span>
+    <span class="predict__question">{question}</span>
+  </summary>
+  <div class="predict__answer" data-predict-answer>
+    <slot />
+  </div>
+</details>
+
+<style>
+  .predict {
+    margin-block: var(--space-lg);
+    padding: var(--space-sm);
+    border: var(--hairline) solid var(--color-rule-paper);
+    border-radius: var(--radius-md);
+    background-color: var(--color-paper-raised);
+  }
+
+  .predict__summary {
+    display: grid;
+    gap: var(--space-3xs);
+    min-block-size: var(--tap-target);
+    cursor: pointer;
+  }
+
+  .predict__summary:focus-visible {
+    outline: var(--focus-ring-width) solid var(--color-focus);
+    outline-offset: var(--focus-ring-offset);
+  }
+
+  .predict__label {
+    color: var(--color-accent-paper);
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    font-weight: var(--weight-medium);
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+  }
+
+  .predict__question {
+    color: var(--color-ink);
+    font-size: var(--text-lead);
+    line-height: var(--leading-snug);
+  }
+
+  .predict__answer {
+    display: grid;
+    gap: var(--space-sm);
+    margin-block-start: var(--space-sm);
+    padding-block-start: var(--space-sm);
+    border-block-start: var(--hairline) solid var(--color-rule-paper);
+    color: var(--color-paper-muted);
+    line-height: var(--leading-relaxed);
+  }
+
+  .predict__answer :global(p) {
+    margin: 0;
+  }
+
+  .predict__answer :global(a) {
+    color: var(--color-accent-paper);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .predict[open] .predict__answer {
+      animation: predict-reveal var(--duration-quick) var(--ease-out);
+    }
+  }
+
+  @keyframes predict-reveal {
+    from {
+      opacity: 0;
+      transform: translateY(-0.25rem);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .predict[open] .predict__answer {
+      animation: none;
+    }
+  }
+</style>

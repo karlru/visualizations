@@ -147,6 +147,7 @@ export const devStoryConfig = defineStoryConfig<SmokeParams, SmokeSnapshot, Smok
       id: 'a-closer-look',
       title: 'A closer look',
       scene: 'closeup',
+      reducedMotionSteps: 2,
       sceneOverrides: {
         revealProgress: 0.75,
       },
@@ -155,6 +156,7 @@ export const devStoryConfig = defineStoryConfig<SmokeParams, SmokeSnapshot, Smok
       id: 'the-turn',
       title: 'The turn',
       scene: 'drift',
+      reducedMotionSteps: 3,
       sceneOverrides: {
         camera: { kind: '2d', panX: -0.3, panY: -0.1, zoom: 155, rotation: 0.3 },
         revealProgress: 0.9,
@@ -164,6 +166,7 @@ export const devStoryConfig = defineStoryConfig<SmokeParams, SmokeSnapshot, Smok
       id: 'pulling-back',
       title: 'Pulling back',
       scene: 'wide',
+      reducedMotionSteps: 2,
       sceneOverrides: {
         params: { speed: 1.25 },
       },

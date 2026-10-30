@@ -11,20 +11,29 @@
 
 import Chapter from '../../components/story/Chapter.astro';
 import StoryController from '../../components/story/StoryController.svelte';
+import Predict from '../../components/ui/Predict.astro';
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import { devStoryConfig } from '../../stories/dev/config';
 
 const prose = [
-  'The stage on the left is sticky, not scroll-jacked. The document remains the scroller, so the native scrollbar, PageDown, arrow keys, Home, and End all keep working while the point moves.',
-  'This chapter changes the camera and the visible layers. The simulation itself keeps running: scroll decides what the reader sees, never how the algorithm behaves.',
-  'Presentation overrides are published as chapter metadata. The controller reads them from the DOM, composes the scene, and leaves the engine parameters untouched.',
-  'The final chapter pulls back to the whole field. Replay resets the simulation, play/pause freezes it, and the speed control changes the clock, not the scene.',
+  'The moving point is the whole simulation: a deterministic orbit around a focal city. It is deliberately simple, because this fixture tests the runtime rather than a real algorithm. The document remains the scroller, so the native scrollbar, PageDown, arrow keys, Home, and End keep working while the point moves.',
+  'This chapter changes the camera and the visible layers. The simulation itself keeps running: scroll decides what the reader sees, never how the algorithm behaves. That separation is what lets the same engine serve a scroll story, a lab, and a static article.',
+  'Presentation overrides are published as chapter metadata. The controller reads them from the DOM, composes the scene, and leaves the engine parameters untouched. A chapter can therefore zoom in, highlight a layer, and settle a reveal without becoming a second source of simulation state.',
+  'The final chapter pulls back to the whole field. Replay resets the simulation, play/pause freezes it, and the speed control changes the clock, not the scene. If motion is reduced, the story starts paused and the reader moves through discrete keyframes with the step controls.',
 ];
 
 const chapters = devStoryConfig.chapters.map((chapter, index) => ({
   ...chapter,
   eyebrow: `Chapter ${String(index + 1).padStart(2, '0')}`,
   body: prose[index] ?? '',
+}));
+
+// The rail is part of the article/no-JS document too. The controller replaces
+// this build-time list with the measured DOM ids after hydration.
+const initialChapters = devStoryConfig.chapters.map((chapter, index) => ({
+  id: chapter.id,
+  title: chapter.title,
+  number: index + 1,
 }));
 ---
 
@@ -51,7 +60,7 @@ const chapters = devStoryConfig.chapters.map((chapter, index) => ({
       </p>
     </header>
 
-    <StoryController client:load>
+    <StoryController client:load {initialChapters}>
       {
         chapters.map((chapter) => (
           <Chapter
@@ -71,6 +80,96 @@ const chapters = devStoryConfig.chapters.map((chapter, index) => ({
         ))
       }
     </StoryController>
+
+    <section
+      class="story-smoke__specimen prose"
+      aria-labelledby="article-example-title"
+      data-testid="article-example"
+    >
+      <p class="eyebrow">Article evidence</p>
+      <h2 id="article-example-title">Everything the article carries without JavaScript</h2>
+      <p>
+        The server-rendered default is the article. The stage is an enhancement that appears only
+        after the island hydrates, so the prose below never depends on a canvas to make its
+        argument. Formula, figure, prediction, and citation are ordinary semantic HTML.
+      </p>
+
+      <div
+        class="story-formula"
+        data-testid="story-formula"
+        role="math"
+        aria-label="Pheromone update: tau i j becomes one minus rho times tau i j, plus the sum over ants k of delta tau i j k"
+      >
+        <span aria-hidden="true">
+          τ<sub>ij</sub> ← (1 − ρ) τ<sub>ij</sub> + Σ<sub>k=1</sub><sup>m</sup>
+          Δτ<sub>ij</sub><sup>(k)</sup>
+        </span>
+      </div>
+      <p class="story-smoke__formula-note">
+        Plain markup for now; Phase 3 replaces this with build-time KaTeX. The formula stays in
+        the pre-rendered HTML either way.
+      </p>
+
+      <figure class="figure" data-testid="story-figure">
+        <div class="figure__frame">
+          <svg
+            viewBox="0 0 320 180"
+            role="img"
+            aria-labelledby="tour-figure-title tour-figure-desc"
+          >
+            <title id="tour-figure-title">A five-city tour drawn as a closed polygon</title>
+            <desc id="tour-figure-desc">
+              Four pale candidate edges and one heavy accent-coloured best tour that visits every
+              city once and returns to the start.
+            </desc>
+            <rect width="320" height="180" fill="var(--color-stage)"></rect>
+            <g stroke="var(--color-stage-muted)" stroke-width="1" stroke-dasharray="3 5">
+              <line x1="46" y1="130" x2="128" y2="40"></line>
+              <line x1="128" y1="40" x2="276" y2="62"></line>
+              <line x1="276" y1="62" x2="238" y2="148"></line>
+              <line x1="238" y1="148" x2="46" y2="130"></line>
+            </g>
+            <polyline
+              points="46,130 128,40 276,62 238,148 166,104 46,130"
+              fill="none"
+              stroke="var(--color-accent-stage)"
+              stroke-width="3"
+              stroke-linejoin="round"></polyline>
+            <g fill="var(--color-stage-ink)">
+              <circle cx="46" cy="130" r="5"></circle>
+              <circle cx="128" cy="40" r="5"></circle>
+              <circle cx="276" cy="62" r="5"></circle>
+              <circle cx="238" cy="148" r="5"></circle>
+              <circle cx="166" cy="104" r="5"></circle>
+            </g>
+          </svg>
+        </div>
+        <figcaption>
+          Figure 1. A tour is a cycle, not a path: the return edge is part of its length. The heavy
+          stroke and the node pattern distinguish the best tour without relying on colour alone.
+        </figcaption>
+      </figure>
+
+      <Predict
+        question="If each ant only reacts to local pheromone, where does a globally good tour come from?"
+      >
+        <p>
+          No ant sees the whole tour. A short edge is reinforced a little more often, so later ants
+          are slightly more likely to choose it. Evaporation removes stale reinforcement. The
+          colony never plans; it repeatedly samples a probability distribution that its own trails
+          keep reshaping.
+        </p>
+      </Predict>
+
+      <p class="story-smoke__citation" data-testid="story-citation">
+        Source: <cite>Dorigo, M., Maniezzo, V., &amp; Colorni, A. (1996). Ant System: Optimization by
+          a Colony of Cooperating Agents. <em>IEEE Transactions on Systems, Man, and Cybernetics,
+            Part B</em>, 26(1), 29–41.</cite>
+        <a href="https://doi.org/10.1109/3477.484436" rel="noopener noreferrer">
+          doi:10.1109/3477.484436
+        </a>
+      </p>
+    </section>
 
     <section class="story-smoke__outro" aria-labelledby="outro-title">
       <p class="eyebrow">End of fixture</p>
@@ -124,6 +223,39 @@ const chapters = devStoryConfig.chapters.map((chapter, index) => ({
     color: var(--color-ink);
     font-family: var(--font-mono);
     font-size: var(--text-2xs);
+  }
+
+  .story-smoke__specimen {
+    padding-block-end: var(--space-2xl);
+  }
+
+  .story-smoke__specimen > h2 {
+    margin-block: var(--space-sm) var(--space-md);
+    font-size: var(--text-h2);
+  }
+
+  .story-formula {
+    margin-block: var(--space-lg);
+    padding: var(--space-md);
+    overflow-x: auto;
+    border: var(--hairline) solid var(--color-rule-stage);
+    border-radius: var(--radius-md);
+    background-color: var(--color-stage-inset);
+    color: var(--color-stage-ink);
+    font-family: var(--font-display);
+    font-size: var(--text-h3);
+    line-height: var(--leading-snug);
+  }
+
+  .story-smoke__formula-note,
+  .story-smoke__citation {
+    color: var(--color-paper-muted);
+    font-size: var(--text-sm);
+    line-height: var(--leading-relaxed);
+  }
+
+  .story-smoke__citation a {
+    color: var(--color-accent-paper);
   }
 
   .story-smoke__outro {

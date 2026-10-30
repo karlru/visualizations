@@ -133,7 +133,10 @@ test.describe('story controls', () => {
     const expected = [
       'stage-play-pause',
       'stage-replay',
+      'stage-step-back',
       'stage-speed',
+      'motion-toggle',
+      'article-mode-toggle',
       'orbit-range',
       'orbit-number',
       'trails',
@@ -142,7 +145,7 @@ test.describe('story controls', () => {
       'seed-randomize',
     ];
     const seen: string[] = [];
-    for (let index = 0; index < 12; index += 1) {
+    for (let index = 0; index < 16; index += 1) {
       await page.keyboard.press('Tab');
       const entry = await page.evaluate(() => {
         const element = document.activeElement;

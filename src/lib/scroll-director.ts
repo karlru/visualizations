@@ -137,6 +137,7 @@ export class ScrollDirector {
   private lenis: Lenis | null = null;
   private tickerCallback: ((time: number) => void) | null = null;
   private activeChapterIdValue: string | null = null;
+  private reducedMotionOverride = false;
   private destroyed = false;
 
   constructor(options: ScrollDirectorOptions = {}) {
@@ -231,6 +232,20 @@ export class ScrollDirector {
     this.lenis?.resize();
     this.syncActiveChapter();
     this.syncDataAttributes();
+  }
+
+  /**
+   * Add or remove the reader's manual reduced-motion constraint.
+   *
+   * This can only reduce motion: when the OS matches `prefers-reduced-motion:
+   * reduce`, the query remains authoritative because `readEnvironment()` ORs
+   * both inputs. The controller calls this when the manual toggle changes and
+   * when the media query changes at runtime.
+   */
+  setReducedMotionOverride(reduced: boolean): void {
+    if (this.destroyed || this.reducedMotionOverride === reduced) return;
+    this.reducedMotionOverride = reduced;
+    this.applySmoothScrollPolicy();
   }
 
   /** Snapshot of the current scroll state. Cheap enough for tests and the HUD. */
@@ -405,7 +420,8 @@ export class ScrollDirector {
 
     return {
       testMode: isLenisTestMode(window.location.search, authoredAttribute),
-      reducedMotion: this.reducedMotionQuery.matches,
+      // The OS preference is authoritative; the manual preference may only add.
+      reducedMotion: this.reducedMotionQuery.matches || this.reducedMotionOverride,
       coarsePointer: this.coarsePointerQuery.matches,
     };
   }

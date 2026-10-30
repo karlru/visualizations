@@ -728,37 +728,48 @@ Verified 2026-10-30 with `pnpm lint`, `pnpm test`, `pnpm build`, `pnpm check:lin
 
 Verified 2026-10-30 with `pnpm lint`, `pnpm test`, `pnpm build`, `pnpm check:links`, and `CI=1 pnpm test:e2e` (47 Playwright tests, including the new 11-test `tests/e2e/controls.spec.ts`). The control layer lives in `src/components/controls/`: `Slider` keeps a native range plus an exact number input, a visible label and readout, and `aria-valuetext`; `Toggle` is a native checkbox with a 44 px transparent target over a small switch; `PresetPicker` is a native select that applies typed config presets; `SeedControl` validates unsigned 32-bit seeds, reports invalid entries through a polite notice, and randomizes with `crypto.getRandomValues`. `Metrics` renders a key/value `<dl>` inside a polite live region; the controller samples it on chapter entry, pause/replay, seed/preset changes, and a one-second timer, never from the GSAP frame callback. The development story exposes orbit radius, ant trails, presets, and seed, all applied through `engine.setParams` and the renderer's existing `setParams` path without recreating the runtime. Its stage is a focusable `region` (no application role) described by a visible shortcut `<details>`: Space toggles playback, ArrowRight/Up advance one 1/60 s fixed step, ArrowLeft/Down replay one step back, and Escape focuses the first simulation control. `StoryStage` forwards key events only when the region itself is the target, so native button/slider/input keys are untouched and page scrolling is never hijacked. E2E verifies Tab reachability, slider naming/value, non-double-toggle on focused buttons and sliders, deterministic stepping, Escape without a trap, metrics mutation counts far below frame counts, 44 px target boxes, computed focus rings, DOM/visual reading order, a 360 px overlay rule for the pinned stage, and a clean WCAG 2.2 AA axe scan. Backward stepping replays from reset and is documented to restart runs longer than 10,000 fixed steps; a production engine that exposes a cheaper deterministic restore should replace that replay in Phase 2.
 
-### Step 1.7 — Reduced motion and article mode
+### (DONE) Step 1.7 — Reduced motion and article mode
 
 **Goal:** The full story remains readable and understandable without animation.
 
 **Tasks**
 
-1. Detect `prefers-reduced-motion` and expose a manual motion toggle that can only reduce motion further.
-2. Disable autoplay, scroll scrubbing, camera motion, and smooth scrolling under reduced motion.
-3. Provide step-forward and step-back controls for scenes.
-4. Make the server-rendered default the article layout. The stage is an enhancement inserted after hydration.
-5. Implement article mode as the no-stage layout; with JavaScript disabled it is the only layout.
-6. Build `<Predict>` on `<details>/<summary>` so it works without JavaScript.
-7. Persist the reader's choice if `localStorage` is available.
-8. Add a no-JavaScript layout test that asserts prose, formulas, and figures are visible and no empty stage is present.
+1. (DONE) Detect `prefers-reduced-motion` and expose a manual motion toggle that can only reduce motion further.
+2. (DONE) Disable autoplay, scroll scrubbing, camera motion, and smooth scrolling under reduced motion.
+3. (DONE) Provide step-forward and step-back controls for scenes.
+4. (DONE) Make the server-rendered default the article layout. The stage is an enhancement inserted after hydration.
+5. (DONE) Implement article mode as the no-stage layout; with JavaScript disabled it is the only layout.
+6. (DONE) Build `<Predict>` on `<details>/<summary>` so it works without JavaScript.
+7. (DONE) Persist the reader's choice if `localStorage` is available.
+8. (DONE) Add a no-JavaScript layout test that asserts prose, formulas, and figures are visible and no empty stage is present.
 
 **Files**
 
 - `src/components/story/ArticleModeToggle.svelte`
 - `src/components/story/StoryController.svelte`
+- `src/components/story/StageChrome.svelte`
+- `src/components/ui/Predict.astro`
 - `src/lib/persistence.ts`
+- `src/lib/motion-policy.ts`
+- `src/lib/scroll-director.ts`
 - `src/styles/story.css`
+- `src/pages/dev/story-smoke.astro`
+- `src/stories/dev/config.ts`
+- `tests/unit/persistence.test.ts`
+- `tests/e2e/motion-article.spec.ts`
+- `tests/e2e/no-js.spec.ts`
 
 **Acceptance criteria**
 
-- [ ] With reduced motion enabled, no animation starts automatically.
-- [ ] Step controls advance and reverse the scene.
-- [ ] Article mode hides the stage and shows all content.
-- [ ] With JavaScript disabled, the article layout renders with all prose, formulas, figures, and citations; no empty stage is present.
-- [ ] `<Predict>` reveals its explanation without JavaScript.
-- [ ] The choice persists across reloads when storage is available.
-- [ ] The story remains understandable in both modes.
+- [x] With reduced motion enabled, no animation starts automatically.
+- [x] Step controls advance and reverse the scene.
+- [x] Article mode hides the stage and shows all content.
+- [x] With JavaScript disabled, the article layout renders with all prose, formulas, figures, and citations; no empty stage is present.
+- [x] `<Predict>` reveals its explanation without JavaScript.
+- [x] The choice persists across reloads when storage is available.
+- [x] The story remains understandable in both modes.
+
+Verified 2026-10-30 with `pnpm lint`, `pnpm test` (139 passing, 1 existing todo), `pnpm build`, `pnpm check:links` (54 internal references across 6 HTML files), and `CI=1 pnpm test:e2e` (56 Playwright tests). The article is the SSR default: `StoryController` renders the progress rail and chapter children, but no stage, controls, metrics, or article toggle until `onMount` sets `data-story-enhanced="true"`. The two-column/sticky layout and 110svh chapter ranges are gated on `[data-story-enhanced="true"][data-article-mode="false"]`; the no-JS and article layouts stay compact. `ArticleModeToggle` removes the stage from the DOM (not just visually) and persists `algorithm-stories.article-mode` (`article`/`stage`); the manual motion choice persists as `algorithm-stories.reduced-motion` (`reduced`/`full`). Both reads and writes go through `src/lib/persistence.ts`, which collapses missing/throwing storage to "no preference"; the storage-failure E2E overrides `window.localStorage` with a throwing getter and still toggles modes. `src/lib/motion-policy.ts` makes the OS preference authoritative: the manual toggle can only add reduced motion, and it is checked and disabled with a visible explanation when the OS asks for reduce. A `matchMedia` change listener pauses at runtime, settles the active chapter on its final keyframe, and re-applies the Lenis override. Reduced motion starts paused, ignores scroll progress for camera/reveal composition, and steps through `ChapterSpec.reducedMotionSteps` keyframes with the stage's back/forward controls; replay stays paused. `ScrollDirector.setReducedMotionOverride()` and `html[data-reduced-motion="true"]` remove Lenis and CSS smooth scrolling for a manual reduction too. `Predict.astro` is native `<details>/<summary>`; the dev page now carries real prose, a static formula, an inline SVG tour figure, a DOI citation, and the prediction in the no-JS article. The reduced-motion and article-mode axe scans are clean, and the earlier controls spec now tabs through the three added controls (step back, motion toggle, article toggle) instead of a fixed 12-stop walk.
 
 ### Step 1.8 — URL state and sharing
 

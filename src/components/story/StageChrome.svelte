@@ -13,9 +13,19 @@
     readonly speed: number;
     readonly chapterTitle?: string;
     readonly sceneId?: string | null;
+    /** Effective reduced-motion state (OS or reader choice). */
+    readonly reducedMotion?: boolean;
+    /** True when the OS asks for reduced motion; the toggle is then locked. */
+    readonly systemReducedMotion?: boolean;
+    /** Zero-based keyframe inside the active chapter. */
+    readonly sceneStep?: number;
+    /** Number of keyframes declared by the active chapter (at least one). */
+    readonly sceneStepCount?: number;
     readonly onTogglePaused: () => void;
     readonly onReplay: () => void;
     readonly onSpeedChange: (speed: number) => void;
+    readonly onStepScene?: (direction: 1 | -1) => void;
+    readonly onToggleReducedMotion?: (reduced: boolean) => void;
   }
 
   let {
@@ -23,12 +33,21 @@
     speed,
     chapterTitle,
     sceneId,
+    reducedMotion = false,
+    systemReducedMotion = false,
+    sceneStep = 0,
+    sceneStepCount = 1,
     onTogglePaused,
     onReplay,
     onSpeedChange,
+    onStepScene,
+    onToggleReducedMotion,
   }: Props = $props();
 
   const SPEEDS = [0.5, 1, 2, 4] as const;
+
+  let stepBackDisabled = $derived(sceneStep <= 0);
+  let stepForwardDisabled = $derived(sceneStep >= sceneStepCount - 1);
 
   function formatSpeed(value: number): string {
     return value === 1 ? '1×' : `${value}×`;
@@ -40,6 +59,18 @@
     const next = Number.parseFloat(select.value);
     if (Number.isFinite(next) && next > 0) onSpeedChange(next);
   }
+
+  function handleMotion(event: Event): void {
+    const input = event.currentTarget;
+    if (!(input instanceof HTMLInputElement)) return;
+    // A system preference locks the control. Forced synthetic events must not
+    // leave the visible checkbox out of sync with the authoritative state.
+    if (systemReducedMotion) {
+      input.checked = true;
+      return;
+    }
+    onToggleReducedMotion?.(input.checked);
+  }
 </script>
 
 <div
@@ -47,12 +78,16 @@
   data-stage-chrome
   data-paused={paused ? 'true' : 'false'}
   data-speed={speed}
+  data-reduced-motion={reducedMotion ? 'true' : 'false'}
+  data-system-reduced-motion={systemReducedMotion ? 'true' : 'false'}
+  data-scene-step={sceneStep}
+  data-scene-step-count={sceneStepCount}
 >
   <button
     type="button"
     class="stage-chrome__button"
     data-testid="stage-play-pause"
-    aria-label={paused ? 'Resume simulation' : 'Pause simulation'}
+    aria-label={paused ? 'Play simulation' : 'Pause simulation'}
     aria-pressed={paused}
     aria-keyshortcuts="Space"
     onclick={onTogglePaused}
@@ -70,6 +105,33 @@
     Replay
   </button>
 
+  <fieldset class="stage-chrome__steps">
+    <legend class="visually-hidden">Scene keyframes</legend>
+    <button
+      type="button"
+      class="stage-chrome__button stage-chrome__step"
+      data-testid="stage-step-back"
+      aria-label="Previous scene keyframe"
+      disabled={stepBackDisabled}
+      onclick={() => onStepScene?.(-1)}
+    >
+      <span aria-hidden="true">‹</span>
+    </button>
+    <span class="stage-chrome__step-readout data" data-scene-step-readout aria-live="polite">
+      {sceneStep + 1} / {sceneStepCount}
+    </span>
+    <button
+      type="button"
+      class="stage-chrome__button stage-chrome__step"
+      data-testid="stage-step-forward"
+      aria-label="Next scene keyframe"
+      disabled={stepForwardDisabled}
+      onclick={() => onStepScene?.(1)}
+    >
+      <span aria-hidden="true">›</span>
+    </button>
+  </fieldset>
+
   <label class="stage-chrome__field">
     <span class="stage-chrome__field-label">Speed</span>
     <select
@@ -85,6 +147,26 @@
     </select>
   </label>
 
+  <label class="stage-chrome__motion">
+    <input
+      type="checkbox"
+      class="stage-chrome__motion-input"
+      data-testid="motion-toggle"
+      checked={reducedMotion}
+      disabled={systemReducedMotion}
+      aria-describedby={systemReducedMotion ? 'story-motion-note' : undefined}
+      onchange={handleMotion}
+    />
+    <span>Reduce motion</span>
+  </label>
+
+  {#if systemReducedMotion}
+    <p class="stage-chrome__motion-note" id="story-motion-note" data-motion-note>
+      Your system asks for reduced motion. The story starts paused and this control can only
+      reduce motion further.
+    </p>
+  {/if}
+
   <details class="stage-chrome__details" data-testid="stage-details">
     <summary class="stage-chrome__summary">Details</summary>
     <div class="stage-chrome__panel">
@@ -96,6 +178,14 @@
         <div>
           <dt>Scene</dt>
           <dd class="data">{sceneId ?? '—'}</dd>
+        </div>
+        <div>
+          <dt>Keyframe</dt>
+          <dd class="data">{sceneStep + 1} / {sceneStepCount}</dd>
+        </div>
+        <div>
+          <dt>Motion</dt>
+          <dd class="data">{reducedMotion ? 'Reduced' : 'Full'}</dd>
         </div>
         <div>
           <dt>Speed</dt>
@@ -163,6 +253,80 @@
     color: var(--color-accent-stage);
   }
 
+  .stage-chrome__button:disabled {
+    border-color: var(--color-rule-stage);
+    color: var(--color-stage-muted);
+    cursor: not-allowed;
+    opacity: 0.65;
+  }
+
+  .stage-chrome__steps {
+    display: inline-flex;
+    gap: var(--space-3xs);
+    align-items: center;
+    min-inline-size: 0;
+    padding: 0;
+    border: 0;
+    margin: 0;
+  }
+
+  .stage-chrome__step {
+    min-inline-size: var(--tap-target);
+    padding-inline: 0;
+    font-size: var(--text-sm);
+  }
+
+  .stage-chrome__step-readout {
+    min-inline-size: 3.5ch;
+    color: var(--color-stage-muted);
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    text-align: center;
+  }
+
+  .stage-chrome__motion {
+    display: inline-flex;
+    gap: var(--space-2xs);
+    align-items: center;
+    min-block-size: var(--tap-target);
+    padding-inline: var(--space-2xs);
+    color: var(--color-stage-ink);
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+
+  .stage-chrome__motion:has(.stage-chrome__motion-input:disabled) {
+    cursor: not-allowed;
+    opacity: 0.8;
+  }
+
+  .stage-chrome__motion-input {
+    inline-size: 1.15rem;
+    block-size: 1.15rem;
+    accent-color: var(--color-accent-stage);
+  }
+
+  .stage-chrome__motion-input:focus-visible {
+    outline: var(--focus-ring-width) solid var(--color-focus);
+    outline-offset: var(--focus-ring-offset);
+  }
+
+  .stage-chrome__motion-note {
+    flex-basis: 100%;
+    max-inline-size: 46ch;
+    margin: 0;
+    padding: var(--space-3xs) var(--space-2xs);
+    border: var(--hairline) solid var(--color-rule-stage);
+    border-radius: var(--radius-sm);
+    background-color: color-mix(in srgb, var(--color-stage) 82%, transparent);
+    color: var(--color-stage-muted);
+    font-size: var(--text-2xs);
+    line-height: var(--leading-normal);
+  }
+
   .stage-chrome__field {
     display: inline-flex;
     gap: var(--space-2xs);
@@ -219,7 +383,7 @@
 
   .stage-chrome__facts {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(6rem, 1fr));
     gap: var(--space-2xs);
     margin: 0;
   }

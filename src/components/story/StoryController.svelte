@@ -17,6 +17,16 @@
    * Scroll never mutates engine parameters. A chapter entry may apply the
    * story's typed parameter defaults (and a `StoryConfig` chapter override),
    * but progress only changes camera, layer opacity, highlights, and reveal.
+   *
+   * Layout and motion are progressive enhancements:
+   *
+   * - the server renders the article layout; the stage exists only after
+   *   `enhanced` flips in onMount, and never in article mode;
+   * - reduced motion (OS or the reader's further-reduced choice) starts paused,
+   *   ignores scroll progress for scene composition, and exposes discrete
+   *   keyframe stepping instead of scrubbing;
+   * - article mode and the manual motion choice persist through the safe
+   *   `localStorage` wrapper, which degrades to "no preference".
    */
 
   import { onDestroy, onMount, type Snippet } from 'svelte';
@@ -27,6 +37,17 @@
     parseChapterSceneOverrides,
     type RailChapterInfo,
   } from '../../lib/chapter-metadata';
+  import {
+    parseStoredMotionPreference,
+    resolveMotionPreference,
+    serializeMotionPreference,
+  } from '../../lib/motion-policy';
+  import {
+    isPersistenceAvailable,
+    PREFERENCE_KEYS,
+    readPreference,
+    writePreference,
+  } from '../../lib/persistence';
   import { composeSceneState } from '../../lib/scene-composition';
   import { type ScrollChapterEvent, ScrollDirector } from '../../lib/scroll-director';
   import { Canvas2DRenderer } from '../../render/canvas2d/Canvas2DRenderer';
@@ -44,6 +65,7 @@
   import SeedControl from '../controls/SeedControl.svelte';
   import Slider from '../controls/Slider.svelte';
   import Toggle from '../controls/Toggle.svelte';
+  import ArticleModeToggle from './ArticleModeToggle.svelte';
   import { createSmokeLayers } from './canvas-smoke-layers';
   import ProgressRail from './ProgressRail.svelte';
   import StageChrome from './StageChrome.svelte';
@@ -53,11 +75,21 @@
   interface Props {
     /** CSS selector for chapter elements. One director owns every match. */
     chapterSelector?: string;
+    /**
+     * Chapter list known at build time. It lets the progress rail and its
+     * fragment links render in the article/no-JS document; onMount replaces it
+     * with the measured DOM ids, which remain the runtime source of truth.
+     */
+    initialChapters?: readonly RailChapterInfo[];
     /** Prose chapters. They are server-rendered and remain readable without JS. */
     children?: Snippet;
   }
 
-  let { chapterSelector = '[data-story-chapter]', children }: Props = $props();
+  let {
+    chapterSelector = '[data-story-chapter]',
+    initialChapters = [],
+    children,
+  }: Props = $props();
 
   interface RuntimeChapter {
     readonly id: string;
@@ -73,6 +105,8 @@
   const clamp01 = (value: number): number => Math.max(0, Math.min(1, value));
   /** Backward stepping replays from reset; cap the work a long run can cause. */
   const MAX_REPLAY_STEPS = 10_000;
+  /** A chapter without `reducedMotionSteps` exposes one settled keyframe. */
+  const DEFAULT_REDUCED_MOTION_STEPS = 1;
 
   let root: HTMLElement | null = null;
 
@@ -86,8 +120,18 @@
   let speed = $state(1);
   let scene = $state<SceneState | null>(null);
   let params = $state<SmokeParams>({ ...story.defaults });
-  let chapters = $state<readonly RailChapterInfo[]>([]);
+  let chapters = $state<readonly RailChapterInfo[]>(initialChapters);
   let selectedPreset = $state<string | null>('default');
+  /**
+   * Enhancement marker. False on the server and during hydration, so the
+   * server-rendered document is the article layout. It flips only in onMount.
+   */
+  let enhanced = $state(false);
+  let articleMode = $state(false);
+  let systemReducedMotion = $state(false);
+  let manualReducedMotion = $state(false);
+  let sceneStep = $state(0);
+  let persistenceAvailable = $state(false);
   let metricItems = $state<readonly MetricItem[]>([
     { id: 'sim-time', label: 'Simulated time', value: '0.0 s' },
     { id: 'steps', label: 'Fixed steps', value: '0' },
@@ -99,6 +143,7 @@
   let engine: Engine<SmokeParams, SmokeSnapshot, SmokeMetrics> | null = null;
   let clock: FixedStepClock | null = null;
   let stageHandle: StoryStageHandle | null = null;
+  let motionQuery: MediaQueryList | null = null;
   let runtimeChapters = new Map<string, RuntimeChapter>();
   /** Reader overrides persist across chapter entry; chapters reset the run only. */
   let readerParams: Partial<SmokeParams> = {};
@@ -119,6 +164,23 @@
   );
 
   /**
+   * Effective motion policy. The OS preference is authoritative; the manual
+   * preference can only add constraint. The story stage exists only after
+   * hydration, and never in article mode.
+   */
+  let motionPreference = $derived(
+    resolveMotionPreference({
+      systemReduced: systemReducedMotion,
+      manualReduced: manualReducedMotion,
+    }),
+  );
+  let reducedMotion = $derived(motionPreference.reduced);
+  let showStage = $derived(enhanced && !articleMode);
+  let activeSceneStepCount = $derived(
+    sceneStepCountFor(activeChapterId === null ? undefined : runtimeChapters.get(activeChapterId)),
+  );
+
+  /**
    * The renderer factory is created here, inside the island. Astro cannot pass
    * a function across hydration, and a story config must not import a renderer.
    * Step 4.1 replaces this single concrete factory with a renderer-id registry.
@@ -130,6 +192,18 @@
     });
 
   const getSnapshot = (): Readonly<SmokeSnapshot> => engine?.snapshot() ?? EMPTY_SNAPSHOT;
+
+  /** Keyframes declared by a chapter, with a safe settled minimum of one. */
+  function sceneStepCountFor(chapter: RuntimeChapter | undefined): number {
+    if (chapter?.spec?.reducedMotionSteps === undefined) return DEFAULT_REDUCED_MOTION_STEPS;
+    return Math.max(DEFAULT_REDUCED_MOTION_STEPS, Math.floor(chapter.spec.reducedMotionSteps));
+  }
+
+  /** Progress represented by a discrete keyframe. The last frame is settled. */
+  function keyframeProgress(step: number, count: number): number {
+    if (count <= 1) return 1;
+    return clamp01(step / (count - 1));
+  }
 
   function readHash(): string {
     const raw = window.location.hash.replace(/^#/, '');
@@ -152,6 +226,16 @@
     root.dataset.engineTrails = params.trails ? 'true' : 'false';
     root.dataset.engineSeed = String(params.seed);
     root.dataset.preset = selectedPreset ?? 'custom';
+    root.dataset.motion = reducedMotion ? 'reduced' : 'full';
+    root.dataset.systemReducedMotion = systemReducedMotion ? 'true' : 'false';
+    root.dataset.manualReducedMotion = manualReducedMotion ? 'true' : 'false';
+    root.dataset.articleMode = articleMode ? 'true' : 'false';
+    root.dataset.sceneStep = String(sceneStep);
+    root.dataset.sceneStepCount = String(activeSceneStepCount);
+    root.dataset.persistence = persistenceAvailable ? 'available' : 'unavailable';
+    // The manual preference also disables CSS smooth scrolling when the OS
+    // allows motion. Lenis is handled by ScrollDirector's override.
+    document.documentElement.dataset.reducedMotion = reducedMotion ? 'true' : 'false';
   }
 
   /**
@@ -250,7 +334,7 @@
     return { runtime, rail };
   }
 
-  function applyScene(chapter: RuntimeChapter, progress: number): void {
+  function applySceneAt(chapter: RuntimeChapter, progress: number): void {
     const definition = story.scenes[chapter.sceneId];
     if (definition === undefined) return;
 
@@ -265,6 +349,18 @@
         .map((layer) => layer.id)
         .join(' ');
     }
+  }
+
+  /**
+   * Apply the chapter's presentation. Under reduced motion scroll progress is
+   * ignored: the scene jumps to a discrete keyframe (the settled frame on
+   * chapter entry), so scrolling never scrubs the camera or reveal.
+   */
+  function applyScene(chapter: RuntimeChapter, progress: number): void {
+    const nextProgress = reducedMotion
+      ? keyframeProgress(sceneStep, sceneStepCountFor(chapter))
+      : progress;
+    applySceneAt(chapter, nextProgress);
   }
 
   function handleChapterEvent(
@@ -294,6 +390,9 @@
         simulatedSeconds = 0;
         stepCount = 0;
         frameCount = 0;
+        // Enter the chapter on its settled keyframe. Reduced-motion readers can
+        // then step backwards through the discrete states, never scrub.
+        sceneStep = sceneStepCountFor(chapter) - 1;
         sampleMetrics(true);
         writeDebug();
       }
@@ -309,15 +408,18 @@
       }
       activeProgress = progress;
       lastEvent = 'progress';
-      applyScene(chapter, progress);
+      // Scroll may update the rail, but it must not scrub a reduced-motion
+      // scene. The keyframe stays put until the reader steps.
+      if (!reducedMotion) applyScene(chapter, progress);
       return;
     }
 
     // Exit settles the presentation at the edge the reader crossed. It never
-    // rewinds the engine or mutates its parameters.
+    // rewinds the engine or mutates its parameters. Reduced motion keeps the
+    // discrete keyframe instead of settling to the scroll edge.
     activeProgress = progress;
     lastEvent = 'exit';
-    applyScene(chapter, progress);
+    if (!reducedMotion) applyScene(chapter, progress);
   }
 
   /**
@@ -366,9 +468,13 @@
     clock?.reset();
     simulatedSeconds = 0;
     stepCount = 0;
-    setPaused(false);
+    // Reduced motion never autoplays, including after an explicit replay.
+    setPaused(reducedMotion);
     const chapter = activeChapterId === null ? undefined : runtimeChapters.get(activeChapterId);
-    if (chapter !== undefined) applyScene(chapter, activeProgress);
+    if (chapter !== undefined) {
+      sceneStep = sceneStepCountFor(chapter) - 1;
+      applyScene(chapter, activeProgress);
+    }
     stageHandle?.redraw();
     writeDebug();
     sampleMetrics(true);
@@ -460,6 +566,86 @@
   }
 
   /**
+   * Step between discrete scene keyframes. This is the reduced-motion reading
+   * path: it pauses the clock, never scrubs scroll progress, and composes the
+   * scene at an exact keyframe. Under full motion a later scroll event simply
+   * takes control again.
+   */
+  function stepScene(direction: 1 | -1): void {
+    const chapter = activeChapterId === null ? undefined : runtimeChapters.get(activeChapterId);
+    if (chapter === undefined) return;
+
+    setPaused(true);
+    const count = sceneStepCountFor(chapter);
+    const next = Math.max(0, Math.min(count - 1, sceneStep + direction));
+    if (next === sceneStep) return;
+
+    sceneStep = next;
+    applySceneAt(chapter, keyframeProgress(next, count));
+    stageHandle?.redraw();
+    writeDebug();
+    sampleMetrics(true);
+  }
+
+  /**
+   * Reconcile motion state after either the OS media query or the manual
+   * preference changes. Reducing motion pauses immediately and settles the
+   * active chapter on its final keyframe; increasing it never autoplays.
+   */
+  function syncMotionState(pauseWhenReduced: boolean): void {
+    const reduced = systemReducedMotion || manualReducedMotion;
+    document.documentElement.dataset.reducedMotion = reduced ? 'true' : 'false';
+    director?.setReducedMotionOverride(reduced);
+
+    if (reduced && pauseWhenReduced) {
+      setPaused(true);
+      const chapter = activeChapterId === null ? undefined : runtimeChapters.get(activeChapterId);
+      if (chapter !== undefined) {
+        sceneStep = sceneStepCountFor(chapter) - 1;
+        applySceneAt(chapter, keyframeProgress(sceneStep, sceneStepCountFor(chapter)));
+        stageHandle?.redraw();
+      }
+    }
+
+    writeDebug();
+  }
+
+  const handleMotionQueryChange = (): void => {
+    if (!mounted || motionQuery === null) return;
+    systemReducedMotion = motionQuery.matches;
+    syncMotionState(motionQuery.matches);
+    sampleMetrics(true);
+  };
+
+  /** The manual toggle may only reduce motion. A system preference locks it. */
+  function changeReducedMotion(next: boolean): void {
+    if (systemReducedMotion) return;
+    manualReducedMotion = next;
+    writePreference(
+      PREFERENCE_KEYS.reducedMotion,
+      serializeMotionPreference(next),
+    );
+    syncMotionState(next);
+    sampleMetrics(true);
+  }
+
+  function toggleArticleMode(): void {
+    articleMode = !articleMode;
+    writePreference(PREFERENCE_KEYS.articleMode, articleMode ? 'article' : 'stage');
+    if (articleMode) stageHandle = null;
+    writeDebug();
+
+    // The layout changes height when the stage leaves or returns. Re-measure
+    // the chapter triggers on the next frame and keep the active chapter in
+    // view, so the reader does not jump to an unrelated section.
+    requestAnimationFrame(() => {
+      if (!mounted) return;
+      director?.refresh();
+      if (activeChapterId !== null) scrollToChapter(activeChapterId);
+    });
+  }
+
+  /**
    * Stage shortcuts are scoped to the focusable region itself. `StoryStage`
    * only forwards events whose target is the region, so a focused button,
    * slider, or number input keeps its native Space/arrow behaviour.
@@ -518,6 +704,10 @@
   function handleStageReady(handle: StoryStageHandle): void {
     stageHandle = handle;
     director?.refresh();
+    // The stage enhancement changes chapter heights. Re-resolve the fragment
+    // against the measured stage layout, not the article layout measured before
+    // hydration.
+    if (initialHash.length > 0) resolveHash(true);
   }
 
   function scrollToChapter(id: string): boolean {
@@ -540,10 +730,10 @@
     return true;
   }
 
-  function resolveHash(): void {
+  function resolveHash(force = false): void {
     const id = readHash();
     if (id.length === 0 || !runtimeChapters.has(id)) return;
-    if (activeChapterId === id) return;
+    if (!force && activeChapterId === id) return;
     scrollToChapter(id);
   }
 
@@ -602,6 +792,9 @@
     listeners?.abort();
     listeners = null;
 
+    motionQuery?.removeEventListener('change', handleMotionQueryChange);
+    motionQuery = null;
+
     if (metricTimer !== null) {
       clearInterval(metricTimer);
       metricTimer = null;
@@ -625,6 +818,7 @@
 
     delete document.documentElement.dataset.storyRuntime;
     delete document.documentElement.dataset.scrollController;
+    delete document.documentElement.dataset.reducedMotion;
   }
 
   onMount(() => {
@@ -637,6 +831,20 @@
     window.__scrollDirector?.destroy();
     window.__scrollDirectorMounts = (window.__scrollDirectorMounts ?? 0) + 1;
 
+    // Preferences are best-effort. The article layout and full motion remain
+    // usable when storage is missing or throws.
+    persistenceAvailable = isPersistenceAvailable();
+    motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+    systemReducedMotion = motionQuery.matches;
+    manualReducedMotion = parseStoredMotionPreference(
+      readPreference(PREFERENCE_KEYS.reducedMotion),
+    );
+    articleMode = readPreference(PREFERENCE_KEYS.articleMode) === 'article';
+    // Reduced motion never autoplays. Set this before the clock exists so no
+    // frame can advance between hydration and the first reader input.
+    paused = systemReducedMotion || manualReducedMotion;
+    document.documentElement.dataset.reducedMotion = paused ? 'true' : 'false';
+
     engine = story.createEngine(params);
     clock = new FixedStepClock({ paused, speed });
     writeDebug();
@@ -644,6 +852,7 @@
 
     const instance = new ScrollDirector();
     director = instance;
+    instance.setReducedMotionOverride(paused);
 
     try {
       const { runtime, rail } = readChapters();
@@ -663,6 +872,8 @@
       throw error;
     }
 
+    motionQuery.addEventListener('change', handleMotionQueryChange);
+
     // Measure the chapter ranges before resolving a fragment. This is the
     // "after the pin offset is known" step: the stage is sticky, and chapter
     // heights can change once fonts settle.
@@ -674,6 +885,19 @@
     window.__scrollDirectorDebug = () => instance.debugState();
     document.documentElement.dataset.storyRuntime = 'ready';
     document.documentElement.dataset.scrollController = 'ready';
+
+    // Enhancement only: the server-rendered document never contains a stage.
+    // Article mode persists across reloads by simply never turning this on for
+    // the stage layout.
+    enhanced = true;
+    if (!articleMode) {
+      // The two-column/sticky layout changes chapter heights after Svelte
+      // flushes. Registering the stage also refreshes; this covers article
+      // readers who keep the compact layout.
+      requestAnimationFrame(() => {
+        if (mounted) instance.refresh();
+      });
+    }
 
     void document.fonts.ready.then(() => {
       if (!mounted) return;
@@ -704,7 +928,14 @@
 <div
   bind:this={root}
   class="story-controller"
+  class:story-controller--enhanced={enhanced}
+  class:story-controller--article={articleMode}
   data-story-controller={status}
+  data-story-enhanced={enhanced ? 'true' : undefined}
+  data-article-mode={articleMode ? 'true' : 'false'}
+  data-motion={reducedMotion ? 'reduced' : 'full'}
+  data-system-reduced-motion={systemReducedMotion ? 'true' : 'false'}
+  data-manual-reduced-motion={manualReducedMotion ? 'true' : 'false'}
   data-active-chapter={activeChapterId ?? undefined}
   data-active-scene={activeSceneId ?? undefined}
   data-active-chapter-title={activeChapterTitle || undefined}
@@ -724,6 +955,8 @@
   data-scene-zoom=""
   data-scene-reveal=""
   data-scene-layers=""
+  data-scene-step="0"
+  data-scene-step-count={activeSceneStepCount}
 >
   <ProgressRail
     {chapters}
@@ -733,97 +966,123 @@
     onNavigate={navigateToChapter}
   />
 
-  <div class="story-layout">
-    <div class="story-layout__stage">
-      <StoryStage
-        {createRenderer}
-        {scene}
-        {params}
-        {getSnapshot}
-        onFrame={handleFrame}
-        {paused}
-        dprCap={2}
-        testId="story-stage"
-        ariaLabel="Development story stage"
-        description="A moving point orbits a focal city while four chapters change the camera, layers, and highlighted object. The canvas is decorative; chapter prose and stage labels carry the meaning."
-        interactive
-        roledescription="interactive simulation stage"
-        describedBy="story-shortcuts"
-        ariaKeyshortcuts="Space ArrowLeft ArrowRight ArrowUp ArrowDown Escape"
-        onStageKeydown={handleStageKeydown}
-        onReady={handleStageReady}
-      >
-        <StageChrome
+  <div class="story-layout" data-story-layout>
+    {#if showStage}
+      <div class="story-layout__stage">
+        <StoryStage
+          {createRenderer}
+          {scene}
+          {params}
+          {getSnapshot}
+          onFrame={handleFrame}
           {paused}
-          {speed}
-          chapterTitle={activeChapterTitle}
-          sceneId={activeSceneId}
-          onTogglePaused={togglePaused}
-          onReplay={replay}
-          onSpeedChange={changeSpeed}
-        />
-      </StoryStage>
-    </div>
+          dprCap={2}
+          testId="story-stage"
+          ariaLabel="Development story stage"
+          description="A moving point orbits a focal city while four chapters change the camera, layers, and highlighted object. The canvas is decorative; chapter prose and stage labels carry the meaning."
+          interactive
+          roledescription="interactive simulation stage"
+          describedBy="story-shortcuts"
+          ariaKeyshortcuts="Space ArrowLeft ArrowRight ArrowUp ArrowDown Escape"
+          onStageKeydown={handleStageKeydown}
+          onReady={handleStageReady}
+        >
+          <StageChrome
+            {paused}
+            {speed}
+            chapterTitle={activeChapterTitle}
+            sceneId={activeSceneId}
+            {reducedMotion}
+            systemReducedMotion={motionPreference.systemReduced}
+            {sceneStep}
+            sceneStepCount={activeSceneStepCount}
+            onTogglePaused={togglePaused}
+            onReplay={replay}
+            onSpeedChange={changeSpeed}
+            onStepScene={stepScene}
+            onToggleReducedMotion={changeReducedMotion}
+          />
+        </StoryStage>
+      </div>
+    {/if}
 
     <div class="story-layout__column">
-      <section class="story-controls" aria-labelledby="story-controls-title" data-controls-panel>
-        <div class="story-controls__head">
-          <h2 class="story-controls__title" id="story-controls-title">Simulation controls</h2>
-          <p class="story-controls__note">
-            Changes apply live to the running simulation. Presets and the seed start a new run;
-            the orbit and trail controls never recreate the runtime.
-          </p>
+      <!--
+        The server renders the article. This toolbar and the stage exist only
+        after onMount sets the enhancement marker, so no empty stage or dead
+        control is ever part of the no-JavaScript document.
+      -->
+      {#if enhanced}
+        <div class="story-modes" data-story-modes>
+          <ArticleModeToggle {articleMode} onToggle={toggleArticleMode} />
         </div>
+      {/if}
 
-        <div class="story-controls__grid">
-          <Slider
-            id="orbit"
-            label="Orbit radius"
-            value={params.orbit}
-            min={0.4}
-            max={2.4}
-            step={0.05}
-            formatValue={(value) => `${value.toFixed(2)} ×`}
-            hint="Scales the ant orbit and the focal pheromone ring."
-            onValueChange={changeOrbit}
-          />
+      {#if showStage}
+        <section class="story-controls" aria-labelledby="story-controls-title" data-controls-panel>
+          <div class="story-controls__head">
+            <h2 class="story-controls__title" id="story-controls-title">Simulation controls</h2>
+            <p class="story-controls__note">
+              Changes apply live to the running simulation. Presets and the seed start a new run;
+              the orbit and trail controls never recreate the runtime.
+            </p>
+          </div>
 
-          <Toggle
-            id="trails"
-            label="Show ant trails"
-            checked={params.trails}
-            description="Draws a line from each ant to the focal city."
-            onCheckedChange={changeTrails}
-          />
+          <div class="story-controls__grid">
+            <Slider
+              id="orbit"
+              label="Orbit radius"
+              value={params.orbit}
+              min={0.4}
+              max={2.4}
+              step={0.05}
+              formatValue={(value) => `${value.toFixed(2)} ×`}
+              hint="Scales the ant orbit and the focal pheromone ring."
+              onValueChange={changeOrbit}
+            />
 
-          <PresetPicker
-            id="preset"
-            presets={story.presets}
-            selected={selectedPreset}
-            onSelect={applyPreset}
-          />
+            <Toggle
+              id="trails"
+              label="Show ant trails"
+              checked={params.trails}
+              description="Draws a line from each ant to the focal city."
+              onCheckedChange={changeTrails}
+            />
 
-          <SeedControl id="seed" seed={params.seed} onSeedChange={changeSeed} />
-        </div>
+            <PresetPicker
+              id="preset"
+              presets={story.presets}
+              selected={selectedPreset}
+              onSelect={applyPreset}
+            />
 
-        <details class="story-controls__shortcuts" id="story-shortcuts" data-stage-shortcuts>
-          <summary class="story-controls__summary">Keyboard shortcuts</summary>
-          <ul class="story-controls__keys">
-            <li><kbd>Space</kbd> Play or pause the simulation.</li>
-            <li><kbd>ArrowRight</kbd> / <kbd>ArrowUp</kbd> Pause and advance one fixed step (1/60 s).</li>
-            <li><kbd>ArrowLeft</kbd> / <kbd>ArrowDown</kbd> Pause and step back one fixed step.</li>
-            <li><kbd>Escape</kbd> Leave the stage and move to the first simulation control.</li>
-          </ul>
-          <p class="story-controls__keys-note">
-            Backward stepping replays the run from its first fixed step, so it is exact; runs
-            longer than 10,000 fixed steps restart at zero when stepped back. Shortcuts apply only
-            while the stage region itself has focus. Buttons, sliders, and inputs keep their native
-            Space and arrow behaviour, and page scrolling is never hi-jacked from outside the stage.
-          </p>
-        </details>
-      </section>
+            <SeedControl id="seed" seed={params.seed} onSeedChange={changeSeed} />
+          </div>
 
-      <Metrics id="story-metrics" title="Live metrics" items={metricItems} />
+          <details class="story-controls__shortcuts" id="story-shortcuts" data-stage-shortcuts>
+            <summary class="story-controls__summary">Keyboard shortcuts</summary>
+            <ul class="story-controls__keys">
+              <li><kbd>Space</kbd> Play or pause the simulation.</li>
+              <li>
+                <kbd>ArrowRight</kbd> / <kbd>ArrowUp</kbd> Pause and advance one fixed step (1/60 s).
+              </li>
+              <li>
+                <kbd>ArrowLeft</kbd> / <kbd>ArrowDown</kbd> Pause and step back one fixed step.
+              </li>
+              <li><kbd>Escape</kbd> Leave the stage and move to the first simulation control.</li>
+            </ul>
+            <p class="story-controls__keys-note">
+              Backward stepping replays the run from its first fixed step, so it is exact; runs
+              longer than 10,000 fixed steps restart at zero when stepped back. Shortcuts apply
+              only while the stage region itself has focus. Buttons, sliders, and inputs keep their
+              native Space and arrow behaviour, and page scrolling is never hi-jacked from outside
+              the stage.
+            </p>
+          </details>
+        </section>
+
+        <Metrics id="story-metrics" title="Live metrics" items={metricItems} />
+      {/if}
 
       <div class="story-layout__chapters" data-story-chapters>
         {@render children?.()}

@@ -61,11 +61,35 @@
   display: contents;
 }
 
+/*
+ * The server renders the article: one readable column, no stage column, no
+ * empty placeholder. The two-column stage layout is switched on only when the
+ * island has set `data-story-enhanced="true"` after mount and the reader has
+ * not chosen article mode. This is why the no-JS document never contains an
+ * empty stage.
+ */
 .story-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
-  gap: var(--space-2xl);
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-lg);
   align-items: start;
+}
+
+@media (min-width: 60.001rem) {
+  .story-controller[data-story-enhanced="true"][data-article-mode="false"] .story-layout {
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+    gap: var(--space-2xl);
+  }
+}
+
+.story-modes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2xs) var(--space-md);
+  align-items: center;
+  margin-block-end: var(--space-sm);
+  padding-block-end: var(--space-sm);
+  border-block-end: var(--hairline) solid var(--color-rule-paper);
 }
 
 .story-layout__stage {
@@ -189,12 +213,24 @@
 .story-chapter {
   display: flex;
   flex-direction: column;
-  justify-content: center;
   gap: var(--space-md);
-  min-block-size: 110svh;
-  padding-block: var(--space-2xl);
+  padding-block: var(--space-xl);
   border-block-start: var(--hairline) solid var(--color-rule-paper);
   scroll-margin-block-start: calc(var(--header-height) + var(--space-md));
+}
+
+/* Only the enhanced stage layout gives each chapter a scroll range. The
+   article and no-JS layouts stay compact and read like a normal essay. */
+.story-controller[data-story-enhanced="true"][data-article-mode="false"] .story-chapter {
+  justify-content: center;
+  min-block-size: 110svh;
+  padding-block: var(--space-2xl);
+}
+
+/* Article mode can be wider than the prose measure because there is no stage
+   column competing for space; the prose itself keeps its measure. */
+.story-controller[data-article-mode="true"] .story-layout__chapters {
+  max-inline-size: 100%;
 }
 
 .story-chapter:first-child {
@@ -362,6 +398,12 @@ html.lenis {
 html.lenis,
 html.lenis body {
   height: auto;
+}
+
+/* The reader's manual reduced-motion choice disables CSS smooth scrolling in
+   addition to Lenis, even when the OS preference allows motion. */
+html[data-reduced-motion="true"] {
+  scroll-behavior: auto;
 }
 
 .lenis [data-lenis-prevent] {
