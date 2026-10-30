@@ -903,7 +903,7 @@ Verified 2026-10-30 with `pnpm lint` and `pnpm test` (225 passing, 1 existing to
 3. (DONE) Construct one tour per ant using the probabilistic transition rule, falling back to a uniform choice when all weights are zero.
 4. (DONE) Deposit pheromone proportional to inverse tour length.
 5. (DONE) Evaporate and update pheromone, allowing values to reach zero but never negative or non-finite.
-6. Track best tour, best length, mean length, iteration, and normalized pheromone entropy using the formula in `docs/stories.md` §2.6.
+6. (DONE) Track best tour, best length, mean length, iteration, and normalized pheromone entropy using the formula in `docs/stories.md` §2.6.
 7. Support `stepIteration()` for deterministic tests and `step(dt)` for the clock.
 8. Restart the run at iteration 0 when a structural parameter or the city set changes; invalidate best/mean history.
 9. Handle edge cases: `α = 0`, `β = 0`, `ρ = 1`, one ant, two cities, collinear cities.
@@ -922,11 +922,11 @@ Verified 2026-10-30 with `pnpm lint` and `pnpm test` (225 passing, 1 existing to
 - [x] Transition probabilities are normalized over the allowed set.
 - [x] All-zero transition weights fall back to a uniform choice.
 - [x] Pheromone remains non-negative and finite, including `ρ = 1`.
-- [ ] The best length never increases for a fixed city set since the last reset.
-- [ ] The entropy metric is normalized to `[0, 1]`.
-- [ ] A fixed run identity produces identical results.
+- [x] The best length never increases for a fixed city set since the last reset.
+- [x] The entropy metric is normalized to `[0, 1]`.
+- [x] A fixed run identity produces identical results.
 - [ ] Structural parameter changes restart at iteration 0; presentation changes do not.
-- [ ] Metrics are available at a low frequency.
+- [x] Metrics are available at a low frequency.
 
 ### Step 2.3 — ACO correctness tests
 

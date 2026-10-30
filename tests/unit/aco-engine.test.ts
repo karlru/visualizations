@@ -7,6 +7,7 @@ import {
   BASE_ITERATIONS_PER_SECOND,
   buildTransitionWeights,
   INITIAL_PHEROMONE,
+  normalizedPheromoneEntropy,
   transitionProbabilities,
 } from '../../src/engines/aco/engine';
 import { ACO_PRESETS } from '../../src/engines/aco/presets';
@@ -90,6 +91,10 @@ function assertValidTours(engine: AcoEngine, instance = instanceFor()): void {
     expect(Number.isFinite(ant.tourLength)).toBe(true);
     expect(ant.tourLength).toBeCloseTo(tourLength(instance, tour), 12);
   }
+}
+
+function tourList(engine: AcoEngine): number[][] {
+  return engine.snapshot().ants.map((ant) => Array.from(ant.tour));
 }
 
 describe('parameters, constants, and presets', () => {
@@ -441,5 +446,176 @@ describe('tour construction and pheromone update', () => {
       assertFinitePheromone(engine);
       assertValidTours(engine, instanceFor(overrides));
     }
+  });
+});
+describe('entropy metric', () => {
+  it('is 1 for uniform pheromone and 1 for a zero total', () => {
+    const instance = createTspInstance(1, 4);
+    const size = instance.cityCount;
+
+    expect(normalizedPheromoneEntropy(instance, uniformPheromone(size, 0.7))).toBeCloseTo(1, 12);
+    expect(normalizedPheromoneEntropy(instance, new Float64Array(size * size))).toBe(1);
+  });
+
+  it('is 0 when all pheromone mass sits on one edge', () => {
+    const instance = createTspInstance(1, 4);
+    const size = instance.cityCount;
+    const pheromone = new Float64Array(size * size);
+    pheromone[0 * size + 1] = 5;
+    pheromone[1 * size + 0] = 5;
+
+    expect(normalizedPheromoneEntropy(instance, pheromone)).toBeCloseTo(0, 12);
+  });
+
+  it('matches the known three-edge distribution', () => {
+    const instance = createTspInstance(1, 3);
+    const size = instance.cityCount;
+    const pheromone = new Float64Array(size * size);
+    pheromone[0 * size + 1] = 1;
+    pheromone[1 * size + 0] = 1;
+    pheromone[0 * size + 2] = 1;
+    pheromone[2 * size + 0] = 1;
+    // The third edge is zero.
+
+    const expected = Math.log(2) / Math.log(3);
+    expect(normalizedPheromoneEntropy(instance, pheromone)).toBeCloseTo(expected, 12);
+  });
+
+  it('stays inside [0, 1] for arbitrary distributions', () => {
+    const instance = createTspInstance(3, 6);
+    const size = instance.cityCount;
+
+    fc.assert(
+      fc.property(
+        fc.array(fc.double({ min: 0, max: 100, noNaN: true }), {
+          minLength: size * size,
+          maxLength: size * size,
+        }),
+        (values) => {
+          const pheromone = Float64Array.from(values);
+          for (let city = 0; city < size; city += 1) {
+            pheromone[city * size + city] = 0;
+          }
+          const entropy = normalizedPheromoneEntropy(instance, pheromone);
+          expect(entropy).toBeGreaterThanOrEqual(0);
+          expect(entropy).toBeLessThanOrEqual(1);
+          expect(Number.isFinite(entropy)).toBe(true);
+        },
+      ),
+      { numRuns: 80, seed: 20261030 },
+    );
+  });
+
+  it('defines the degenerate one- and two-city cases as 1', () => {
+    const one = createTspInstance(1, 1);
+    expect(normalizedPheromoneEntropy(one, new Float64Array(1))).toBe(1);
+
+    const two = createTspInstance(1, 2);
+    expect(normalizedPheromoneEntropy(two, uniformPheromone(2))).toBe(1);
+  });
+});
+
+describe('iteration metrics', () => {
+  it('initializes best from the first iteration and never increases it', () => {
+    const engine = engineWith({ cityCount: 25, antCount: 20 });
+    run(engine, 1);
+
+    const first = engine.snapshot();
+    const firstLengths = first.ants.map((ant) => ant.tourLength);
+    expect(first.bestLength).toBeCloseTo(Math.min(...firstLengths), 12);
+    expect(first.meanLength).toBeCloseTo(
+      firstLengths.reduce((sum, value) => sum + value, 0) / firstLengths.length,
+      12,
+    );
+    expect(first.iteration).toBe(1);
+
+    let previousBest = first.bestLength as number;
+    for (let iteration = 0; iteration < 30; iteration += 1) {
+      engine.stepIteration();
+      const current = engine.snapshot();
+      expect(current.bestLength).not.toBeNull();
+      expect(current.bestLength as number).toBeLessThanOrEqual(previousBest);
+
+      const lengths = current.ants.map((ant) => ant.tourLength);
+      expect(current.bestLength as number).toBeLessThanOrEqual(Math.min(...lengths));
+      expect(current.meanLength).toBeCloseTo(
+        lengths.reduce((sum, value) => sum + value, 0) / lengths.length,
+        12,
+      );
+      previousBest = current.bestLength as number;
+    }
+  });
+
+  it('reports entropy in [0, 1] after every iteration', () => {
+    const engine = engineWith({ cityCount: 15, antCount: 10 });
+    for (let iteration = 0; iteration < 20; iteration += 1) {
+      engine.stepIteration();
+      const entropy = engine.snapshot().entropy;
+      expect(entropy).toBeGreaterThanOrEqual(0);
+      expect(entropy).toBeLessThanOrEqual(1);
+      expect(Number.isFinite(entropy)).toBe(true);
+    }
+  });
+
+  it('exposes metrics without advancing the simulation', () => {
+    const engine = run(engineWith(), 3);
+    const first = engine.metrics();
+    const second = engine.metrics();
+
+    expect(second).toEqual(first);
+    expect(second.iteration).toBe(3);
+    expect(second.cityCount).toBe(DEFAULTS.cityCount);
+    expect(second.antCount).toBe(DEFAULTS.antCount);
+    expect(second.bestLength).not.toBeNull();
+    expect(second.meanLength).not.toBeNull();
+    expect(second.entropy).toBeGreaterThanOrEqual(0);
+    expect(second.entropy).toBeLessThanOrEqual(1);
+    expect(second.degraded).toBe(false);
+    expect(second.droppedIterations).toBe(0);
+
+    engine.snapshot();
+    expect(engine.metrics()).toEqual(first);
+  });
+});
+
+describe('determinism', () => {
+  it('produces identical tours, lengths, pheromone, and metrics for one run identity', () => {
+    const settings = params({ cityCount: 18, antCount: 9, seed: 1234 });
+    const first = run(new AcoEngine(settings), 10);
+    const second = run(new AcoEngine(settings), 10);
+
+    expect(tourList(second)).toEqual(tourList(first));
+    expect(second.metrics()).toEqual(first.metrics());
+    expect(Array.from(second.snapshot().pheromone)).toEqual(Array.from(first.snapshot().pheromone));
+  });
+
+  it('reproduces a run exactly after reset', () => {
+    const engine = engineWith({ cityCount: 16, antCount: 7 });
+    run(engine, 6);
+    const expected = {
+      tours: tourList(engine),
+      metrics: engine.metrics(),
+      pheromone: Array.from(engine.snapshot().pheromone),
+    };
+
+    run(engine, 4);
+    engine.reset();
+
+    expect(engine.snapshot().iteration).toBe(0);
+    expect(engine.snapshot().bestLength).toBeNull();
+    expect(engine.snapshot().pheromone[1]).toBe(INITIAL_PHEROMONE);
+
+    run(engine, 6);
+    expect(tourList(engine)).toEqual(expected.tours);
+    expect(engine.metrics()).toEqual(expected.metrics);
+    expect(Array.from(engine.snapshot().pheromone)).toEqual(expected.pheromone);
+  });
+
+  it('starts a different run when the seed changes', () => {
+    const first = run(engineWith({ seed: 1 }), 3);
+    const second = run(engineWith({ seed: 2 }), 3);
+
+    expect(second.snapshot().cities).not.toEqual(first.snapshot().cities);
+    expect(second.metrics()).not.toEqual(first.metrics());
   });
 });
