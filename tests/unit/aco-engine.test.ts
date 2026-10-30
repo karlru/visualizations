@@ -914,3 +914,51 @@ describe('parameter edge cases', () => {
     }
   });
 });
+describe('render snapshot', () => {
+  it('returns the same object and stable buffers across frames', () => {
+    const engine = engineWith({ cityCount: 9, antCount: 4 });
+    const snapshot = engine.snapshot();
+    const cities = snapshot.cities;
+    const matrix = snapshot.distanceMatrix;
+    const pheromone = snapshot.pheromone;
+    const ants = snapshot.ants;
+    const tour = ants[0].tour;
+
+    engine.stepIteration();
+    const next = engine.snapshot();
+
+    expect(next).toBe(snapshot);
+    expect(next.cities).toBe(cities);
+    expect(next.distanceMatrix).toBe(matrix);
+    expect(next.pheromone).toBe(pheromone);
+    expect(next.ants).toBe(ants);
+    expect(next.ants[0].tour).toBe(tour);
+    expect(next.ants[0].visitedCount).toBe(9);
+    expect(next.iteration).toBe(1);
+    expect(next.bestTour).not.toBeNull();
+  });
+
+  it('keeps the snapshot object stable across a presentation change', () => {
+    const engine = engineWith();
+    const snapshot = engine.snapshot();
+    engine.setParams(params({ speed: 2 }));
+
+    expect(engine.snapshot()).toBe(snapshot);
+    expect(snapshot.speed).toBe(2);
+    expect(snapshot.params.speed).toBe(2);
+  });
+
+  it('exposes enough data for ant animation without extra copies', () => {
+    const engine = run(engineWith({ cityCount: 7, antCount: 3 }), 1);
+    const snapshot = engine.snapshot();
+
+    expect(snapshot.iterationProgress).toBeGreaterThanOrEqual(0);
+    expect(snapshot.iterationProgress).toBeLessThan(1);
+    for (const ant of snapshot.ants) {
+      expect(ant.tour).toHaveLength(7);
+      expect(ant.visitedCount).toBe(7);
+      expect(ant.tourLength).toBeGreaterThan(0);
+    }
+    expect(snapshot.bestTour?.length).toBe(7);
+  });
+});
