@@ -999,9 +999,9 @@ Verified 2026-10-30 with `pnpm lint`, `pnpm test` (331 passing, 1 existing todo;
 
 1. (DONE) Draw the city graph and faint candidate edges.
 2. (DONE) Draw pheromone intensity with alpha and width on a readable scale.
-3. Draw ants as moving dots with short trails.
-4. Draw the best tour in a distinct accent.
-5. Draw the probability fan for the focal ant with the top N candidates (default N = 8) and an explicit "other (Σ)" bucket.
+3. (DONE) Draw ants as moving dots with short trails.
+4. (DONE) Draw the best tour in a distinct accent.
+5. (DONE) Draw the probability fan for the focal ant with the top N candidates (default N = 8) and an explicit "other (Σ)" bucket.
 6. Add a compact convergence chart as an SVG/DOM component, not as canvas text.
 7. Add layer toggles for debugging and for the lab.
 8. Ensure labels are DOM overlays, not canvas text.
