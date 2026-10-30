@@ -496,7 +496,7 @@ Local verification (2026-10-30): `pnpm exec wrangler dev --port 8799 --local` pa
 
 The story runtime is built once and used by both stories. It is tested with a hidden development page before any real story content is written.
 
-### Step 1.1 — Define core contracts
+### (DONE) Step 1.1 — Define core contracts
 
 **Goal:** Stable TypeScript contracts for engines, scenes, renderers, and story configuration.
 
@@ -508,7 +508,7 @@ The story runtime is built once and used by both stories. It is tested with a hi
 4. (DONE) Define `StoryConfig` with slug, engine factory, defaults, presets, scenes, and URL parameter schema.
 5. (DONE) Define `ChapterSpec` with id, title, scene overrides, `pseudocodeLine`, `annotations`, `reducedMotionSteps`, and `tourAct`.
 6. (DONE) Add an import-boundary lint rule or test that engines do not import UI or renderer code.
-7. Add a fake-3D contract test: async mount, a 3D camera pose, and label registration. This must pass before Phase 4.
+7. (DONE) Add a fake-3D contract test: async mount, a 3D camera pose, and label registration. This must pass before Phase 4.
 
 **Files**
 
@@ -519,13 +519,13 @@ The story runtime is built once and used by both stories. It is tested with a hi
 
 **Acceptance criteria**
 
-- [ ] All contracts compile in strict mode.
-- [ ] A dummy engine and dummy renderer satisfy the interfaces.
-- [ ] Engines have no DOM, Svelte, Astro, or Three.js imports.
-- [ ] The scene state can describe both 2D and 3D scenes without renderer-specific fields.
-- [ ] `setParams` is generic; no `unknown` parameter type is used at the renderer boundary.
-- [ ] A fake 3D renderer passes the contract test with async mount, orbit pose, and label registration.
-- [ ] The story config can be imported without side effects.
+- [x] All contracts compile in strict mode.
+- [x] A dummy engine and dummy renderer satisfy the interfaces.
+- [x] Engines have no DOM, Svelte, Astro, or Three.js imports.
+- [x] The scene state can describe both 2D and 3D scenes without renderer-specific fields.
+- [x] `setParams` is generic; no `unknown` parameter type is used at the renderer boundary.
+- [x] A fake 3D renderer passes the contract test with async mount, orbit pose, and label registration.
+- [x] The story config can be imported without side effects.
 
 ### Step 1.2 — Seeded RNG and fixed-timestep clock
 
