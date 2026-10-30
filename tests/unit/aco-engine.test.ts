@@ -1452,3 +1452,79 @@ describe('invalid parameters and inputs', () => {
     expect(() => engine.setCities([{ x: -0.1, y: 0.5 }])).toThrow(/unit square/);
   });
 });
+
+describe('beta distance sensitivity', () => {
+  const cities = [
+    { x: 0, y: 0 },
+    { x: 0.1, y: 0 },
+    { x: 0.9, y: 0 },
+  ];
+  const instance = createTspInstanceFromCities(cities);
+
+  function nearProbability(beta: number, pheromone = uniformPheromone(3, 1)) {
+    return transitionProbabilities(instance, pheromone, 0, allowedMask(3), 1, beta);
+  }
+
+  it('increases the probability mass of the nearest candidate as beta grows', () => {
+    const betas = [0, 1, 2, 4, 8];
+    const near = betas.map((beta) => nearProbability(beta).probabilities[0]);
+
+    expect(near[0]).toBeCloseTo(0.5, 12);
+    for (let index = 1; index < near.length; index += 1) {
+      expect(near[index]).toBeGreaterThan(near[index - 1]);
+    }
+
+    // For p ∝ d^-beta, p_near / p_far = (d_far / d_near)^beta = 9^beta.
+    // This is the quantitative claim: larger beta makes the choice more
+    // distance-sensitive, not merely different.
+    for (const [index, beta] of betas.entries()) {
+      const result = nearProbability(beta);
+      const far = result.probabilities[1];
+      if (beta === 0) {
+        expect(result.probabilities[0]).toBeCloseTo(far, 12);
+      } else {
+        expect(result.probabilities[0]).toBeGreaterThan(far);
+      }
+      expect(result.probabilities[0] / far / 9 ** beta).toBeCloseTo(1, 9);
+      expect(near[index]).toBeCloseTo(result.probabilities[0], 12);
+    }
+  });
+
+  it('overrides unfavourable pheromone by distance at a larger beta', () => {
+    const pheromone = new Float64Array(9);
+    // The near city carries little pheromone; the far city carries a lot.
+    pheromone[0 * 3 + 1] = 0.1;
+    pheromone[1 * 3 + 0] = 0.1;
+    pheromone[0 * 3 + 2] = 10;
+    pheromone[2 * 3 + 0] = 10;
+
+    const weak = nearProbability(0, pheromone).probabilities[0];
+    const strong = nearProbability(4, pheromone).probabilities[0];
+
+    expect(weak).toBeCloseTo(0.1 / 10.1, 12);
+    expect(strong).toBeGreaterThan(weak);
+    expect(strong).toBeGreaterThan(0.9);
+
+    // With alpha = 1, the weights are 0.1 · (1/0.1)^4 and 10 · (1/0.9)^4.
+    const expected = (0.1 * 10 ** 4) / (0.1 * 10 ** 4 + 10 * (1 / 0.9) ** 4);
+    expect(strong).toBeCloseTo(expected, 9);
+  });
+
+  it('selects the nearest city more often at larger beta with the same seed', () => {
+    const countNear = (beta: number): number => {
+      const engine = new AcoEngine(
+        params({ cityCount: 3, antCount: 60, alpha: 1, beta, rho: 0.5, seed: 99 }),
+      );
+      engine.setCities(cities);
+      engine.stepIteration();
+
+      // Ants starting at city 0 choose between city 1 (near) and city 2 (far);
+      // ant k starts at city k mod 3, so every third ant is in this sample.
+      return engine
+        .snapshot()
+        .ants.filter((ant) => ant.tour[0] === 0 && ant.tour[1] === 1).length;
+    };
+
+    expect(countNear(8)).toBeGreaterThan(countNear(0));
+  });
+});
