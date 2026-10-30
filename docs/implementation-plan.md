@@ -533,8 +533,8 @@ The story runtime is built once and used by both stories. It is tested with a hi
 
 **Tasks**
 
-1. Implement a small seeded PRNG for simulation use.
-2. Add a seed-to-state helper and a `randomInt`/`randomFloat` API.
+1. (DONE) Implement a small seeded PRNG for simulation use.
+2. (DONE) Add a seed-to-state helper and a `randomInt`/`randomFloat` API.
 3. Implement a fixed-timestep accumulator with a maximum number of substeps.
 4. Add a speed multiplier and a pause flag.
 5. Add tests for determinism, range, large time deltas, and frame-rate independence (30/60/120 fps converge to the same state for the same elapsed time).
