@@ -279,9 +279,13 @@ The best tour is the best one this run found. Nothing in the method proves that 
 
 The lab is where you change the experiment. Cities (2–150) and ants (1–200) change the instance and the colony size. α (0–5), β (0–10), and ρ (0–1) change the rule. Speed (0.5×, 1×, 2×, 4×) changes how fast iterations arrive, not what an iteration does. The seed reproduces a run: the same seed produces the same map and the same sampled choices.
 
-The four presets are shortcuts to the combinations in the previous chapter. City-map edits are local to your session: they are not encoded in a share URL, and the interface says so when you make one.
+The four presets are shortcuts to the combinations in the previous chapter. City-map edits are local to your session: they are not encoded in a share link, and the interface says so when you make one.
 
-Be honest about what is here now. This page's stage already offers playback, replay, speed, and share. A share link records the seed, the structural parameters, the speed, and the chapter you are reading. The parameter panel, presets, city editor, and reset belong to the lab experience and are not part of this chapter yet. The explanations above do not depend on them: every number in the story is reproducible from the engine with the defaults.
+The stage offers playback, replay, speed, and share. The lab adds explicit step controls, a restart action, the parameter panel, presets, the city editor, layer toggles, camera framing, and reset. You can pause, step one deterministic fixed step forward or back, and watch the best-and-mean chart, ranked probability fan, and text summary update together. Layer toggles change the drawing without recreating the simulation. Camera buttons frame the overview, the focal city, the best tour, and the convergence pull-back, and zoom in, zoom out, and reset work from the keyboard. On the map, drag a city handle or focus it and use the arrow keys; Add city, Remove selected, and Reset map keep the instance between 2 and 150 cities. Every map edit pauses the run, rebuilds distances, and restarts at iteration 0.
+
+A share link records the seed, the structural parameters, the speed, and the chapter you are reading; it restarts at step 0 and restores a seeded map rather than your local edits.
+
+Side-by-side comparison of two parameter sets is a documented *should* that is deferred for release 1. Run one configuration at a time, or share two links and open them side by side. The explanations above do not depend on the lab: every number in the story is reproducible from the engine with the defaults.
 
 </Chapter>
 

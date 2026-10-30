@@ -57,10 +57,13 @@
   import { setPseudocodeActiveLine } from '../../lib/pseudocode-dom';
   import { composeSceneState } from '../../lib/scene-composition';
   import { type ScrollChapterEvent, ScrollDirector } from '../../lib/scroll-director';
-  import type { SceneState } from '../../render/types';
+  import type { CameraState, SceneState } from '../../render/types';
   import { loadStoryModule, type StoryModule } from '../../stories/loader';
   import type { ChapterSpec } from '../../stories/registry';
   import type {
+    StoryAuxiliaryView,
+    StoryCameraPreset,
+    StoryMapPoint,
     StoryMetric,
     StoryModuleView,
     StoryParamBag,
@@ -72,9 +75,11 @@
   import SeedControl from '../controls/SeedControl.svelte';
   import Slider from '../controls/Slider.svelte';
   import Toggle from '../controls/Toggle.svelte';
+  import AcoLabPanel from './AcoLabPanel.svelte';
   import ArticleModeToggle from './ArticleModeToggle.svelte';
   import ProgressRail from './ProgressRail.svelte';
   import StageChrome from './StageChrome.svelte';
+  import StoryMapOverlay from './StoryMapOverlay.svelte';
   import StoryStage from './StoryStage.svelte';
   import type {
     StoryRuntimeDebugState,
@@ -170,12 +175,25 @@
   let shareStatus = $state<{ readonly ok: boolean; readonly message: string } | null>(null);
   let sharing = $state(false);
   let metricItems = $state<readonly StoryMetric[]>([]);
+  let auxiliary = $state<StoryAuxiliaryView | null>(null);
+  let layerOverrides = $state<Readonly<Record<string, boolean>>>({});
+  let cameraOverride = $state<CameraState | null>(null);
+  let cameraPresetId = $state<string | null>(null);
+  let mapSelected = $state<number | null>(null);
+  let mapEditMode = $state(false);
+  let mapNotice = $state(
+    'Map edits are local and are not included in share links. Every edit pauses the run and restarts it at iteration 0.',
+  );
+  let coarsePointer = $state(false);
+  let stageRevision = $state(0);
+  let mapRevision = $state(0);
 
   let director: ScrollDirector | null = null;
   let runtime: StoryRuntime | null = null;
   let clock: FixedStepClock | null = null;
   let stageHandle: StoryStageHandle | null = null;
   let motionQuery: MediaQueryList | null = null;
+  let pointerQuery: MediaQueryList | null = null;
   let runtimeChapters = new Map<string, RuntimeChapter>();
   /** Reader overrides persist across chapter entry; chapters reset the run only. */
   let readerParams: Partial<StoryParamBag> = {};
@@ -254,6 +272,24 @@
   );
   let reducedMotion = $derived(motionPreference.reduced);
   let showStage = $derived(enhanced && !articleMode);
+  /** True once the reader has entered the lab and has not entered another chapter. */
+  let labOpen = $state(false);
+  /** The ACO lab panel appears at the end of the story after the lab is entered. */
+  let labActive = $derived(showStage && story?.lab === 'aco' && labOpen);
+  /** Effective layer visibility after the lab's presentation overrides. */
+  let layerVisibility = $derived.by((): Record<string, boolean> => {
+    const result: Record<string, boolean> = {};
+    const current = scene;
+    if (current === null) return result;
+    for (const layer of current.layers) {
+      if (layer.id === 'graph') {
+        result[layer.id] = true;
+        continue;
+      }
+      result[layer.id] = layerOverrides[layer.id] ?? layer.visible;
+    }
+    return result;
+  });
   let activeSceneStepCount = $derived(
     sceneStepCountFor(activeChapterId === null ? undefined : runtimeChapters.get(activeChapterId)),
   );
@@ -458,6 +494,22 @@
     root.dataset.sceneStepCount = String(activeSceneStepCount);
     root.dataset.persistence = persistenceAvailable ? 'available' : 'unavailable';
     root.dataset.entryCount = String(entryCount);
+    root.dataset.lab = story?.lab ?? 'none';
+    root.dataset.labActive = labActive ? 'true' : 'false';
+    root.dataset.stageRevision = String(stageRevision);
+    root.dataset.mapRevision = String(mapRevision);
+    root.dataset.mapCustom = auxiliary?.map?.custom ? 'true' : 'false';
+    root.dataset.mapCities = auxiliary?.map ? String(auxiliary.map.points.length) : '';
+    root.dataset.mapSelected = mapSelected === null ? '' : String(mapSelected);
+    root.dataset.mapEditMode = mapEditMode ? 'true' : 'false';
+    root.dataset.layerOverrides = JSON.stringify(layerOverrides);
+    root.dataset.cameraPreset = cameraPresetId ?? 'none';
+    root.dataset.cameraOverride = cameraOverride === null ? 'false' : 'true';
+    if (cameraOverride !== null && cameraOverride.kind === '2d') {
+      root.dataset.cameraOverrideZoom = cameraOverride.zoom.toFixed(3);
+    } else {
+      delete root.dataset.cameraOverrideZoom;
+    }
     if (entryState !== null) {
       root.dataset.entryChapter = entryState.chapter;
       root.dataset.entryScene = entryState.scene;
@@ -489,6 +541,11 @@
   function sampleMetrics(force = false): void {
     if (runtime === null) return;
     const next = runtime.metrics({ simulatedSeconds, steps: stepCount });
+    if (story?.lab === 'aco') {
+      auxiliary = runtime.auxiliary();
+    } else {
+      auxiliary = null;
+    }
 
     const signature = next.map((item) => `${item.id}=${item.value}`).join('|');
     if (!force && signature === metricSignature) return;
@@ -560,14 +617,45 @@
     return { runtime, rail };
   }
 
+  /**
+   * Apply presentation-only lab overrides on top of the composed scene:
+   * layer visibility toggles and a reader-chosen camera framing. The graph is
+   * never hideable. The engine is untouched.
+   */
+  function composePresentation(base: SceneState): SceneState {
+    let next = base;
+
+    if (Object.keys(layerOverrides).length > 0) {
+      next = {
+        ...next,
+        layers: next.layers.map((layer) => {
+          if (layer.id === 'graph') return { ...layer, visible: true };
+          const override = layerOverrides[layer.id];
+          if (override === undefined) return layer;
+          return {
+            ...layer,
+            visible: override,
+            opacity: override ? Math.max(layer.opacity, 0.25) : 0,
+          };
+        }),
+      };
+    }
+
+    if (cameraOverride !== null && cameraOverride.kind === next.camera.kind) {
+      next = { ...next, camera: cameraOverride };
+    }
+    return next;
+  }
+
   function applySceneAt(chapter: RuntimeChapter, progress: number): void {
     const currentStory = story;
     if (currentStory === null) return;
     const definition = currentStory.scenes[chapter.sceneId];
     if (definition === undefined) return;
 
-    const next = composeSceneState(definition, chapter.overrides, progress);
+    const next = composePresentation(composeSceneState(definition, chapter.overrides, progress));
     scene = next;
+    stageRevision += 1;
 
     if (root !== null) {
       root.dataset.sceneZoom = next.camera.kind === '2d' ? next.camera.zoom.toFixed(2) : '';
@@ -577,6 +665,153 @@
         .map((layer) => layer.id)
         .join(' ');
     }
+  }
+
+  /** Reapply the active chapter's settled presentation after a lab edit. */
+  function reapplyPresentation(): void {
+    const chapter =
+      activeChapterId === null ? undefined : runtimeChapters.get(activeChapterId);
+    if (chapter !== undefined) {
+      applySceneAt(chapter, reducedMotion ? keyframeProgress(sceneStep, sceneStepCountFor(chapter)) : activeProgress);
+    }
+    stageHandle?.redraw();
+    stageRevision += 1;
+    writeDebug();
+  }
+
+  function changeLayer(id: string, visible: boolean): void {
+    if (id === 'graph') return;
+    layerOverrides = { ...layerOverrides, [id]: visible };
+    reapplyPresentation();
+  }
+
+  function applyCameraPreset(preset: StoryCameraPreset): void {
+    cameraPresetId = preset.id;
+    cameraOverride = preset.camera;
+    // A framing preset should be predictable even after a manual orbit/zoom.
+    stageHandle?.resetCamera();
+    reapplyPresentation();
+  }
+
+  function resetCameraOverride(): void {
+    cameraPresetId = null;
+    cameraOverride = null;
+    stageHandle?.resetCamera();
+    reapplyPresentation();
+  }
+
+  function zoomCamera(factor: number): void {
+    stageHandle?.zoomBy(factor);
+    stageRevision += 1;
+    writeDebug();
+  }
+
+  function mapRuntime() {
+    return runtime?.map() ?? null;
+  }
+
+  function refreshMapSelection(): void {
+    const points = mapRuntime()?.getView().points ?? [];
+    if (points.length === 0) {
+      mapSelected = null;
+      return;
+    }
+    if (mapSelected !== null && mapSelected >= points.length) {
+      mapSelected = points.length - 1;
+    }
+  }
+
+  function commitMapChange(message: string): void {
+    const current = runtime?.params;
+    if (current !== undefined) {
+      params = { ...current };
+      const cityCount = current.cityCount;
+      if (typeof cityCount === 'number') {
+        readerParams = { ...readerParams, cityCount };
+      }
+    }
+
+    // A map edit is a new run: pause, restart the fixed-step clock, drop any
+    // camera framing that referenced the old map, and invalidate the sampled UI.
+    setPaused(true);
+    clock?.reset();
+    simulatedSeconds = 0;
+    stepCount = 0;
+    cameraOverride = null;
+    cameraPresetId = null;
+    mapRevision += 1;
+    mapNotice = message;
+    refreshMapSelection();
+    reapplyPresentation();
+    stageHandle?.redraw();
+    sampleMetrics(true);
+    writeDebug();
+    scheduleUrlSync();
+  }
+
+  function addCity(): void {
+    const map = mapRuntime();
+    if (map === null) return;
+    const before = map.getView();
+    if (!before.canAdd) return;
+    map.addPoint();
+    const points = map.getView().points;
+    mapSelected = points.length > 0 ? points.length - 1 : null;
+    commitMapChange(
+      'City added. Map edits are local and are not included in share links; a share restores a seeded map with the same city count.',
+    );
+  }
+
+  function removeCity(): void {
+    const map = mapRuntime();
+    if (map === null) return;
+    const view = map.getView();
+    if (!view.canRemove) return;
+    const index = mapSelected ?? view.points.length - 1;
+    map.removePoint(index);
+    const points = map.getView().points;
+    mapSelected = points.length === 0 ? null : Math.min(index, points.length - 1);
+    commitMapChange(
+      'City removed. Map edits are local and are not included in share links; a share restores a seeded map with the same city count.',
+    );
+  }
+
+  function resetMap(): void {
+    const map = mapRuntime();
+    if (map === null) return;
+    map.reset();
+    mapSelected = null;
+    commitMapChange(
+      'Seeded map restored from the current seed and city count. Map edits are not included in share links.',
+    );
+  }
+
+  function moveCity(index: number, point: StoryMapPoint): void {
+    const map = mapRuntime();
+    if (map === null) return;
+    map.setPoint(index, point);
+    mapSelected = index;
+    commitMapChange(
+      'City moved. Map edits are local and are not included in share links; a share restores a seeded map with the same city count.',
+    );
+  }
+
+  function nudgeCity(index: number, dx: number, dy: number): void {
+    const map = mapRuntime();
+    if (map === null) return;
+    const point = map.getView().points[index];
+    if (point === undefined) return;
+    moveCity(index, { x: point.x + dx, y: point.y + dy });
+  }
+
+  function changeMapEditMode(enabled: boolean): void {
+    mapEditMode = enabled;
+    writeDebug();
+  }
+
+  function selectCity(index: number): void {
+    mapSelected = index;
+    writeDebug();
   }
 
   /**
@@ -609,6 +844,18 @@
       lastEvent = 'enter';
 
       if (changed) {
+        // The lab stays mounted after its chapter so controls at the end of the
+        // story do not disappear while the reader is still using them. Entering
+        // any other chapter closes it again.
+        labOpen = chapter.id === 'the-lab';
+        // Chapter entry owns the narrative presentation. Lab toggles and a
+        // reader camera framing are local to the lab and are cleared here, so
+        // the next chapter's scene is shown exactly as authored.
+        layerOverrides = {};
+        cameraOverride = null;
+        cameraPresetId = null;
+        mapSelected = null;
+        mapEditMode = false;
         // Chapter entry is the only place simulation configuration changes.
         // Reader overrides are re-applied so live controls survive scrolling.
         params = resolveParams(chapter.spec);
@@ -749,6 +996,12 @@
     sampleMetrics(true);
   }
 
+  /** Lab restart: reset the run and stay paused so the iteration-0 state is visible. */
+  function restartRun(): void {
+    replay();
+    setPaused(true);
+  }
+
   /**
    * Apply reader parameter changes live, without recreating the runtime.
    *
@@ -772,8 +1025,10 @@
       stageHandle?.redraw();
     }
 
-    writeDebug();
+    // Sample first so `data-map-*` and the text summary reflect the new map
+    // before the debug attributes are written.
     sampleMetrics(true);
+    writeDebug();
     scheduleUrlSync();
   }
 
@@ -804,6 +1059,19 @@
 
   function changeSeed(seed: number): void {
     applyParams({ seed }, { reset: true });
+  }
+
+  /** Structural lab sliders restart the run and clear the applied preset. */
+  function changeStructuralParam(key: string, value: number): void {
+    if (!Number.isFinite(value)) return;
+    selectedPreset = null;
+    applyParams({ [key]: value }, { reset: true });
+    if (key === 'cityCount') {
+      mapSelected = null;
+      mapNotice =
+        'City count changed, so the seeded map was regenerated. Map edits are local and are not included in share links.';
+      writeDebug();
+    }
   }
 
   /**
@@ -894,6 +1162,12 @@
     sampleMetrics(true);
   };
 
+  const handlePointerQueryChange = (): void => {
+    if (!mounted || pointerQuery === null) return;
+    coarsePointer = pointerQuery.matches;
+    writeDebug();
+  };
+
   /** The manual toggle may only reduce motion. A system preference locks it. */
   function changeReducedMotion(next: boolean): void {
     if (systemReducedMotion) return;
@@ -962,7 +1236,7 @@
   }
 
   function focusAfterStage(): void {
-    const panel = root?.querySelector<HTMLElement>('[data-controls-panel]');
+    const panel = root?.querySelector<HTMLElement>('[data-controls-panel], [data-lab-panel]');
     const firstControl = panel?.querySelector<HTMLElement>(
       'input:not([disabled]), select:not([disabled]), button:not([disabled]), summary',
     );
@@ -980,6 +1254,7 @@
 
   function handleStageReady(handle: StoryStageHandle): void {
     stageHandle = handle;
+    stageRevision += 1;
     director?.refresh();
     // The stage enhancement changes chapter heights. Re-resolve the fragment
     // against the measured stage layout, not the article layout measured before
@@ -1104,6 +1379,8 @@
 
     motionQuery?.removeEventListener('change', handleMotionQueryChange);
     motionQuery = null;
+    pointerQuery?.removeEventListener('change', handlePointerQueryChange);
+    pointerQuery = null;
 
     if (metricTimer !== null) {
       clearInterval(metricTimer);
@@ -1214,6 +1491,7 @@
     }
 
     motionQuery?.addEventListener('change', handleMotionQueryChange);
+    pointerQuery?.addEventListener('change', handlePointerQueryChange);
 
     // Measure the chapter ranges before resolving a fragment. This is the
     // "after the pin offset is known" step: the stage is sticky, and chapter
@@ -1277,6 +1555,8 @@
     persistenceAvailable = isPersistenceAvailable();
     motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
     systemReducedMotion = motionQuery.matches;
+    pointerQuery = window.matchMedia('(pointer: coarse)');
+    coarsePointer = pointerQuery.matches;
     manualReducedMotion = parseStoredMotionPreference(
       readPreference(PREFERENCE_KEYS.reducedMotion),
     );
@@ -1324,6 +1604,7 @@
   data-active-chapter={activeChapterId ?? undefined}
   data-active-scene={activeSceneId ?? undefined}
   data-active-chapter-title={activeChapterTitle || undefined}
+  data-lab-active={labActive ? 'true' : 'false'}
   data-scroll-progress={activeProgress.toFixed(4)}
   data-scroll-event={lastEvent || undefined}
   data-chapter-count={chapters.length}
@@ -1404,6 +1685,21 @@
             onToggleReducedMotion={changeReducedMotion}
             onShare={shareCurrentState}
           />
+          {#if labActive && auxiliary?.map}
+            <StoryMapOverlay
+              points={auxiliary.map.points}
+              selected={mapSelected}
+              editMode={mapEditMode}
+              coarse={coarsePointer}
+              nudgeStep={auxiliary.map.nudgeStep}
+              revision={stageRevision}
+              project={(x, y) => stageHandle?.worldToScreen(x, y) ?? null}
+              unproject={(clientX, clientY) => stageHandle?.screenToWorld(clientX, clientY) ?? null}
+              onSelect={selectCity}
+              onMove={moveCity}
+              onNudge={nudgeCity}
+            />
+          {/if}
         </StoryStage>
 
         <!--
@@ -1527,6 +1823,41 @@
       <div class="story-layout__chapters" data-story-chapters>
         {@render children?.()}
       </div>
+
+      {#if labActive && story !== null}
+        <AcoLabPanel
+          {story}
+          {params}
+          metrics={metricItems}
+          auxiliary={auxiliary}
+          {paused}
+          {selectedPreset}
+          {layerVisibility}
+          {mapEditMode}
+          {coarsePointer}
+          selectedCity={mapSelected}
+          {mapNotice}
+          shareMessage={shareStatus?.message}
+          shareOk={shareStatus?.ok}
+          sharePending={sharing}
+          onParamChange={changeStructuralParam}
+          onPreset={applyPreset}
+          onSeed={changeSeed}
+          onTogglePaused={togglePaused}
+          onStep={stepSimulation}
+          onRestart={restartRun}
+          onShare={shareCurrentState}
+          onLayerChange={changeLayer}
+          onCameraPreset={applyCameraPreset}
+          onZoom={zoomCamera}
+          onCameraReset={resetCameraOverride}
+          onMapEditModeChange={changeMapEditMode}
+          onSelectCity={selectCity}
+          onMapAdd={addCity}
+          onMapRemove={removeCity}
+          onMapReset={resetMap}
+        />
+      {/if}
     </div>
   </div>
 </div>

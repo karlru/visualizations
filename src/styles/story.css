@@ -815,13 +815,32 @@ pre.pseudocode > code {
 
 /*
  * The panel is below the stage, so on one column the pinned wrapper would be
- * taller than the viewport and its lower half unreachable. The dedicated mobile
- * stage layout is Step 3.6; until then the ACO stage column scrolls normally
- * while the prose remains the document scroller.
+ * taller than the viewport and its lower half unreachable. The ACO stage column
+ * therefore scrolls normally while the prose remains the document scroller.
+ * Step 3.5 adds one exception: in the lab the listing is hidden and the stage
+ * stays pinned so city handles remain reachable while the reader uses the lab
+ * panel. Step 3.6 owns the complete mobile stage layout.
  */
 @media (max-width: 60rem) {
   .story-layout__stage.story-layout__stage--with-pseudocode {
     position: static;
+  }
+
+  /*
+   * The lab needs the stage and its city handles on screen while the reader
+   * works down in the lab panel. Hide the stage pseudocode listing in lab mode
+   * so the pinned stage stays shorter than the viewport; the full listing
+   * remains in the article and in every narrative chapter.
+   */
+  .story-controller[data-lab-active="true"]
+    .story-layout__stage.story-layout__stage--with-pseudocode {
+    position: sticky;
+    align-self: stretch;
+    inline-size: 100%;
+  }
+
+  .story-controller[data-lab-active="true"] .story-pseudocode {
+    display: none;
   }
 }
 
@@ -849,13 +868,19 @@ pre.pseudocode > code {
  */
 @media (max-width: 60rem) {
   .story-layout {
-    grid-template-columns: minmax(0, 1fr);
+    /* A flex column, not a one-row grid: a sticky stage must stick across the
+       whole story height. In a single-column grid the stage row is only as tall
+       as the stage, so it scrolls away before the reader reaches the lab. */
+    display: flex;
+    flex-direction: column;
     gap: var(--space-lg);
   }
 
   .story-layout__stage {
     position: sticky;
     inset-block-start: var(--space-2xs);
+    align-self: stretch;
+    inline-size: 100%;
     z-index: var(--z-sticky);
     padding-block-end: var(--space-2xs);
     background-color: var(--color-paper);
