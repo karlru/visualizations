@@ -1179,3 +1179,211 @@ describe('known small instances', () => {
     expect(pheromoneDriven.probabilities[1]).toBeCloseTo(0.8, 12);
   });
 });
+
+describe('property-based checks', () => {
+  const pointArb = fc
+    .record({
+      x: fc.integer({ min: 0, max: 10 }),
+      y: fc.integer({ min: 0, max: 10 }),
+    })
+    .map(({ x, y }) => ({ x: x / 10, y: y / 10 }));
+
+  it('ACO-INV-01: constructs a permutation tour and closes it for arbitrary layouts', () => {
+    fc.assert(
+      fc.property(
+        fc.array(pointArb, { minLength: 1, maxLength: 7 }),
+        fc.integer({ min: 0, max: 500 }),
+        fc.integer({ min: 1, max: 4 }),
+        (cities, seed, antCount) => {
+          const instance = createTspInstanceFromCities(cities, seed);
+          const engine = new AcoEngine({
+            ...DEFAULTS,
+            cityCount: cities.length,
+            antCount,
+            seed,
+          });
+          engine.setCities(cities);
+          engine.stepIteration();
+
+          for (const ant of engine.snapshot().ants) {
+            const tour = Array.from(ant.tour);
+            expect(validateTour(instance, tour)).toEqual({ valid: true });
+            expect(new Set(tour).size).toBe(cities.length);
+            expect(Number.isFinite(ant.tourLength)).toBe(true);
+            expect(ant.tourLength).toBeCloseTo(tourLength(instance, tour), 12);
+          }
+        },
+      ),
+      { numRuns: 50, seed: 20261030 },
+    );
+  });
+
+  it('ACO-INV-02: transition probabilities are non-negative and sum to 1', () => {
+    const instance = createTspInstance(17, 4);
+    const size = instance.cityCount;
+
+    fc.assert(
+      fc.property(
+        fc.array(fc.integer({ min: 0, max: 1000 }), {
+          minLength: size * size,
+          maxLength: size * size,
+        }),
+        fc.integer({ min: 0, max: size - 1 }),
+        fc.array(fc.boolean(), { minLength: size, maxLength: size }),
+        fc.integer({ min: 0, max: 5 }),
+        fc.integer({ min: 0, max: 10 }),
+        (values, current, allowedFlags, alpha, beta) => {
+          const pheromone = Float64Array.from(values, (value) => value / 1000);
+          for (let city = 0; city < size; city += 1) {
+            pheromone[city * size + city] = 0;
+          }
+          const allowed = Uint8Array.from(allowedFlags, (flag) => (flag ? 1 : 0));
+          const expectedCount = allowed.reduce(
+            (count, flag, city) => (flag === 1 && city !== current ? count + 1 : count),
+            0,
+          );
+          const result = transitionProbabilities(
+            instance,
+            pheromone,
+            current,
+            allowed,
+            alpha,
+            beta,
+          );
+
+          expect(result.count).toBe(expectedCount);
+          let sum = 0;
+          for (let index = 0; index < result.count; index += 1) {
+            const probability = result.probabilities[index];
+            expect(Number.isFinite(probability)).toBe(true);
+            expect(probability).toBeGreaterThanOrEqual(0);
+            sum += probability;
+          }
+          if (result.count === 0) {
+            expect(sum).toBe(0);
+          } else {
+            expect(sum).toBeCloseTo(1, 12);
+          }
+        },
+      ),
+      { numRuns: 100, seed: 20261030 },
+    );
+  });
+});
+
+describe('ACO invariants (docs/requirements.md §4.1)', () => {
+  it('ACO-INV-03: pheromone stays non-negative and finite for all valid parameters', () => {
+    for (const alpha of [0, 1, 5]) {
+      for (const beta of [0, 2, 10]) {
+        for (const rho of [0, 0.5, 1]) {
+          const settings = params({ cityCount: 6, antCount: 3, alpha, beta, rho, seed: 3 });
+          const engine = run(new AcoEngine(settings), 4);
+          assertFinitePheromone(engine);
+
+          const snapshot = engine.snapshot();
+          const size = snapshot.cityCount;
+          for (let from = 0; from < size; from += 1) {
+            for (let to = 0; to < size; to += 1) {
+              expect(snapshot.pheromone[from * size + to]).toBe(
+                snapshot.pheromone[to * size + from],
+              );
+            }
+          }
+        }
+      }
+    }
+  });
+
+  it('ACO-INV-04: rho = 1 clears every unused edge before deposit', () => {
+    const settings = params({ cityCount: 6, antCount: 1, rho: 1, seed: 9 });
+    const engine = new AcoEngine(settings);
+    engine.stepIteration();
+
+    const snapshot = engine.snapshot();
+    const size = snapshot.cityCount;
+    const ant = snapshot.ants[0];
+    const used = usedEdgeSet(Array.from(ant.tour), size);
+    const deposit = ACO_DEPOSIT_CONSTANT / ant.tourLength;
+
+    for (let from = 0; from < size; from += 1) {
+      for (let to = from + 1; to < size; to += 1) {
+        const value = snapshot.pheromone[from * size + to];
+        if (used.has(from * size + to)) {
+          expect(value).toBeCloseTo(deposit, 12);
+        } else {
+          expect(value).toBe(0);
+        }
+      }
+    }
+
+    // The next iteration must still construct valid tours from zeroed edges.
+    engine.stepIteration();
+    assertFinitePheromone(engine);
+    assertValidTours(engine, createTspInstance(settings.seed, settings.cityCount));
+  });
+
+  it('ACO-INV-05: a fixed run identity reproduces tours, pheromone, and metrics', () => {
+    const settings = params({ cityCount: 12, antCount: 5, seed: 77 });
+    const first = run(new AcoEngine(settings), 6);
+    const second = run(new AcoEngine(settings), 6);
+
+    expect(tourList(second)).toEqual(tourList(first));
+    expect(second.metrics()).toEqual(first.metrics());
+    expect(Array.from(second.snapshot().pheromone)).toEqual(Array.from(first.snapshot().pheromone));
+  });
+
+  it('ACO-INV-06: the best length never increases and the best tour is retained', () => {
+    const engine = new AcoEngine(params({ cityCount: 9, antCount: 3, seed: 8 }));
+    engine.stepIteration();
+
+    let previousLength = engine.snapshot().bestLength as number;
+    let previousTour = engine.snapshot().bestTour;
+
+    for (let iteration = 0; iteration < 20; iteration += 1) {
+      engine.stepIteration();
+      const snapshot = engine.snapshot();
+      const currentLength = snapshot.bestLength as number;
+
+      expect(currentLength).toBeLessThanOrEqual(previousLength);
+      if (currentLength === previousLength) {
+        expect(snapshot.bestTour).toBe(previousTour);
+      }
+
+      previousLength = currentLength;
+      previousTour = snapshot.bestTour;
+    }
+  });
+
+  it('ACO-INV-07: coincident cities and zero weights stay finite with a uniform fallback', () => {
+    const point = { x: 0.5, y: 0.5 };
+    const cities = [point, point, point];
+    const engine = new AcoEngine(params({ cityCount: 3, antCount: 2, seed: 2 }));
+    engine.setCities(cities);
+    run(engine, 3);
+
+    assertFinitePheromone(engine);
+    const instance = createTspInstanceFromCities(cities);
+    for (const ant of engine.snapshot().ants) {
+      expect(validateTour(instance, Array.from(ant.tour))).toEqual({ valid: true });
+      expect(Number.isFinite(ant.tourLength)).toBe(true);
+    }
+
+    const empty = new Float64Array(instance.cityCount * instance.cityCount);
+    const result = transitionProbabilities(instance, empty, 0, allowedMask(3), 1, 2);
+    expect(result.uniform).toBe(true);
+    expect(result.probabilities[0]).toBeCloseTo(0.5, 12);
+    expect(result.probabilities[1]).toBeCloseTo(0.5, 12);
+  });
+
+  it('ACO-INV-08: entropy is 1 for uniform pheromone and 0 for a single edge', () => {
+    const instance = createTspInstance(1, 5);
+    const size = instance.cityCount;
+
+    expect(normalizedPheromoneEntropy(instance, uniformPheromone(size, 3))).toBeCloseTo(1, 12);
+
+    const single = new Float64Array(size * size);
+    single[0 * size + 1] = 2;
+    single[1 * size + 0] = 2;
+    expect(normalizedPheromoneEntropy(instance, single)).toBeCloseTo(0, 12);
+  });
+});
