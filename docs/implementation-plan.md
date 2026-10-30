@@ -867,8 +867,8 @@ Verified 2026-10-30 with `pnpm lint`, `pnpm test` (188 passing, 1 existing todo)
 **Tasks**
 
 1. (DONE) Define `City`, `Tour`, and `TspInstance`.
-2. Generate a seeded random city layout inside a normalized coordinate space.
-3. Compute a distance matrix, clamping coincident cities to a small epsilon.
+2. (DONE) Generate a seeded random city layout inside a normalized coordinate space.
+3. (DONE) Compute a distance matrix, clamping coincident cities to a small epsilon.
 4. Compute tour length, including the return edge.
 5. Validate that a tour visits every city exactly once.
 6. Add a nearest-neighbor initial tour for comparison.
