@@ -310,6 +310,18 @@ test.describe('ACO story route', () => {
       );
     }
 
+    // Article mode carries the static figure, the glossary, and the citations,
+    // not just the chapter prose.
+    const figure = page.locator('figure[data-figure="aco-best-tour"]');
+    await expect(figure).toBeVisible();
+    await expect(figure.locator('svg')).toBeVisible();
+    await expect(figure.locator('figcaption')).toContainText('4.91');
+    await expect(page.getByRole('heading', { name: 'Glossary' })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'References and further reading' }),
+    ).toBeVisible();
+    expect(await page.locator('#references a[href^="https://"]').count()).toBeGreaterThanOrEqual(3);
+
     await page.getByTestId('article-mode-toggle').click();
     await waitForRuntime(page);
     const restored = await readStory(page);
@@ -363,5 +375,46 @@ test.describe('ACO story route without JavaScript', () => {
       'href',
       '#emergence',
     );
+  });
+
+  test('reveals a prediction and carries the figure, glossary, and citations', async ({ page }) => {
+    await page.goto(STORY);
+
+    // Native <details>/<summary>, no client script: clicking the summary opens
+    // the answer.
+    const predict = page.locator('details[data-predict]').first();
+    await expect(predict).toBeVisible();
+    expect(await predict.evaluate((element) => (element as HTMLDetailsElement).open)).toBe(false);
+    await expect(predict.locator('[data-predict-answer]')).not.toBeVisible();
+    await predict.locator('summary').click();
+    expect(await predict.evaluate((element) => (element as HTMLDetailsElement).open)).toBe(true);
+    await expect(predict.locator('[data-predict-answer]')).toBeVisible();
+    await expect(predict.locator('[data-predict-answer]')).toContainText('random');
+
+    // The best-tour figure is inline SVG in the server-rendered article.
+    const figure = page.locator('figure[data-figure="aco-best-tour"]');
+    await expect(figure).toBeVisible();
+    await expect(figure.locator('svg')).toBeVisible();
+    await expect(figure.locator('figcaption')).toContainText('4.91');
+    await expect(figure.locator('figcaption')).toContainText('dashed');
+    await expect(figure.locator('figcaption')).toContainText('square');
+
+    // Both explicit failure-mode sections are real headings.
+    await expect(page.getByRole('heading', { name: 'Limitations', level: 3 })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Applications', level: 3 })).toBeVisible();
+
+    await expect(page.getByRole('heading', { name: 'Glossary' })).toBeVisible();
+    await expect(page.locator('#glossary dl dt')).toHaveCount(9);
+
+    await expect(
+      page.getByRole('heading', { name: 'References and further reading' }),
+    ).toBeVisible();
+    const citations = page.locator('#references a[href^="https://"]');
+    expect(await citations.count()).toBeGreaterThanOrEqual(3);
+    for (let index = 0; index < (await citations.count()); index += 1) {
+      const rel = await citations.nth(index).getAttribute('rel');
+      expect(rel).toContain('noopener');
+      expect(rel).toContain('noreferrer');
+    }
   });
 });

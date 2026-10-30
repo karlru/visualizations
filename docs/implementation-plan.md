@@ -236,7 +236,8 @@ git --version
    │  ├─ randu.test.ts
    │  ├─ import-boundaries.test.ts
    │  ├─ story-loader.test.ts
-   │  └─ content-schema.test.ts
+   │  ├─ content-schema.test.ts
+   │  └─ aco-content.test.ts
    └─ e2e/
       ├─ smoke.spec.ts
       ├─ site.spec.ts
@@ -1054,20 +1055,20 @@ pnpm add -D @types/d3-scale @types/d3-shape @types/d3-color tsx
 Verified 2026-10-30 with `pnpm lint`, `pnpm test` (355 passing, 1 existing todo; 24 new cases in `tests/unit/aco-render.test.ts`), `pnpm build`, and `CI=1 pnpm exec playwright test tests/e2e/aco-renderer.spec.ts` (3 passing). `src/render/canvas2d/layers/` adds the graph, pheromone, ants, best-tour, and probability-fan layers plus `createAcoLayers()`; every layer guards `visible`/opacity, reads the story world space (`ACO_WORLD_SCALE = 6`), converts CSS-pixel widths through the camera zoom, and draws no text. The graph batches all `n(n−1)/2` candidate edges into one path and reveals a deterministic prefix. Pheromone uses `t = ln(1 + τ/τ₀) / ln(1 + 32)` with width/alpha interpolation and a zero floor, bucketed into twenty batched paths on a theme-cached d3-color ramp. Ants interpolate `progress × n` along the tour (wrapping the return edge), use one reusable trail buffer, and skip `visitedCount === 0`. The best tour combines an amber halo, an accent dashed line, and square markers; its length stays in the DOM metrics. `src/stories/aco/probability-fan.ts` delegates to `transitionProbabilities`/`buildTransitionWeights`, names the top 8 candidates plus the other bucket with an exact normalized total, and feeds both the canvas arcs and `ProbabilityFanSummary.svelte`. The engine now exposes a bounded 512-point `AcoSnapshot.history` (stable array, pooled objects, no recording allocation) and a fresh `AcoMetrics.history` copy; `ConvergenceChart.svelte` plots both series with d3-scale/d3-shape and a visible caption/description. `/dev/aco-smoke` renders the real engine with `ACO_SCENES.emergence`, five layer toggles, play/pause/replay, zoom buttons, the fan summary, chart, and metrics; the E2E spec checks console cleanliness, both chart series, the fan total, a canvas hash change after a toggle without remounting, and the 360 px layout. The committed figure is `src/assets/figures/aco-best-tour.svg`, generated deterministically by `node --import tsx scripts/build-figures.mjs` from the same pure engine and intended for inline MDX use.
 
 
-### Step 3.3 — ACO story prose
+### (DONE) Step 3.3 — ACO story prose
 
 **Goal:** A complete narrative with the required educational content.
 
 **Tasks**
 
-1. Write the MDX chapters listed in `docs/stories.md`.
-2. Add learning objectives, difficulty, prerequisites, and references.
-3. Add at least one predict-then-reveal interaction.
-4. Add callouts for key ideas.
-5. Add a limitations section and an applications section.
-6. Add a glossary or inline definitions.
-7. Verify every chapter is readable in article mode.
-8. Add `scripts/check-citations.mjs` to verify stable URLs/DOIs and report external link status; wire it into `check:citations`.
+1. (DONE) Write the MDX chapters listed in `docs/stories.md`.
+2. (DONE) Add learning objectives, difficulty, prerequisites, and references.
+3. (DONE) Add at least one predict-then-reveal interaction.
+4. (DONE) Add callouts for key ideas.
+5. (DONE) Add a limitations section and an applications section.
+6. (DONE) Add a glossary or inline definitions.
+7. (DONE) Verify every chapter is readable in article mode.
+8. (DONE) Add `scripts/check-citations.mjs` to verify stable URLs/DOIs and report external link status; wire it into `check:citations`.
 
 **Files**
 
@@ -1079,17 +1080,23 @@ Verified 2026-10-30 with `pnpm lint`, `pnpm test` (355 passing, 1 existing todo;
 
 **Acceptance criteria**
 
-- [ ] All required chapters exist.
-- [ ] The narrative explains the problem, the rules, the emergence, the parameters, and the limits.
-- [ ] At least one predict-then-reveal interaction works.
-- [ ] Applications and limitations sections are present.
-- [ ] Key terms are defined in a glossary or inline.
-- [ ] At least three citations are present and resolve.
-- [ ] `pnpm check:citations` passes and reports external citation status.
-- [ ] Article mode contains the complete argument.
-- [ ] No chapter depends on animation alone to make sense.
+- [x] All required chapters exist.
+- [x] The narrative explains the problem, the rules, the emergence, the parameters, and the limits.
+- [x] At least one predict-then-reveal interaction works.
+- [x] Applications and limitations sections are present.
+- [x] Key terms are defined in a glossary or inline.
+- [x] At least three citations are present and resolve.
+- [x] `pnpm check:citations` passes and reports external citation status.
+- [x] Article mode contains the complete argument.
+- [x] No chapter depends on animation alone to make sense.
 
-**Session note (route/runtime half, 2026-10-30).** The first half of Step 3.3 is complete; the prose/citation half remains. `src/stories/runtime.ts` adds the non-generic `StoryModuleView`/`StoryRuntime` facade created by `createStoryModule(config, hooks)`, with story-keyed dynamic modules in `src/stories/loader.ts` (`ant-colony-optimization`, `story-smoke`, `pulse-smoke`; RANDU stays out until Phase 5). `StoryController` now consumes the runtime and a primitive `StoryParamBag` instead of importing a fixture engine, fixture params, or the removed `renderer-factory.ts`; the concrete `AcoEngine`/`Canvas2DRenderer`/`createAcoLayers()` wiring lives in `src/stories/aco/module.ts`, and the dev fixtures keep their orbit/trails/preset panel through a `controlPanel: 'fixture'` hook. `StoryConfig.presetKeeps` (default seed; dev keeps `variant`, ACO keeps `cityCount`/`antCount`/`speed`) keeps run identity through presets. `StoryLayout.astro` and `stories/[...slug].astro` render `/stories/ant-colony-optimization` from the content entry plus the module view, with ten placeholder `<Chapter>` sections using the exact `ACO_CHAPTERS` ids/titles/scenes. `speedControl: engine` writes ACO `speed` without touching the 1× clock and round-trips the URL. Verification for this half: `pnpm lint`, `pnpm test`, `pnpm build`, `pnpm check:links`, and the full `CI=1 pnpm test:e2e` including `tests/e2e/aco-story.spec.ts` (route, deep link, speed round-trip, article mode, and no-JS article). Tasks 2–8 and every acceptance bullet remain open for the prose session because the page currently carries placeholder prose and no citations, callouts, predict interaction, figures, or glossary.
+**Session note (2026-10-30).** Step 3.3 is complete. The route/runtime half added `src/stories/runtime.ts` (the non-generic `StoryModuleView`/`StoryRuntime` facade from `createStoryModule(config, hooks)`), story-keyed dynamic modules in `src/stories/loader.ts`, and moved the concrete `AcoEngine`/`Canvas2DRenderer`/`createAcoLayers()` wiring into `src/stories/aco/module.ts`. `StoryController` consumes the runtime and a primitive `StoryParamBag`; `StoryConfig.presetKeeps` keeps run identity through presets, and `speedControl: engine` writes ACO speed without touching the 1× clock. `/stories/ant-colony-optimization` renders from the content entry plus the module view with the exact ten `ACO_CHAPTERS` ids/titles/scenes.
+
+The prose half replaces the placeholders with 2,617 words across the ten chapters (one idea each, 177–368 words per chapter), in the `docs/stories.md` §6 voice: concrete, definition-first, and explicit about what the visualization shows versus what the algorithm guarantees. Each chapter is self-contained in article mode. `the-colony` defines stigmergy; `the-problem` defines tour/cycle/return edge and the (n−1)!/2 search space; `one-ants-choice` states the unvisited allowed set and gives the top-eight-plus-"other (Σ)" textual ranking with normalized probabilities; `the-probability-rule` states `p_ij ∝ τ_ij^α η_ij^β`, explains α/β and the α=0/β=0 extremes (distance-driven sampling, not nearest neighbour); `leaving-a-trace` gives Q/L_k with Q fixed at 1; `forgetting` gives (1−ρ) and the ρ=1 boundary; `emergence` distinguishes the non-increasing record from the fluctuating current-iteration mean, defines normalized entropy, and embeds the static best-tour figure; `tuning-the-colony` documents all four presets and an experiment; `when-it-fails` has explicit `<h3>Limitations</h3>` and `<h3>Applications</h3>` sections (vehicle routing, network design, scheduling, dynamic problems, TSPLIB) and names ACS/MMAS as unimplemented refinements; `the-lab` names every planned control, discloses that map edits are local and absent from share URLs, and does not promise controls that are not on the page yet. Two `<Predict>` blocks and five `<Callout>` tones (`idea`/`warning`/`try`) use native `<details>` and semantic notes. The inline `aco-best-tour.svg` figure (imported with `?raw`) is server-rendered with a halo + dashed accent + square markers caption and the 4.91 numeric length; a glossary defines nine terms and the references list all four frontmatter sources with DOI/URL links carrying `rel="noopener noreferrer"`.
+
+`scripts/check-citations.mjs` scans story frontmatter, validates DOI/URL formats, resolves DOIs through `https://doi.org/api/handles/<doi>` (avoiding publisher bot walls), follows URL redirects with a timeout, and prints a per-citation table. Malformed citations and 404/410 fail; 401/403/405/429/5xx, timeouts, and network errors warn. `--offline` validates formats without network access; `--require-resolution` makes the three-ACO-citation floor strict. The default run passes when at least three resolve, and reports the floor as not enforced rather than failing on a blocked or offline runner.
+
+Verification: `pnpm lint`, `pnpm test` (370 passing, 1 existing todo; 8 new cases in `tests/unit/aco-content.test.ts`), `pnpm build`, `pnpm check:links` (83 internal references across 9 HTML files), `pnpm check:citations` (8 citations across 2 stories: 6 ok, 2 warnings, 0 failed; 3 of 4 ACO citations resolved, floor met), and `CI=1 pnpm test:e2e` (84 Playwright tests). The E2E additions open a prediction with JavaScript disabled, assert the inline figure/glossary/references/limitations/applications, check external-link `rel` values, and run an ACO-route axe scan with no serious or critical violations. A 320 px and 1440 px visual pass confirmed the formula, ranked fan, preset list, figure, glossary, and references wrap without page overflow.
 
 ### Step 3.4 — Math and pseudocode
 
