@@ -930,7 +930,7 @@ Verified 2026-10-30 with `pnpm lint` and `pnpm test` (225 passing, 1 existing to
 
 Verified 2026-10-30 with `pnpm lint`, `pnpm test` (281 passing, 1 existing todo; 56 new engine tests), and `pnpm build`. `src/engines/aco/engine.ts` implements the complete Ant System: `τ₀ = 0.1` on every off-diagonal edge, construction with `p_ij ∝ τ_ij^α η_ij^β` and one seeded draw per next-city choice, deposit `Q / L_k`, evaporation then deposit, and normalized entropy with `E = n(n−1)/2`. `Q = 1`, the base rate (`1` iteration per simulated second), and the per-call/backlog caps (`2` and `8`) are exported constants. `stepIteration()` is the deterministic test/reduced-motion entry point; `step(dt)` converts simulated seconds into a pending-iteration budget, carries the fraction, runs at most two whole iterations per call, and counts trimmed whole backlog in `metrics().droppedIterations`. The fixed-step suite reaches identical tours and pheromone at 30, 60, and 120 fps. Structural fields (`cityCount`, `antCount`, `α`, `β`, `ρ`, `seed`) and `setCities()` restart at iteration 0 and clear best/mean history; `speed` changes apply without a reset, and a same-value `setParams` is a no-op. `transitionProbabilities(instance, pheromone, currentCity, allowed, alpha, beta, options?)` is exported for Step 3.2's fan and returns `{ cities, probabilities, count, uniform }`, with ascending candidate order and a uniform fallback for all-zero or non-finite weights. `AcoSnapshot` keeps stable references to cities, distances, the pheromone matrix, ant tour buffers, and the last best tour; ants are animated from `tour` plus the shared `iterationProgress`, so no graph is copied per frame. Best length starts from the first iteration's fastest ant; the nearest-neighbor baseline remains a separate `nearestNeighborTour` comparison. `src/engines/aco/presets.ts` carries the four documented parameter patches. `tests/unit/aco-engine.test.ts` covers valid tours, normalization, fallback, `ρ = 1`, non-increasing best, entropy with known distributions, determinism, structural/presentation resets, snapshot buffer reuse, collinear/coincident/one-city cases, frame-rate independence, and the workload cap.
 
-### Step 2.3 — ACO correctness tests
+### (DONE) Step 2.3 — ACO correctness tests
 
 **Goal:** Confidence that the visual result is mathematically trustworthy.
 
@@ -949,10 +949,12 @@ Verified 2026-10-30 with `pnpm lint`, `pnpm test` (281 passing, 1 existing todo;
 
 **Acceptance criteria**
 
-- [ ] All ACO invariants from `docs/requirements.md` have tests.
-- [ ] Tests run quickly and do not depend on the DOM.
-- [ ] Tests fail if the transition formula, deposit, or evaporation is broken.
-- [ ] Edge cases do not produce `NaN`, `Infinity`, or empty tours.
+- [x] All ACO invariants from `docs/requirements.md` have tests.
+- [x] Tests run quickly and do not depend on the DOM.
+- [x] Tests fail if the transition formula, deposit, or evaporation is broken.
+- [x] Edge cases do not produce `NaN`, `Infinity`, or empty tours.
+
+Verified 2026-10-30 with `pnpm lint`, `pnpm test` (308 passing, 1 existing todo; 27 new cases in `tests/unit/aco-engine.test.ts`), and `pnpm build`. The new cases live beside the Step 2.2 engine suite rather than in `tests/unit/aco.test.ts`, keeping TSP geometry and engine behavior separated; no new file was added. Coverage: hand-computable two-city, unit-square, and triangle instances with exact lengths and probabilities (`0.9/0.1` distance-driven, `0.2/0.8` pheromone-driven); fast-check properties for `ACO-INV-01` tour validity and `ACO-INV-02` normalization over random allowed sets; edge cases at `α ∈ {0,5}`, `β ∈ {0,10}`, `ρ ∈ {0,1}`, one ant, one/two cities, collinear and coincident cities, plus named `RangeError` checks for every structural field and the transition helpers; a controlled β test asserting the nearest-candidate mass rises from `0.5` to the exact `9^β` probability ratio (including a case where β overrides adverse pheromone) and a same-seed sampling check; evaporation with `ρ = 0.4` comparing unused edges against `(1 − ρ)·τ`, with `ρ = 0` and `ρ = 1` boundaries and exact `Q / L` deposits; and best-tour preservation across flat iterations plus non-increasing best length. Mutation checks (each reverted, not committed) failed as intended: ignoring `η^β` failed 5 formula/probability tests; using `Q · L` for the deposit failed the deposit test, `ACO-INV-04`, and the `Q / L` test; skipping evaporation failed both evaporation tests, the deposit test, the `ρ = 1` pheromone test, and `ACO-INV-04`.
 
 ## 7. Phase 3 — ACO story
 
