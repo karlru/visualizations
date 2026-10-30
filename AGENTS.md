@@ -2,9 +2,7 @@
 
 ## Project
 
-**Algorithm Stories** is a fully static, scroll-driven site of interactive visual essays that explain algorithms from the inside. Release 1 contains exactly two stories: Ant Colony Optimization (Canvas 2D) and LCG/RANDU (Three.js), built on Astro + Svelte islands.
-
-The repository is currently **docs-only**: no `package.json`, source, or tests exist yet. Implementation starts at Phase 0, Step 0.1 of `docs/implementation-plan.md`.
+**Visualizations** is a fully static, scroll-driven site of interactive visual essays that explain algorithms from the inside. Release 1 contains exactly two stories: Ant Colony Optimization (Canvas 2D) and LCG/RANDU (Three.js), built on Astro + Svelte islands.
 
 ## Documentation
 
@@ -93,10 +91,3 @@ Not runnable yet (project not scaffolded). Once Phase 0 is complete, use these f
 | `pnpm deploy` | Build and deploy with Wrangler. |
 
 Phase gates run the full set: `lint` → `test` → `build` → `check:*` → `test:e2e` → `test:a11y` → `test:visual` → `lhci`. Deployment is automated from `main`; do not deploy from feature branches.
-
-## Gotchas
-
-- RANDU math is integer-exact: check `9x − 6y + z` on integer states, never divide normalized floats by `2^31`; use the fast path only when `a × (m − 1) + c ≤ 2^53` (ANSI C is not safe). See `technology.md` §3.22.
-- A fixed run identity must reproduce identical results; structural parameter changes reset to iteration 0, presentation changes do not. URL encodes the starting state, not the current frame.
-- The no-JS default is the article layout — never ship an empty stage placeholder.
-- Visual regression flakes come from unseeded randomness, live time, Lenis, or unloaded fonts. Fix the harness rather than loosening assertions.
