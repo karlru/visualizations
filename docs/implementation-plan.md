@@ -216,7 +216,11 @@ git --version
 │  │  ├─ persistence.ts
 │  │  ├─ chapter-metadata.ts
 │  │  ├─ scene-composition.ts
-│  │  └─ scroll-director.ts
+│  │  ├─ scroll-director.ts
+│  │  ├─ aco-formulas.ts
+│  │  ├─ pseudocode.ts
+│  │  ├─ pseudocode-dom.ts
+│  │  └─ story-pseudocode.ts
 │  └─ styles/
 │     ├─ tokens.css
 │     ├─ base.css
@@ -237,7 +241,8 @@ git --version
    │  ├─ import-boundaries.test.ts
    │  ├─ story-loader.test.ts
    │  ├─ content-schema.test.ts
-   │  └─ aco-content.test.ts
+   │  ├─ aco-content.test.ts
+   │  └─ pseudocode.test.ts
    └─ e2e/
       ├─ smoke.spec.ts
       ├─ site.spec.ts
@@ -1098,39 +1103,51 @@ The prose half replaces the placeholders with 2,620 words across the ten chapter
 
 Verification: `pnpm lint`, `pnpm test` (370 passing, 1 existing todo; 8 new cases in `tests/unit/aco-content.test.ts`), `pnpm build`, `pnpm check:links` (83 internal references across 9 HTML files), `pnpm check:citations` (8 citations across 2 stories: 6 ok, 2 warnings, 0 failed; 3 of 4 ACO citations resolved, floor met), and `CI=1 pnpm test:e2e` (84 Playwright tests). The E2E additions open a prediction with JavaScript disabled, assert the inline figure/glossary/references/limitations/applications, check external-link `rel` values, and run an ACO-route axe scan with no serious or critical violations. A 320 px and 1440 px visual pass confirmed the formula, ranked fan, preset list, figure, glossary, and references wrap without page overflow.
 
-### Step 3.4 — Math and pseudocode
+### (DONE) Step 3.4 — Math and pseudocode
 
 **Goal:** The underlying logic is visible and synchronized with the story.
 
 **Tasks**
 
-1. Add the transition probability, deposit, and evaporation formulas.
-2. Render math at build time and configure the MDX pipeline with `remark-math` and `rehype-katex`.
-3. Add pseudocode with syntax highlighting at build time.
-4. Add line-level highlight control driven by the active scene.
-5. Style formulas and code for the editorial paper and the dark stage.
-6. Ensure formulas and code are readable at 320 px.
+1. (DONE) Add the transition probability, deposit, and evaporation formulas.
+2. (DONE) Render math at build time and configure the MDX pipeline with `remark-math` and `rehype-katex`.
+3. (DONE) Add pseudocode with syntax highlighting at build time.
+4. (DONE) Add line-level highlight control driven by the active scene.
+5. (DONE) Style formulas and code for the editorial paper and the dark stage.
+6. (DONE) Ensure formulas and code are readable at 320 px.
 
 **Commands**
 
 ```bash
-pnpm add katex remark-math rehype-katex
+pnpm add katex remark-math rehype-katex shiki @astrojs/markdown-remark
 ```
 
 **Files**
 
 - `src/components/ui/Math.astro`
 - `src/components/ui/Pseudocode.astro`
+- `src/lib/aco-formulas.ts`
+- `src/lib/pseudocode.ts`
+- `src/lib/pseudocode-dom.ts`
+- `src/lib/story-pseudocode.ts`
 - `src/content/stories/ant-colony-optimization/index.mdx`
+- `src/components/story/StoryController.svelte`
+- `src/pages/stories/[...slug].astro`
+- `src/layouts/StoryLayout.astro`
+- `astro.config.mjs`
 - `src/styles/story.css`
+- `tests/unit/pseudocode.test.ts`
+- `tests/e2e/aco-story.spec.ts`
 
 **Acceptance criteria**
 
-- [ ] All three formulas render correctly.
-- [ ] Pseudocode is highlighted without runtime highlighting.
-- [ ] The highlighted line changes with the scene.
-- [ ] Math and code remain readable in article mode.
-- [ ] Long lines scroll within their own container on mobile.
+- [x] All three formulas render correctly.
+- [x] Pseudocode is highlighted without runtime highlighting.
+- [x] The highlighted line changes with the scene.
+- [x] Math and code remain readable in article mode.
+- [x] Long lines scroll within their own container on mobile.
+
+Verified 2026-10-30 with `pnpm lint`, `pnpm test` (378 passing, 1 existing todo; 8 new cases in `tests/unit/pseudocode.test.ts`), `pnpm build`, `pnpm check:links` (84 internal references across 9 HTML files), `pnpm check:citations` (8 citations: 6 ok, 2 warnings, 0 failed; 3 of 4 ACO citations resolved, floor met), and `CI=1 pnpm test:e2e` (86 Playwright tests). Astro 7 defaults to Sätteri, which ignores remark/rehype plugins, so the MDX pipeline uses `@astrojs/markdown-remark`'s `unified()` with `remark-math` and `rehype-katex` (`throwOnError`, `output: 'htmlAndMathml'`); MDX inherits it. `Math.astro` renders the three `docs/stories.md` §2.7 formulas with `katex.renderToString` at build time and labels each with a visible caption and MathML output. `katex/dist/katex.min.css` is imported only by `StoryLayout.astro`; Vite emits the KaTeX fonts as same-origin `/_astro/KaTeX_*.woff2|woff|ttf` assets, and the home and index routes contain no KaTeX CSS. `src/lib/pseudocode.ts` holds the canonical ten-line listing, a small custom TextMate grammar, and a Shiki core highlighter with a CSS-variable theme; the output has `data-line="0…9"` on every line and no script. `src/lib/story-pseudocode.ts` generates the panel HTML once at build time in the page, and the island receives it as a string prop. `StoryController` mounts the panel only in the enhanced stage layout and moves exactly one `data-active`/`aria-current="step"` line in an `$effect` keyed on `activeChapterId`; `pseudocodeLine` values (2, 3, 4, 4, 7, 6, 8, 4, 9, 2) are unchanged. The article/no-JS path keeps a `<Pseudocode>` block in `the-probability-rule` with a static line 4. E2E asserts three display formulas in stage, article, and no-JS modes, the panel appearing only in stage mode, the active line moving from chapter 01 line 2 to `leaving-a-trace` line 7 and `forgetting` line 6, unique ids, no page overflow at 320 px with the listing and formula scrolling inside their own containers, and a clean ACO axe scan. The stage column gives up vertical room for the panel and is non-sticky below 60rem until Step 3.6 designs the mobile stage layout.
 
 ### Step 3.5 — ACO lab
 

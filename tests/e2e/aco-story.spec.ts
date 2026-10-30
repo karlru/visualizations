@@ -286,6 +286,112 @@ test.describe('ACO story route', () => {
     expect(errors).toEqual([]);
   });
 
+  test('build-time math and the pseudocode panel follow the active chapter', async ({ page }) => {
+    const errors = watchErrors(page);
+    await page.goto(STORY);
+    await waitForRuntime(page);
+
+    // Three display formulas, each rendered by KaTeX during the build with a
+    // MathML copy for assistive technology.
+    await expect(page.locator('.katex-display')).toHaveCount(3);
+    expect(await page.locator('.katex').count()).toBeGreaterThanOrEqual(3);
+    expect(await page.locator('math').count()).toBeGreaterThanOrEqual(3);
+    await expect(page.locator('#formula-transition')).toBeVisible();
+    await expect(page.locator('#formula-deposit')).toBeVisible();
+    await expect(page.locator('#formula-update')).toBeVisible();
+
+    // The stage panel is enhancement-only and carries the same pre-rendered
+    // listing as the article copy. The island does not import Shiki.
+    const panel = page.locator('[data-pseudocode-panel]');
+    await expect(panel).toBeVisible();
+    await expect(panel.locator('h2')).toHaveText('The algorithm');
+    await expect(panel.locator('pre[data-pseudocode]')).toHaveCount(1);
+    await expect(panel.locator('pre[data-pseudocode]')).toHaveAttribute(
+      'aria-label',
+      'Ant System pseudocode',
+    );
+
+    // Chapter 01 (`the-colony`) introduces line 2. Exactly one line carries
+    // `aria-current="step"` — the chapter drives the highlight, not progress.
+    await expect(panel.locator('[data-line="2"][aria-current="step"]')).toHaveCount(1);
+    expect(await panel.locator('[data-line][data-active]').count()).toBe(1);
+
+    await scrollToChapter(page, 'leaving-a-trace');
+    await expect(panel.locator('[data-line="7"][aria-current="step"]')).toHaveCount(1);
+    await expect(panel.locator('[data-line="2"][aria-current="step"]')).toHaveCount(0);
+    expect(await panel.locator('[data-line][data-active]').count()).toBe(1);
+
+    await scrollToChapter(page, 'forgetting');
+    await expect(panel.locator('[data-line="6"][aria-current="step"]')).toHaveCount(1);
+
+    // The article copy and the panel must not share ids.
+    const duplicateIds = await page.evaluate(() => {
+      const ids = Array.from(
+        document.querySelectorAll<HTMLElement>('[id]'),
+        (element) => element.id,
+      );
+      return ids.filter((id, index) => ids.indexOf(id) !== index);
+    });
+    expect(duplicateIds).toEqual([]);
+
+    expect(errors).toEqual([]);
+  });
+
+  test('math and pseudocode stay readable in article mode at 320 px', async ({ page }) => {
+    const errors = watchErrors(page);
+    await page.goto(STORY);
+    await waitForRuntime(page);
+
+    await page.getByTestId('article-mode-toggle').click();
+    await page.waitForFunction(
+      () =>
+        document.querySelector<HTMLElement>('[data-story-controller]')?.dataset.articleMode ===
+        'true',
+    );
+
+    // The stage panel is gone; the article listing and every formula remain.
+    await expect(page.locator('[data-pseudocode-panel]')).toHaveCount(0);
+    const articleListing = page.locator('pre[data-pseudocode]');
+    await expect(articleListing).toBeVisible();
+    await expect(page.locator('.katex-display')).toHaveCount(3);
+    expect(
+      await page.locator('pre[data-pseudocode] span[style*="pseudocode-keyword"]').count(),
+    ).toBeGreaterThan(0);
+
+    await page.setViewportSize({ width: 320, height: 720 });
+    await page.waitForFunction(() => document.documentElement.clientWidth === 320);
+
+    const overflow = await page.evaluate(() => ({
+      document: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      body: document.body.scrollWidth - document.body.clientWidth,
+    }));
+    expect(overflow.document).toBeLessThanOrEqual(0);
+    expect(overflow.body).toBeLessThanOrEqual(0);
+
+    // Long content scrolls inside its own container instead of widening the page.
+    const surfaces = await page.evaluate(() => {
+      const pre = document.querySelector<HTMLElement>('pre[data-pseudocode]');
+      const math = document.querySelector<HTMLElement>(
+        '#formula-transition .formula-math__display',
+      );
+      if (!pre || !math) throw new Error('Missing pseudocode or formula surface');
+      return {
+        preClient: pre.clientWidth,
+        preScroll: pre.scrollWidth,
+        mathClient: math.clientWidth,
+        mathScroll: math.scrollWidth,
+        preRight: pre.getBoundingClientRect().right,
+        mathRight: math.getBoundingClientRect().right,
+      };
+    });
+    expect(surfaces.preRight).toBeLessThanOrEqual(320);
+    expect(surfaces.mathRight).toBeLessThanOrEqual(320);
+    expect(surfaces.preScroll).toBeGreaterThan(surfaces.preClient);
+    expect(surfaces.mathScroll).toBeGreaterThan(surfaces.mathClient);
+
+    expect(errors).toEqual([]);
+  });
+
   test('article mode removes the stage and keeps all ten chapters readable', async ({ page }) => {
     const errors = watchErrors(page);
     await page.goto(STORY);
@@ -350,6 +456,19 @@ test.describe('ACO story route without JavaScript', () => {
     await expect(page.locator('[data-story-controller]')).not.toHaveAttribute(
       'data-story-enhanced',
     );
+
+    // The article carries build-time math and the full highlighted listing; the
+    // stage-only pseudocode panel is absent.
+    await expect(page.locator('[data-pseudocode-panel]')).toHaveCount(0);
+    await expect(page.locator('.katex-display')).toHaveCount(3);
+    expect(await page.locator('math').count()).toBeGreaterThanOrEqual(3);
+    await expect(page.locator('pre[data-pseudocode]')).toBeVisible();
+    await expect(
+      page.locator('pre[data-pseudocode] [data-line="4"][aria-current="step"]'),
+    ).toHaveCount(1);
+    expect(
+      await page.locator('pre[data-pseudocode] span[style*="pseudocode-keyword"]').count(),
+    ).toBeGreaterThan(0);
 
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(
       'The Colony That Finds a Short Route',

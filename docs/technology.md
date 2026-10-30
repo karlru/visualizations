@@ -215,10 +215,15 @@ The project needs scales, color interpolation, line/area generators, and simple 
 | `d3-scale` | Linear axes for the ACO convergence chart. | Yes, in the story island. |
 | `d3-shape` | Best/mean line generators for the convergence chart. | Yes, in the story island. |
 | `d3-color` | Parses token colours and builds the cached pheromone intensity ramp on the canvas. | Yes, in the ACO island. |
+| `katex` | Build-time TeX rendering and the self-hosted KaTeX stylesheet/fonts used on story routes. | CSS and fonts only; no runtime JavaScript. |
+| `remark-math` | Parses `$...$` and `$$...$$` in MDX before the renderer runs. | No; build-time only. |
+| `rehype-katex` | Renders math nodes to static KaTeX HTML + MathML with `throwOnError`. | No; build-time only. |
+| `shiki` | Build-time pseudocode highlighting with a small custom grammar and CSS-variable theme. | No; never in a browser bundle. |
+| `@astrojs/markdown-remark` | Selects the unified Markdown processor so remark/rehype plugins run in Astro 7. | No; build-time only. |
 | `@types/d3-color`, `@types/d3-scale`, `@types/d3-shape` (dev) | Type declarations for the three d3 modules; the runtime packages do not bundle them. | No. |
 | `tsx` (dev) | Runs `scripts/build-figures.mjs` with its TypeScript engine imports at build time. | No; never in a browser bundle. |
 
-No charting framework, DOM-join library, or global state library is added.
+No charting framework, DOM-join library, or global state library is added. Math and code highlighting are build-time transforms; the browser receives only HTML, CSS, MathML, and same-origin fonts.
 
 This keeps the bundle small and avoids mixing D3's DOM paradigm with imperative rendering.
 
@@ -231,6 +236,8 @@ Math is rendered to static HTML during the build. There is no runtime math libra
 - A custom stylesheet matches the editorial typography.
 - KaTeX fonts are self-hosted and subset where practical.
 
+**Pipeline.** Astro 7 defaults to the Sätteri Markdown processor, which does not run remark/rehype plugins. The project installs `@astrojs/markdown-remark` and selects `unified({ remarkPlugins: [remarkMath], rehypePlugins: [rehypeKatex] })` in `astro.config.mjs`. MDX inherits that processor. `rehype-katex` runs with `throwOnError` and `output: 'htmlAndMathml'`, so a malformed expression fails `pnpm build` and the MathML copy stays available to assistive technology. `katex/dist/katex.min.css` is imported only by `StoryLayout.astro`; the home and index routes do not load it. Vite emits the referenced font files as same-origin hashed assets under `/_astro/` — there is no third-party font request.
+
 **Alternatives:** MathJax is more feature-complete but heavier at runtime. Temml/MathML is lighter and more semantic, but styling consistency and browser behavior are less predictable across the target matrix. KaTeX is the safer default.
 
 ### 3.12 Shiki at build time
@@ -240,6 +247,8 @@ Pseudocode is highlighted during the build and shipped as static HTML. This avoi
 - Line-level highlighting is controlled by data attributes, not by re-highlighting at runtime.
 - Code remains readable in article mode and with JavaScript disabled.
 - Code blocks can be horizontally scrollable on narrow screens without breaking the layout.
+
+**Pipeline.** `src/lib/pseudocode.ts` owns the canonical ACO listing and builds a small TextMate grammar for its control words, symbols, and operators. It uses `shiki/core` with the JavaScript regex engine, so the same output is produced in Node, Vitest, and the Astro build. The theme writes CSS variables rather than literal colours; `story.css` defines the paper palette and a dark-stage override, so one pre-rendered listing can be restyled without re-highlighting. Every line gets `data-line="0…9"`; the story island only moves `data-active`/`aria-current="step"` when the active chapter changes. The build-time module is never imported by the island — `src/lib/pseudocode-dom.ts` holds the DOM-only helper.
 
 **Alternatives:** Prism and highlight.js are capable, but they either add runtime work or require more custom integration for build-time output.
 
