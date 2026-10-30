@@ -619,3 +619,103 @@ describe('determinism', () => {
     expect(second.metrics()).not.toEqual(first.metrics());
   });
 });
+describe('fixed-step time budget', () => {
+  it('carries the fractional remainder instead of dropping it', () => {
+    const engine = engineWith({ speed: 1 });
+
+    engine.step(0.4);
+    expect(engine.snapshot().iteration).toBe(0);
+    expect(engine.snapshot().iterationProgress).toBeCloseTo(0.4, 12);
+
+    engine.step(0.6);
+    expect(engine.snapshot().iteration).toBe(1);
+    expect(engine.snapshot().iterationProgress).toBeCloseTo(0, 12);
+
+    engine.reset();
+    for (let index = 0; index < 10; index += 1) {
+      engine.step(0.15);
+    }
+    expect(engine.snapshot().iteration).toBe(1);
+    expect(engine.snapshot().iterationProgress).toBeCloseTo(0.5, 9);
+  });
+
+  it('ignores invalid deltas and pauses at speed zero', () => {
+    const engine = engineWith();
+    engine.step(Number.NaN);
+    engine.step(Number.POSITIVE_INFINITY);
+    engine.step(-1);
+    engine.step(0);
+    expect(engine.snapshot().iteration).toBe(0);
+
+    engine.setParams(params({ speed: 0 }));
+    engine.step(10);
+    expect(engine.snapshot().iteration).toBe(0);
+    expect(engine.snapshot().iterationProgress).toBe(0);
+  });
+
+  it('applies the speed multiplier without resetting the run', () => {
+    const fast = engineWith({ speed: 4 });
+    fast.step(0.3);
+    expect(fast.snapshot().iteration).toBe(1);
+
+    const slow = engineWith({ speed: 1 });
+    slow.step(0.3);
+    expect(slow.snapshot().iteration).toBe(0);
+  });
+
+  it('does not double-count direct stepIteration calls against the clock budget', () => {
+    const engine = engineWith();
+    engine.step(0.5);
+    expect(engine.snapshot().iterationProgress).toBeCloseTo(0.5, 12);
+
+    engine.stepIteration();
+    expect(engine.snapshot().iteration).toBe(1);
+    expect(engine.snapshot().iterationProgress).toBeCloseTo(0.5, 12);
+
+    engine.step(0.5);
+    expect(engine.snapshot().iteration).toBe(2);
+    expect(engine.snapshot().iterationProgress).toBeCloseTo(0, 12);
+  });
+
+  it('reaches the same state at 30, 60, and 120 fps', () => {
+    for (const speed of [1, 4]) {
+      const states = [30, 60, 120].map((fps) => {
+        const engine = engineWith({ cityCount: 14, antCount: 8, speed });
+        const frames = Math.round(fps * 12.5);
+        for (let frame = 0; frame < frames; frame += 1) {
+          engine.step(1 / fps);
+        }
+        return engine;
+      });
+
+      const expectedIterations = Math.floor(12.5 * speed * BASE_ITERATIONS_PER_SECOND);
+      for (const state of states) {
+        expect(state.snapshot().iteration).toBe(expectedIterations);
+        expect(state.metrics().droppedIterations).toBe(0);
+      }
+
+      expect(tourList(states[1])).toEqual(tourList(states[0]));
+      expect(tourList(states[2])).toEqual(tourList(states[0]));
+
+      const reference = states[0].metrics();
+      for (const state of states.slice(1)) {
+        const metrics = state.metrics();
+        expect(metrics.iteration).toBe(reference.iteration);
+        expect(metrics.bestLength).toBe(reference.bestLength);
+        expect(metrics.meanLength).toBe(reference.meanLength);
+        expect(metrics.entropy).toBe(reference.entropy);
+        expect(metrics.droppedIterations).toBe(0);
+        // The sub-iteration remainder differs only by floating-point
+        // accumulation error from stepping at a different frame rate.
+        expect(metrics.pendingIterations).toBeCloseTo(reference.pendingIterations, 9);
+      }
+
+      expect(Array.from(states[1].snapshot().pheromone)).toEqual(
+        Array.from(states[0].snapshot().pheromone),
+      );
+      expect(Array.from(states[2].snapshot().pheromone)).toEqual(
+        Array.from(states[0].snapshot().pheromone),
+      );
+    }
+  });
+});

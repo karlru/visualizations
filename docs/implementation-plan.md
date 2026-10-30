@@ -904,7 +904,7 @@ Verified 2026-10-30 with `pnpm lint` and `pnpm test` (225 passing, 1 existing to
 4. (DONE) Deposit pheromone proportional to inverse tour length.
 5. (DONE) Evaporate and update pheromone, allowing values to reach zero but never negative or non-finite.
 6. (DONE) Track best tour, best length, mean length, iteration, and normalized pheromone entropy using the formula in `docs/stories.md` §2.6.
-7. Support `stepIteration()` for deterministic tests and `step(dt)` for the clock.
+7. (DONE) Support `stepIteration()` for deterministic tests and `step(dt)` for the clock.
 8. Restart the run at iteration 0 when a structural parameter or the city set changes; invalidate best/mean history.
 9. Handle edge cases: `α = 0`, `β = 0`, `ρ = 1`, one ant, two cities, collinear cities.
 10. Expose a snapshot suitable for rendering without copying the entire graph every frame.
