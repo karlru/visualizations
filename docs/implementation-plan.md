@@ -271,7 +271,7 @@ Astro's dev server runs in the background; check it with `pnpm astro dev status`
 2. (DONE) Configure `output: 'static'`.
 3. (DONE) Set a provisional production `site` URL in `astro.config.mjs`; replace it with the deployed workers.dev URL at Step 0.6.
 4. (DONE) Add `astro check` to the build script.
-5. Create a temporary Svelte island on the home page and a temporary MDX page to prove both work.
+5. (DONE) Create a temporary Svelte island on the home page and a temporary MDX page to prove both work.
 6. Remove the temporary examples after verification.
 
 **Commands**
@@ -290,12 +290,12 @@ pnpm exec astro check
 
 **Acceptance criteria**
 
-- [ ] A Svelte island hydrates in the browser.
-- [ ] An MDX page renders.
+- [x] A Svelte island hydrates in the browser.
+- [x] An MDX page renders.
 - [x] `pnpm exec astro check` passes.
-- [ ] `pnpm build` produces static HTML for all routes.
-- [ ] `sitemap-index.xml` and its numbered sitemap file are generated after a build.
-- [ ] No framework adapter for server rendering is installed.
+- [x] `pnpm build` produces static HTML for all routes.
+- [x] `sitemap-index.xml` and its numbered sitemap file are generated after a build.
+- [x] No framework adapter for server rendering is installed.
 
 ### Step 0.3 — Add tooling: Biome, Vitest, Playwright, axe, Lighthouse CI
 
