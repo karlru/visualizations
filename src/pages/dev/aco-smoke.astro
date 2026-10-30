@@ -1,0 +1,86 @@
+---
+import AcoSmokeHarness from '../../components/story/AcoSmokeHarness.svelte';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+---
+
+<BaseLayout
+  title="ACO renderer smoke test"
+  description="Internal fixture for the ACO canvas layers, probability fan, convergence chart, and layer toggles."
+  noindex
+>
+  <div class="aco-smoke-page page-shell">
+    <header class="aco-smoke-page__intro">
+      <p class="eyebrow">Internal · not indexed</p>
+      <h1 class="aco-smoke-page__title">ACO renderer smoke test</h1>
+      <p class="aco-smoke-page__dek">
+        The real <code>AcoEngine</code> and <code>Canvas2DRenderer</code> with the complete layer
+        set: graph, pheromone, ants, best tour, and probability fan. Toggle any layer without
+        recreating the engine; the two panels below read the same pure fan data and bounded
+        convergence history.
+      </p>
+    </header>
+
+    <AcoSmokeHarness client:load />
+
+    <section class="aco-smoke-page__outro" aria-labelledby="outro-title">
+      <h2 id="outro-title" class="aco-smoke-page__outro-title">What this fixture proves</h2>
+      <p>
+        The stage uses the story world space, the seed-42/30-city default run, and the scene
+        labels from <code>ACO_SCENES.emergence</code>. All text — labels, the ranked probability
+        list, the chart caption, and the metrics — stays in the DOM. The canvas draws geometry
+        only.
+      </p>
+      <p>
+        This page stays in the production build as the Step 3.2 fixture and is excluded from the
+        sitemap. The story route, prose, and lab controls arrive in Steps 3.3–3.5.
+      </p>
+      <p>
+        <a href="/">Back to the home page</a>
+      </p>
+    </section>
+  </div>
+</BaseLayout>
+
+<style>
+  .aco-smoke-page {
+    padding-block: var(--space-2xl) var(--space-3xl);
+  }
+
+  .aco-smoke-page__intro {
+    max-inline-size: var(--measure-prose);
+    padding-block-end: var(--space-lg);
+  }
+
+  .aco-smoke-page__title {
+    margin-block-start: var(--space-sm);
+    font-size: var(--text-h1);
+    letter-spacing: var(--tracking-tighter);
+  }
+
+  .aco-smoke-page__dek {
+    margin-block-start: var(--space-md);
+    color: var(--color-paper-muted);
+    font-size: var(--text-lead);
+    line-height: var(--leading-relaxed);
+  }
+
+  .aco-smoke-page__outro {
+    max-inline-size: var(--measure-prose);
+    margin-block-start: var(--space-2xl);
+    padding-block-start: var(--space-xl);
+    border-block-start: var(--hairline) solid var(--color-rule-paper);
+  }
+
+  .aco-smoke-page__outro-title {
+    margin-block: var(--space-sm) var(--space-md);
+    font-size: var(--text-h2);
+  }
+
+  .aco-smoke-page__outro p {
+    line-height: var(--leading-relaxed);
+  }
+
+  .aco-smoke-page__outro p + p {
+    margin-block-start: var(--space-md);
+  }
+</style>

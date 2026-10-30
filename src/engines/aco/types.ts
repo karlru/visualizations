@@ -148,6 +148,41 @@ export interface AcoParams {
 }
 
 /**
+ * One completed iteration in the convergence history.
+ *
+ * `bestLength` is the best tour found up to and including this iteration, so the
+ * series is non-increasing. `meanLength` is the mean of this iteration's tours.
+ * Both are in the same normalized problem units as {@link AcoSnapshot.bestLength}.
+ */
+export interface AcoHistoryPoint {
+  /** Completed iteration number, starting at 1. */
+  readonly iteration: number;
+
+  /** Best tour length found so far at this iteration. */
+  readonly bestLength: number;
+
+  /** Mean tour length of this iteration. */
+  readonly meanLength: number;
+}
+
+/**
+ * A bounded, chronological best/mean history for the convergence chart.
+ *
+ * The engine retains at most `capacity` points (512 in release 1). The array is
+ * stable and mutated in place: the convergence chart may hold the reference and
+ * read it at UI frequency, but must not mutate it. Once the cap is reached the
+ * oldest point is dropped, so `points[0]` is the oldest retained iteration and
+ * `points[points.length - 1]` is the newest.
+ */
+export interface AcoHistory {
+  /** Maximum retained points; fixed for the engine's lifetime. */
+  readonly capacity: number;
+
+  /** Chronological points, oldest first. Length is at most `capacity`. */
+  readonly points: readonly AcoHistoryPoint[];
+}
+
+/**
  * Per-ant data for one rendered frame.
  *
  * The engine completes a whole tour per ant in one iteration. The renderer
@@ -229,6 +264,15 @@ export interface AcoSnapshot {
   readonly entropy: number;
 
   /**
+   * Bounded best/mean history, one point per completed iteration.
+   *
+   * The history object and its `points` array are stable and updated in place,
+   * so the convergence chart can read them without a per-frame copy. A reset or
+   * structural parameter change clears the history.
+   */
+  readonly history: AcoHistory;
+
+  /**
    * Simulated-time fraction accumulated toward the next iteration, in `[0, 1)`.
    * Presentation only. At 1 the engine has already run the iteration and the
    * fraction has wrapped.
@@ -264,6 +308,14 @@ export interface AcoMetrics {
 
   /** Normalized pheromone entropy in `[0, 1]`. */
   readonly entropy: number;
+
+  /**
+   * Fresh copy of the bounded best/mean history, oldest first.
+   *
+   * Metrics may allocate; callers should read this on chapter entry, pause,
+   * replay, a parameter change, or a slow timer — never once per frame.
+   */
+  readonly history: readonly AcoHistoryPoint[];
 
   /** Colony size. */
   readonly antCount: number;

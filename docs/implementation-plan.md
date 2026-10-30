@@ -93,6 +93,9 @@ git --version
 │  ├─ capture-runtime.mjs
 │  └─ build-figures.mjs
 ├─ src/
+│  ├─ assets/
+│  │  └─ figures/
+│  │     └─ aco-best-tour.svg
 │  ├─ pages/
 │  │  ├─ index.astro
 │  │  ├─ stories/index.astro
@@ -103,6 +106,7 @@ git --version
 │  │  ├─ rss.xml.ts
 │  │  ├─ og/[...slug].png.ts
 │  │  └─ dev/
+│  │     ├─ aco-smoke.astro
 │  │     ├─ canvas-smoke.astro
 │  │     ├─ pulse-smoke.astro
 │  │     ├─ story-smoke.astro
@@ -125,6 +129,8 @@ git --version
 │  │  │  ├─ StageChrome.svelte
 │  │  │  ├─ story-runtime-debug.ts
 │  │  │  ├─ ConvergenceChart.svelte
+│  │  │  ├─ ProbabilityFanSummary.svelte
+│  │  │  ├─ AcoSmokeHarness.svelte
 │  │  │  └─ ArticleModeToggle.svelte
 │  │  ├─ controls/
 │  │  │  ├─ Slider.svelte
@@ -162,11 +168,13 @@ git --version
 │  │  │  ├─ Canvas2DRenderer.ts
 │  │  │  ├─ camera.ts
 │  │  │  ├─ layers/
+│  │  │  │  ├─ common.ts
 │  │  │  │  ├─ graph.ts
 │  │  │  │  ├─ pheromone.ts
 │  │  │  │  ├─ ants.ts
 │  │  │  │  ├─ best-tour.ts
-│  │  │  │  └─ probability-fan.ts
+│  │  │  │  ├─ probability-fan.ts
+│  │  │  │  └─ index.ts
 │  │  │  └─ theme.ts
 │  │  └─ three/
 │  │     ├─ ThreeRenderer.ts
@@ -190,6 +198,8 @@ git --version
 │  │  ├─ aco/
 │  │  │  ├─ config.ts
 │  │  │  ├─ scenes.ts
+│  │  │  ├─ probability-fan.ts
+│  │  │  ├─ best-tour-figure.ts
 │  │  │  └─ annotations.ts
 │  │  └─ randu/
 │  │     ├─ config.ts
@@ -218,6 +228,7 @@ git --version
    │  ├─ clipboard.test.ts
    │  ├─ scene-composition.test.ts
    │  ├─ aco.test.ts
+   │  ├─ aco-render.test.ts
    │  ├─ randu.test.ts
    │  ├─ import-boundaries.test.ts
    │  ├─ story-loader.test.ts
@@ -229,6 +240,7 @@ git --version
       ├─ story-runtime-acceptance.spec.ts
       ├─ url-state.spec.ts
       ├─ aco.spec.ts
+      ├─ aco-renderer.spec.ts
       ├─ randu.spec.ts
       ├─ a11y.spec.ts
       ├─ responsive.spec.ts
@@ -930,6 +942,8 @@ Verified 2026-10-30 with `pnpm lint` and `pnpm test` (225 passing, 1 existing to
 
 Verified 2026-10-30 with `pnpm lint`, `pnpm test` (281 passing, 1 existing todo; 56 new engine tests), and `pnpm build`. `src/engines/aco/engine.ts` implements the complete Ant System: `τ₀ = 0.1` on every off-diagonal edge, construction with `p_ij ∝ τ_ij^α η_ij^β` and one seeded draw per next-city choice, deposit `Q / L_k`, evaporation then deposit, and normalized entropy with `E = n(n−1)/2`. `Q = 1`, the base rate (`1` iteration per simulated second), and the per-call/backlog caps (`2` and `8`) are exported constants. `stepIteration()` is the deterministic test/reduced-motion entry point; `step(dt)` converts simulated seconds into a pending-iteration budget, carries the fraction, runs at most two whole iterations per call, and counts trimmed whole backlog in `metrics().droppedIterations`. The fixed-step suite reaches identical tours and pheromone at 30, 60, and 120 fps. Structural fields (`cityCount`, `antCount`, `α`, `β`, `ρ`, `seed`) and `setCities()` restart at iteration 0 and clear best/mean history; `speed` changes apply without a reset, and a same-value `setParams` is a no-op. `transitionProbabilities(instance, pheromone, currentCity, allowed, alpha, beta, options?)` is exported for Step 3.2's fan and returns `{ cities, probabilities, count, uniform }`, with ascending candidate order and a uniform fallback for all-zero or non-finite weights. `AcoSnapshot` keeps stable references to cities, distances, the pheromone matrix, ant tour buffers, and the last best tour; ants are animated from `tour` plus the shared `iterationProgress`, so no graph is copied per frame. Best length starts from the first iteration's fastest ant; the nearest-neighbor baseline remains a separate `nearestNeighborTour` comparison. `src/engines/aco/presets.ts` carries the four documented parameter patches. `tests/unit/aco-engine.test.ts` covers valid tours, normalization, fallback, `ρ = 1`, non-increasing best, entropy with known distributions, determinism, structural/presentation resets, snapshot buffer reuse, collinear/coincident/one-city cases, frame-rate independence, and the workload cap.
 
+**Contract extension (Step 3.2):** `AcoSnapshot` now also carries `history: AcoHistory` — a stable, bounded (512-point) chronological best/mean series whose objects are pooled and reused, so the convergence chart can read it without a per-frame copy. `AcoMetrics.history` is a fresh low-frequency copy. Reset, structural parameter changes, and `setCities()` clear the series. `src/engines/aco/types.ts` documents the shape; `tests/unit/aco-render.test.ts` covers the cap, determinism, stable references, reset, and copy isolation.
+
 ### (DONE) Step 2.3 — ACO correctness tests
 
 **Goal:** Confidence that the visual result is mathematically trustworthy.
@@ -991,7 +1005,7 @@ Verified 2026-10-30 with `pnpm lint`, `pnpm test` (308 passing, 1 existing todo;
 
 Verified 2026-10-30 with `pnpm lint`, `pnpm test` (331 passing, 1 existing todo; 23 new cases in `tests/unit/aco-story.test.ts`), and `pnpm build`. `src/stories/aco/config.ts` exports `acoStoryConfig` with slug `ant-colony-optimization`, renderer `canvas2d`, `createEngine: (params) => new AcoEngine(params)`, the exact defaults (30 cities, 40 ants, α 1, β 2, ρ 0.5, speed 1, seed 42; `Q` remains the engine's fixed constant), and the four documented preset patches spread from `ACO_PRESETS` so city count, ant count, seed, and speed are preserved. The URL schema matches `docs/requirements.md` §2.6.1: `seed` (integer, structural), `cities` → `cityCount` (2–150, structural), `ants` → `antCount` (1–200, structural), `alpha` (0–5, structural), `beta` (0–10, structural), `rho` (0–1, structural), `speed` (0.5/1/2/4, presentation), and a `{ source: 'fragment' }` chapter. `StoryConfig` gains an optional `speedControl`: omitted means the existing clock behaviour, while ACO declares `{ kind: 'engine', param: 'speed' }` so Step 3.3/3.5 write the engine's presentation multiplier and leave the clock at 1× instead of applying speed twice. `src/stories/aco/scenes.ts` defines ten scenes in the exact chapter order (the-colony → colony-overview, the-problem → tour-problem, one-ants-choice → focal-choice, the-probability-rule → probability-rule, leaving-a-trace → deposit, forgetting → evaporation, emergence → emergence, tuning-the-colony → tuning, when-it-fails → limits, the-lab → lab), each with a 2D camera, all five canvas layers (`graph`, `pheromone`, `ants`, `best-tour`, `probability-fan`), highlights, reveal, and DOM labels. `src/stories/aco/world.ts` fixes the story world space (normalized unit square × 6, centred on the origin); the focal camera pans to city 17 of the seed-42/30-city layout and the deposit/evaporation cameras follow the best-tour centroid after 40 iterations, both checked against the pure engine in the tests. The convergence chart is not a canvas layer: `AcoSceneDefinition.convergenceChart` is a documented story-level field for the DOM chart that Step 3.2 builds. `src/stories/aco/annotations.ts` holds a 20-entry catalogue keyed by stable id; every chapter's annotation ids resolve in its own scene labels and every catalogue entry is used. Tests cover the chapter↔scene bijection, canonical layers and opacity bounds, graph visibility, annotation resolution, preset patches, exact defaults, URL field mapping plus round-trip/validation, import side effects, 12-iteration determinism (tour, length, pheromone, metrics), 40-iteration world anchors, and `composeSceneState` at progress 0/0.5/1 including exact settlement at progress 1.
 
-### Step 3.2 — ACO renderer layers
+### (DONE) Step 3.2 — ACO renderer layers
 
 **Goal:** A polished 2D visualization of the colony.
 
@@ -1002,16 +1016,17 @@ Verified 2026-10-30 with `pnpm lint`, `pnpm test` (331 passing, 1 existing todo;
 3. (DONE) Draw ants as moving dots with short trails.
 4. (DONE) Draw the best tour in a distinct accent.
 5. (DONE) Draw the probability fan for the focal ant with the top N candidates (default N = 8) and an explicit "other (Σ)" bucket.
-6. Add a compact convergence chart as an SVG/DOM component, not as canvas text.
-7. Add layer toggles for debugging and for the lab.
-8. Ensure labels are DOM overlays, not canvas text.
-9. Ensure the best tour has a weight/pattern difference in addition to color.
-10. Add `scripts/build-figures.mjs` to generate the static ACO best-tour figure for article/no-JS mode by importing the engine with a fixed seed and writing an SVG.
+6. (DONE) Add a compact convergence chart as an SVG/DOM component, not as canvas text.
+7. (DONE) Add layer toggles for debugging and for the lab.
+8. (DONE) Ensure labels are DOM overlays, not canvas text.
+9. (DONE) Ensure the best tour has a weight/pattern difference in addition to color.
+10. (DONE) Add `scripts/build-figures.mjs` to generate the static ACO best-tour figure for article/no-JS mode by importing the engine with a fixed seed and writing an SVG.
 
 **Commands**
 
 ```bash
 pnpm add d3-scale d3-shape d3-color
+pnpm add -D @types/d3-scale @types/d3-shape @types/d3-color tsx
 ```
 
 **Files**
@@ -1023,14 +1038,17 @@ pnpm add d3-scale d3-shape d3-color
 
 **Acceptance criteria**
 
-- [ ] Cities, edges, pheromone, ants, best tour, and probability fan are visible.
-- [ ] The probability fan labels sum to 1 and the textual alternative lists the top candidates plus the "other" bucket.
-- [ ] Pheromone intensity is readable at early and late iterations.
-- [ ] The best tour is distinguishable without relying on color alone.
-- [ ] The convergence chart updates.
-- [ ] Layer toggles work.
-- [ ] The scene remains legible on a dark stage and at 360 px.
-- [ ] `scripts/build-figures.mjs` produces the static best-tour SVG used by article/no-JS mode.
+- [x] Cities, edges, pheromone, ants, best tour, and probability fan are visible.
+- [x] The probability fan labels sum to 1 and the textual alternative lists the top candidates plus the "other" bucket.
+- [x] Pheromone intensity is readable at early and late iterations.
+- [x] The best tour is distinguishable without relying on color alone.
+- [x] The convergence chart updates.
+- [x] Layer toggles work.
+- [x] The scene remains legible on a dark stage and at 360 px.
+- [x] `scripts/build-figures.mjs` produces the static best-tour SVG used by article/no-JS mode.
+
+Verified 2026-10-30 with `pnpm lint`, `pnpm test` (355 passing, 1 existing todo; 24 new cases in `tests/unit/aco-render.test.ts`), `pnpm build`, and `CI=1 pnpm exec playwright test tests/e2e/aco-renderer.spec.ts` (3 passing). `src/render/canvas2d/layers/` adds the graph, pheromone, ants, best-tour, and probability-fan layers plus `createAcoLayers()`; every layer guards `visible`/opacity, reads the story world space (`ACO_WORLD_SCALE = 6`), converts CSS-pixel widths through the camera zoom, and draws no text. The graph batches all `n(n−1)/2` candidate edges into one path and reveals a deterministic prefix. Pheromone uses `t = ln(1 + τ/τ₀) / ln(1 + 32)` with width/alpha interpolation and a zero floor, bucketed into twenty batched paths on a theme-cached d3-color ramp. Ants interpolate `progress × n` along the tour (wrapping the return edge), use one reusable trail buffer, and skip `visitedCount === 0`. The best tour combines an amber halo, an accent dashed line, and square markers; its length stays in the DOM metrics. `src/stories/aco/probability-fan.ts` delegates to `transitionProbabilities`/`buildTransitionWeights`, names the top 8 candidates plus the other bucket with an exact normalized total, and feeds both the canvas arcs and `ProbabilityFanSummary.svelte`. The engine now exposes a bounded 512-point `AcoSnapshot.history` (stable array, pooled objects, no recording allocation) and a fresh `AcoMetrics.history` copy; `ConvergenceChart.svelte` plots both series with d3-scale/d3-shape and a visible caption/description. `/dev/aco-smoke` renders the real engine with `ACO_SCENES.emergence`, five layer toggles, play/pause/replay, zoom buttons, the fan summary, chart, and metrics; the E2E spec checks console cleanliness, both chart series, the fan total, a canvas hash change after a toggle without remounting, and the 360 px layout. The committed figure is `src/assets/figures/aco-best-tour.svg`, generated deterministically by `node --import tsx scripts/build-figures.mjs` from the same pure engine and intended for inline MDX use.
+
 
 ### Step 3.3 — ACO story prose
 
@@ -1944,8 +1962,8 @@ The custom domain (`https://visualizations.ruul.ee`) was attached in Step 0.6, `
 {
   "scripts": {
     "dev": "astro dev",
-    "build": "node scripts/build-figures.mjs && astro check && astro build",
-    "build:figures": "node scripts/build-figures.mjs",
+    "build": "node --import tsx scripts/build-figures.mjs && astro check && astro build",
+    "build:figures": "node --import tsx scripts/build-figures.mjs",
     "preview": "astro preview",
     "lint": "biome check . && astro check",
     "format": "biome format --write .",
@@ -1961,6 +1979,8 @@ The custom domain (`https://visualizations.ruul.ee`) was attached in Step 0.6, `
   }
 }
 ```
+
+`build:figures` runs through `node --import tsx` so the build script can import the pure TypeScript engine and figure renderer without duplicating their logic in JavaScript. `tsx` is a dev-only executable: it runs at build time and is never part of a browser bundle. The ACO figure is written to `src/assets/figures/aco-best-tour.svg` for inline MDX use.
 
 ### Appendix B — Astro configuration skeleton
 

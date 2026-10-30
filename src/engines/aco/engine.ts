@@ -48,7 +48,7 @@
 import { normalizeSeed, SeededRandom } from '../core/rng';
 import type { Engine } from '../core/types';
 import { createTspInstance, createTspInstanceFromCities } from './tsp';
-import type { AcoMetrics, AcoParams, AcoSnapshot, City, TspInstance } from './types';
+import type { AcoHistory, AcoMetrics, AcoParams, AcoSnapshot, City, TspInstance } from './types';
 
 /** Fixed deposit constant `Q` for release 1. */
 export const ACO_DEPOSIT_CONSTANT = 1;
@@ -85,6 +85,16 @@ export const MAX_ITERATIONS_PER_STEP = 2;
  * a long tab-away gap cannot create a permanent catch-up spiral.
  */
 export const MAX_PENDING_ITERATIONS = 8;
+
+/**
+ * Maximum retained convergence-history points.
+ *
+ * One point per completed iteration means 512 points is over eight minutes at
+ * the default 1× speed and still a small, fixed allocation. The history is a
+ * ring-like sliding window: when full, the oldest point is reused so recording
+ * an iteration never allocates.
+ */
+export const ACO_HISTORY_CAPACITY = 512;
 
 /** Inclusive engine limits. The UI is narrower: 2–150 cities, 1–200 ants. */
 export const ACO_LIMITS = Object.freeze({
@@ -421,6 +431,13 @@ interface MutableAntSnapshot {
   visitedCount: number;
 }
 
+/** Internal mutable history point, reused from a fixed pool. */
+interface MutableAcoHistoryPoint {
+  iteration: number;
+  bestLength: number;
+  meanLength: number;
+}
+
 /** Internal snapshot with mutable fields. Consumers only see the readonly view. */
 interface MutableAcoSnapshot {
   iteration: number;
@@ -434,6 +451,7 @@ interface MutableAcoSnapshot {
   bestLength: number | null;
   meanLength: number | null;
   entropy: number;
+  history: AcoHistory;
   iterationProgress: number;
   iterationsPerSecond: number;
   speed: number;
@@ -550,6 +568,12 @@ export class AcoEngine implements Engine<AcoParams, AcoSnapshot, AcoMetrics> {
   private pendingIterations = 0;
   private droppedIterations = 0;
 
+  /** Fixed pool of history point objects; recording never allocates. */
+  private readonly historyPool: MutableAcoHistoryPoint[];
+  /** Chronological view, oldest first. References objects from `historyPool`. */
+  private readonly historyPoints: MutableAcoHistoryPoint[] = [];
+  private readonly historyValue: AcoHistory;
+
   private readonly snapshotValue: MutableAcoSnapshot;
 
   /**
@@ -569,6 +593,16 @@ export class AcoEngine implements Engine<AcoParams, AcoSnapshot, AcoMetrics> {
     this.probabilities = createTransitionProbabilities(size);
     this.ants = createAntSnapshots(normalized.antCount, size);
 
+    this.historyPool = Array.from({ length: ACO_HISTORY_CAPACITY }, () => ({
+      iteration: 0,
+      bestLength: 0,
+      meanLength: 0,
+    }));
+    this.historyValue = {
+      capacity: ACO_HISTORY_CAPACITY,
+      points: this.historyPoints,
+    };
+
     this.snapshotValue = {
       iteration: 0,
       cityCount: size,
@@ -581,6 +615,7 @@ export class AcoEngine implements Engine<AcoParams, AcoSnapshot, AcoMetrics> {
       bestLength: null,
       meanLength: null,
       entropy: 1,
+      history: this.historyValue,
       iterationProgress: 0,
       iterationsPerSecond: BASE_ITERATIONS_PER_SECOND,
       speed: normalized.speed,
@@ -728,6 +763,7 @@ export class AcoEngine implements Engine<AcoParams, AcoSnapshot, AcoMetrics> {
     this.updatePheromone();
     this.entropy = normalizedPheromoneEntropy(this.instance, this.pheromone);
     this.iteration += 1;
+    this.recordHistory();
     this.publish();
   }
 
@@ -743,6 +779,11 @@ export class AcoEngine implements Engine<AcoParams, AcoSnapshot, AcoMetrics> {
       bestLength: this.bestLength,
       meanLength: this.meanLength,
       entropy: this.entropy,
+      history: this.historyPoints.map((point) => ({
+        iteration: point.iteration,
+        bestLength: point.bestLength,
+        meanLength: point.meanLength,
+      })),
       antCount: this.ants.length,
       cityCount: this.instance.cityCount,
       pendingIterations: this.pendingIterations,
@@ -774,7 +815,34 @@ export class AcoEngine implements Engine<AcoParams, AcoSnapshot, AcoMetrics> {
     this.entropy = 1;
     this.pendingIterations = 0;
     this.droppedIterations = 0;
+    this.historyPoints.length = 0;
     this.publish();
+  }
+
+  /**
+   * Append the just-completed iteration to the bounded history.
+   *
+   * Objects come from `historyPool`; once the window is full the oldest entry is
+   * moved to the end and overwritten. No allocation happens on this path, so
+   * recording history cannot add per-frame garbage.
+   */
+  private recordHistory(): void {
+    let point: MutableAcoHistoryPoint;
+    if (this.historyPoints.length < ACO_HISTORY_CAPACITY) {
+      const pooled = this.historyPool[this.historyPoints.length];
+      if (pooled === undefined) return;
+      point = pooled;
+      this.historyPoints.push(point);
+    } else {
+      const oldest = this.historyPoints.shift();
+      if (oldest === undefined) return;
+      point = oldest;
+      this.historyPoints.push(point);
+    }
+
+    point.iteration = this.iteration;
+    point.bestLength = this.bestLength ?? 0;
+    point.meanLength = this.meanLength ?? 0;
   }
 
   /** Reallocate buffers after the city set, ant count, or seed changed. */

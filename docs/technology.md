@@ -208,6 +208,17 @@ The project needs scales, color interpolation, line/area generators, and simple 
 - Small d3 color/interpolation modules provide palette interpolation where needed.
 - Custom canvas and Three.js code handles the rest.
 
+**Release-1 dependency roles (NFR-08):**
+
+| Package | Role | Shipped? |
+|---|---|---|
+| `d3-scale` | Linear axes for the ACO convergence chart. | Yes, in the story island. |
+| `d3-shape` | Best/mean line generators for the convergence chart. | Yes, in the story island. |
+| `d3-color` | Parses token colours and builds the cached pheromone intensity ramp on the canvas. | Yes, in the ACO island. |
+| `tsx` (dev) | Runs `scripts/build-figures.mjs` with its TypeScript engine imports at build time. | No; never in a browser bundle. |
+
+No charting framework, DOM-join library, or global state library is added.
+
 This keeps the bundle small and avoids mixing D3's DOM paradigm with imperative rendering.
 
 ### 3.11 KaTeX at build time
@@ -403,6 +414,8 @@ The point-count control counts rendered triples and generates `triples + 2` outp
 The static HTML default is the article layout. The stage is an enhancement inserted after hydration. With JavaScript disabled, there is no empty stage; `<Predict>` is built on `<details>/<summary>`; all prose, formulas, and static figures remain visible.
 
 A build-time `scripts/build-figures.mjs` imports the engines with fixed seeds and writes the ACO best-tour figure and the RANDU 2D projections. These figures are referenced by MDX, so article and no-JS modes have real figures rather than client-only canvases.
+
+The script runs through `node --import tsx`; `tsx` is a dev-only executable that executes the TypeScript engine imports and never ships to the browser. The ACO figure is committed at `src/assets/figures/aco-best-tour.svg` and imported inline, so it participates in the no-JS HTML and inherits the page's colour tokens. The output is deterministic: fixed seed and iteration count, locale-independent number formatting, and no timestamps.
 
 ### 3.24 Licensing, analytics, and operations
 
