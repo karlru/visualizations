@@ -16,9 +16,16 @@
  * is kept in the typed object so the seed control exercises the same contract
  * the ACO and RANDU stories will use. Changing it is a reader action that
  * restarts the run; the controller owns that reset.
+ *
+ * Step 1.8 adds `variant` as a structural string enum. The fixture renders the
+ * same orbit for both values; the field exists so the URL contract can be
+ * exercised end-to-end with a real enum, exactly as RANDU's generator will be.
  */
 
 import type { Engine } from '../../engines/core/types';
+
+/** Structural run variant. Both values are deterministic. */
+export type SmokeVariant = 'orbit' | 'spiral';
 
 export interface SmokeParams {
   readonly speed: number;
@@ -28,6 +35,8 @@ export interface SmokeParams {
   readonly trails: boolean;
   /** Reproducible run identity. Unused by this fixture; still typed. */
   readonly seed: number;
+  /** Structural enum used to exercise URL state and chapter restarts. */
+  readonly variant: SmokeVariant;
 }
 
 export interface SmokeSnapshot {

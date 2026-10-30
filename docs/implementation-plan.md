@@ -203,6 +203,7 @@ git --version
    │  ├─ rng.test.ts
    │  ├─ clock.test.ts
    │  ├─ url-state.test.ts
+   │  ├─ clipboard.test.ts
    │  ├─ scene-composition.test.ts
    │  ├─ aco.test.ts
    │  ├─ randu.test.ts
@@ -212,6 +213,7 @@ git --version
       ├─ smoke.spec.ts
       ├─ site.spec.ts
       ├─ story-runtime.spec.ts
+      ├─ url-state.spec.ts
       ├─ aco.spec.ts
       ├─ randu.spec.ts
       ├─ a11y.spec.ts
@@ -771,36 +773,45 @@ Verified 2026-10-30 with `pnpm lint`, `pnpm test`, `pnpm build`, `pnpm check:lin
 
 Verified 2026-10-30 with `pnpm lint`, `pnpm test` (139 passing, 1 existing todo), `pnpm build`, `pnpm check:links` (54 internal references across 6 HTML files), and `CI=1 pnpm test:e2e` (56 Playwright tests). The article is the SSR default: `StoryController` renders the progress rail and chapter children, but no stage, controls, metrics, or article toggle until `onMount` sets `data-story-enhanced="true"`. The two-column/sticky layout and 110svh chapter ranges are gated on `[data-story-enhanced="true"][data-article-mode="false"]`; the no-JS and article layouts stay compact. `ArticleModeToggle` removes the stage from the DOM (not just visually) and persists `algorithm-stories.article-mode` (`article`/`stage`); the manual motion choice persists as `algorithm-stories.reduced-motion` (`reduced`/`full`). Both reads and writes go through `src/lib/persistence.ts`, which collapses missing/throwing storage to "no preference"; the storage-failure E2E overrides `window.localStorage` with a throwing getter and still toggles modes. `src/lib/motion-policy.ts` makes the OS preference authoritative: the manual toggle can only add reduced motion, and it is checked and disabled with a visible explanation when the OS asks for reduce. A `matchMedia` change listener pauses at runtime, settles the active chapter on its final keyframe, and re-applies the Lenis override. Reduced motion starts paused, ignores scroll progress for camera/reveal composition, and steps through `ChapterSpec.reducedMotionSteps` keyframes with the stage's back/forward controls; replay stays paused. `ScrollDirector.setReducedMotionOverride()` and `html[data-reduced-motion="true"]` remove Lenis and CSS smooth scrolling for a manual reduction too. `Predict.astro` is native `<details>/<summary>`; the dev page now carries real prose, a static formula, an inline SVG tour figure, a DOI citation, and the prediction in the no-JS article. The reduced-motion and article-mode axe scans are clean, and the earlier controls spec now tabs through the three added controls (step back, motion toggle, article toggle) instead of a fixed 12-stop walk.
 
-### Step 1.8 — URL state and sharing
+### (DONE) Step 1.8 — URL state and sharing
 
 **Goal:** Shareable, restorable story state.
 
 **Tasks**
 
-1. Create a typed URL-state module with serialize, parse, validate, and clamp.
-2. Define per-story parameter schemas and defaults, including generator identity for RANDU.
-3. Use the path for the story slug, the query for parameters/seed, and the `#chapter-id` fragment for the chapter. The fragment is canonical.
-4. Update the URL with `replaceState` on parameter and chapter changes, debounced. Do not add history entries.
-5. Implement a share button that copies the canonical absolute URL.
-6. Restore the starting state (chapter, seed, structural parameters) on load. City-map edits are not shared; the UI says so.
-7. Clamp or reject invalid values according to the validation table in `docs/requirements.md` §2.6.1.
-8. Add unit tests, a table-driven validation test, and an E2E reload test.
+1. (DONE) Create a typed URL-state module with serialize, parse, validate, and clamp.
+2. (DONE) Define per-story parameter schemas and defaults, including generator identity for RANDU.
+3. (DONE) Use the path for the story slug, the query for parameters/seed, and the `#chapter-id` fragment for the chapter. The fragment is canonical.
+4. (DONE) Update the URL with `replaceState` on parameter and chapter changes, debounced. Do not add history entries.
+5. (DONE) Implement a share button that copies the canonical absolute URL.
+6. (DONE) Restore the starting state (chapter, seed, structural parameters) on load. City-map edits are not shared; the UI says so.
+7. (DONE) Clamp or reject invalid values according to the validation table in `docs/requirements.md` §2.6.1.
+8. (DONE) Add unit tests, a table-driven validation test, and an E2E reload test.
 
 **Files**
 
 - `src/engines/core/url-state.ts`
 - `src/lib/clipboard.ts`
+- `src/components/story/StoryController.svelte`
+- `src/components/story/StageChrome.svelte`
+- `src/stories/registry.ts`
+- `src/stories/dev/config.ts`
+- `src/stories/dev/canvas-smoke-engine.ts`
 - `tests/unit/url-state.test.ts`
+- `tests/unit/clipboard.test.ts`
+- `tests/e2e/url-state.spec.ts`
 
 **Acceptance criteria**
 
-- [ ] Serialize/parse round-trips for every parameter, including the chapter fragment.
-- [ ] Invalid values follow the validation table and show a notice where required.
-- [ ] Reloading a shared URL restores the same starting state.
-- [ ] A share taken after a city edit restores the seeded map and the UI discloses that map edits are local.
-- [ ] The share button copies an absolute URL.
-- [ ] Repeated slider and chapter changes do not flood browser history.
-- [ ] No secrets or personal data are encoded.
+- [x] Serialize/parse round-trips for every parameter, including the chapter fragment.
+- [x] Invalid values follow the validation table and show a notice where required.
+- [x] Reloading a shared URL restores the same starting state.
+- [x] A share taken after a city edit restores the seeded map and the UI discloses that map edits are local.
+- [x] The share button copies an absolute URL.
+- [x] Repeated slider and chapter changes do not flood browser history.
+- [x] No secrets or personal data are encoded.
+
+Verified 2026-10-30 with `pnpm lint`, `pnpm test` (185 passing, 1 existing todo), `pnpm build`, `pnpm check:links`, and `CI=1 pnpm test:e2e` (61 Playwright tests). `src/engines/core/url-state.ts` owns the `UrlParamSpec`/`UrlParameterSchema` contracts (re-exported by `src/stories/registry.ts`) and implements canonical query serialization, typed parsing, clamping, and structured notices. The dev story declares `seed` (integer 0–4,294,967,295, structural), `orbit` (0.4–2.4), `variant` (`orbit`/`spiral`, structural), and `trails` (boolean); `story.defaults` remains the single source of defaults and is passed to the serializer so default fields are omitted from canonical URLs. The stage Speed control is the clock's playback rate and is intentionally not part of the shared run identity; the dev config's `speed` field remains the engine's internal chapter rate. `StoryController` parses the URL before building the engine, applies only accepted explicit values on top of chapter entry, resolves a valid fragment after layout measurement, and updates `?query#fragment` through a 180 ms debounced `replaceState`; unrelated query fields such as the `?lenis=off` test switch stay in the live address bar but are excluded from share links. Share copies an absolute URL built from `SITE_URL` plus the current path, with the canonical query and chapter fragment, through `src/lib/clipboard.ts` (Clipboard API with a hidden-textarea `execCommand` fallback; failures resolve instead of throwing). Notices render once in a polite `role="status"` region, never per frame. The dev fixture has no editable city map yet, so the city-edit criterion is verified through the visible disclosure that map edits are local, the seeded default map, and the share/reload test; the ACO lab will exercise the same disclosure with real edits.
 
 ### Step 1.9 — Story runtime acceptance gate
 

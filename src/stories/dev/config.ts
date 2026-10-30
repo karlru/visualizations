@@ -40,7 +40,11 @@ export const devStoryConfig = defineStoryConfig<SmokeParams, SmokeSnapshot, Smok
   slug: 'story-smoke',
   rendererId: 'canvas2d',
   createEngine: (params) => new SmokeEngine(params),
-  defaults: { speed: 1, orbit: 1, trails: true, seed: 20_261_030 },
+  // Defaults are the single source of starting values. `speed` is the engine's
+  // internal time scale (chapters may override it); the stage Speed control is
+  // the clock's playback rate and is deliberately not part of the shared run
+  // identity, so it has no URL field.
+  defaults: { speed: 1, orbit: 1, trails: true, seed: 20_261_030, variant: 'orbit' },
   presets: [
     {
       id: 'default',
@@ -173,7 +177,45 @@ export const devStoryConfig = defineStoryConfig<SmokeParams, SmokeSnapshot, Smok
     },
   ],
   urlParams: {
-    params: [],
+    // Query fields follow docs/requirements.md §2.6.1. Seed and variant define
+    // the run; orbit and trails are presentation state. Defaults are omitted
+    // from canonical URLs, so the default share is the chapter fragment alone.
+    params: [
+      {
+        kind: 'integer',
+        key: 'seed',
+        query: 'seed',
+        structural: true,
+        min: 0,
+        max: 4_294_967_295,
+        label: 'Seed',
+      },
+      {
+        kind: 'number',
+        key: 'orbit',
+        query: 'orbit',
+        structural: false,
+        min: 0.4,
+        max: 2.4,
+        step: 0.05,
+        label: 'Orbit radius',
+      },
+      {
+        kind: 'enum',
+        key: 'variant',
+        query: 'variant',
+        structural: true,
+        values: ['orbit', 'spiral'] as const,
+        label: 'Variant',
+      },
+      {
+        kind: 'boolean',
+        key: 'trails',
+        query: 'trails',
+        structural: false,
+        label: 'Ant trails',
+      },
+    ],
     chapter: { source: 'fragment' },
   },
 });

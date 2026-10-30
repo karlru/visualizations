@@ -273,6 +273,7 @@ test.describe('story runtime', () => {
         document.querySelector<HTMLElement>('[data-story-controller]')?.dataset.activeChapter ===
         'pulling-back',
     );
+    await page.waitForFunction(() => window.location.hash === '#pulling-back');
     expect(await page.evaluate(() => window.location.hash)).toBe('#pulling-back');
 
     expect(errors).toEqual([]);

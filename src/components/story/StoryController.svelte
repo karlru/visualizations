@@ -30,13 +30,20 @@
    */
 
   import { onDestroy, onMount, type Snippet } from 'svelte';
+  import { SITE_URL } from '../../config/site';
   import { FixedStepClock } from '../../engines/core/clock';
   import type { Engine } from '../../engines/core/types';
+  import {
+    parseUrlState,
+    serializeUrlState,
+    type UrlStateNotice,
+  } from '../../engines/core/url-state';
   import {
     type ChapterSceneOverrides,
     parseChapterSceneOverrides,
     type RailChapterInfo,
   } from '../../lib/chapter-metadata';
+  import { shareUrl } from '../../lib/clipboard';
   import {
     parseStoredMotionPreference,
     resolveMotionPreference,
@@ -132,6 +139,9 @@
   let manualReducedMotion = $state(false);
   let sceneStep = $state(0);
   let persistenceAvailable = $state(false);
+  let urlNotices = $state<readonly UrlStateNotice[]>([]);
+  let shareStatus = $state<{ readonly ok: boolean; readonly message: string } | null>(null);
+  let sharing = $state(false);
   let metricItems = $state<readonly MetricItem[]>([
     { id: 'sim-time', label: 'Simulated time', value: '0.0 s' },
     { id: 'steps', label: 'Fixed steps', value: '0' },
@@ -156,6 +166,16 @@
   let cleanupDone = false;
   let listeners: AbortController | null = null;
   let initialHash = '';
+  let urlChapter: string | null = null;
+  let chapterIds: readonly string[] = [];
+  let urlSyncTimer: number | null = null;
+
+  /** Query fields that may stay in the address bar but are never story state. */
+  const RESERVED_QUERY_KEYS: ReadonlySet<string> = new Set([
+    '__proto__',
+    'prototype',
+    'constructor',
+  ]);
 
   let activeIndex = $derived(
     activeChapterId === null
@@ -215,6 +235,99 @@
     }
   }
 
+  /**
+   * Chapter ids for URL validation. The DOM is the runtime source of truth;
+   * the typed config is the fallback before chapters are measured.
+   */
+  function readChapterIds(): readonly string[] {
+    if (root !== null) {
+      const ids = Array.from(
+        root.querySelectorAll<HTMLElement>(chapterSelector),
+        (element) => element.id,
+      ).filter((id) => id.length > 0);
+      if (ids.length > 0) return ids;
+    }
+    return story.chapters.map((chapter) => chapter.id);
+  }
+
+  /** The canonical story query + fragment for the current state. */
+  function canonicalUrlState() {
+    return serializeUrlState(story.urlParams, params, activeChapterId ?? urlChapter, {
+      defaults: story.defaults,
+      chapterIds,
+    });
+  }
+
+  /**
+   * Replace the address bar with the canonical story state. Unrelated query
+   * fields (for example the development-only `?lenis=off` switch) are kept in
+   * the live URL but never appear in a share link.
+   */
+  function syncUrlNow(): void {
+    if (!mounted) return;
+    if (urlSyncTimer !== null) {
+      window.clearTimeout(urlSyncTimer);
+      urlSyncTimer = null;
+    }
+
+    const serialized = canonicalUrlState();
+    const merged = new URLSearchParams(serialized.query);
+    const knownQueries = new Set(story.urlParams.params.map((param) => param.query));
+    for (const [key, value] of new URLSearchParams(window.location.search)) {
+      if (knownQueries.has(key) || RESERVED_QUERY_KEYS.has(key)) continue;
+      merged.append(key, value);
+    }
+
+    const search = merged.toString();
+    const relative = `${search.length > 0 ? `?${search}` : ''}${serialized.fragment}`;
+    const next = `${window.location.pathname}${relative}`;
+    const current = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    if (next === current) return;
+
+    // replaceState adds no history entry and does not scroll. `state` is
+    // preserved for other routers or future history consumers.
+    window.history.replaceState(window.history.state, '', next);
+  }
+
+  /** Debounced canonical URL update. Slider and chapter bursts collapse. */
+  function scheduleUrlSync(delay = 180): void {
+    if (!mounted) return;
+    if (urlSyncTimer !== null) window.clearTimeout(urlSyncTimer);
+    urlSyncTimer = window.setTimeout(() => {
+      urlSyncTimer = null;
+      syncUrlNow();
+    }, delay);
+  }
+
+  /** Absolute share URL using the configured site origin, not the dev origin. */
+  function canonicalAbsoluteUrl(): string {
+    const serialized = canonicalUrlState();
+    const base = new URL(SITE_URL);
+    const url = new URL(window.location.pathname, base);
+    url.search = serialized.query;
+    url.hash = serialized.fragment;
+    return url.toString();
+  }
+
+  async function shareCurrentState(): Promise<void> {
+    if (sharing) return;
+    sharing = true;
+    const absolute = canonicalAbsoluteUrl();
+    const result = await shareUrl(absolute);
+    shareStatus = result.ok
+      ? {
+          ok: true,
+          message:
+            'Link copied. It restores this chapter, seed, orbit, variant, and trail setting. City-map edits stay local.',
+        }
+      : {
+          ok: false,
+          message:
+            'Could not copy the link. The address bar still holds the shareable URL.',
+        };
+    sharing = false;
+  }
+
   function writeDebug(): void {
     if (root === null) return;
     root.dataset.simTime = simulatedSeconds.toFixed(3);
@@ -225,6 +338,8 @@
     root.dataset.engineOrbit = params.orbit.toFixed(3);
     root.dataset.engineTrails = params.trails ? 'true' : 'false';
     root.dataset.engineSeed = String(params.seed);
+    root.dataset.engineVariant = params.variant;
+    root.dataset.urlNoticeCodes = urlNotices.map((notice) => notice.code).join(' ');
     root.dataset.preset = selectedPreset ?? 'custom';
     root.dataset.motion = reducedMotion ? 'reduced' : 'full';
     root.dataset.systemReducedMotion = systemReducedMotion ? 'true' : 'false';
@@ -395,6 +510,8 @@
         sceneStep = sceneStepCountFor(chapter) - 1;
         sampleMetrics(true);
         writeDebug();
+        urlChapter = chapter.id;
+        scheduleUrlSync();
       }
 
       applyScene(chapter, progress);
@@ -501,6 +618,7 @@
 
     writeDebug();
     sampleMetrics(true);
+    scheduleUrlSync();
   }
 
   function changeOrbit(next: number): void {
@@ -518,9 +636,15 @@
     if (preset === undefined) return;
 
     selectedPreset = id;
-    // A preset is relative to the story defaults, but the seed is the reader's
-    // run identity, not a preset field; keep it across preset changes.
-    const base: SmokeParams = { ...story.defaults, ...preset.params, seed: params.seed };
+    // A preset is relative to the story defaults, but the seed and structural
+    // variant are the reader's run identity, not preset fields; keep both
+    // across preset changes.
+    const base: SmokeParams = {
+      ...story.defaults,
+      ...preset.params,
+      seed: params.seed,
+      variant: params.variant,
+    };
     readerParams = { ...readerParams, ...preset.params };
     applyParams(base, { reset: true });
   }
@@ -739,13 +863,10 @@
 
   function navigateToChapter(id: string): void {
     if (!runtimeChapters.has(id)) return;
-    // The fragment is canonical (Step 1.8 completes the URL contract). Using
-    // replaceState avoids a history entry per chapter while keeping the link
-    // shareable and the controller state coherent.
-    const nextHash = `#${id}`;
-    if (window.location.hash !== nextHash) {
-      window.history.replaceState(null, '', nextHash);
-    }
+    // The fragment is canonical. Update it through the same debounced
+    // replaceState path as scrolling so history never grows per chapter.
+    urlChapter = id;
+    scheduleUrlSync();
     scrollToChapter(id);
   }
 
@@ -753,6 +874,7 @@
     if (!mounted) return;
     const id = readHash();
     if (id.length > 0 && runtimeChapters.has(id)) {
+      urlChapter = id;
       scrollToChapter(id);
     } else {
       director?.refresh();
@@ -800,6 +922,11 @@
       metricTimer = null;
     }
 
+    if (urlSyncTimer !== null) {
+      window.clearTimeout(urlSyncTimer);
+      urlSyncTimer = null;
+    }
+
     const instance = director;
     director = null;
     instance?.destroy();
@@ -845,6 +972,21 @@
     paused = systemReducedMotion || manualReducedMotion;
     document.documentElement.dataset.reducedMotion = paused ? 'true' : 'false';
 
+    // Parse the shareable starting state before constructing the engine. The
+    // URL describes the run's start, never a mid-run frame: values are clamped
+    // or rejected with notices here, and chapter entry below resets to step 0.
+    chapterIds = readChapterIds();
+    const parsedUrl = parseUrlState(
+      story.urlParams,
+      story.defaults,
+      window.location.href,
+      { chapterIds },
+    );
+    urlNotices = parsedUrl.notices;
+    urlChapter = parsedUrl.chapter;
+    params = { ...story.defaults, ...parsedUrl.explicit };
+    readerParams = { ...parsedUrl.explicit };
+
     engine = story.createEngine(params);
     clock = new FixedStepClock({ paused, speed });
     writeDebug();
@@ -880,6 +1022,12 @@
     instance.refresh();
     initialHash = readHash();
     resolveHash();
+    // A valid deep link is the canonical chapter even if the scroll trigger has
+    // not fired its first entry yet.
+    if (parsedUrl.chapter !== null) urlChapter = parsedUrl.chapter;
+    // Canonicalize any clamped/rejected URL fields after the first chapter
+    // entry has settled. The debounce folds the entry and this call together.
+    scheduleUrlSync();
 
     window.__scrollDirector = instance;
     window.__scrollDirectorDebug = () => instance.debugState();
@@ -946,6 +1094,7 @@
   data-engine-orbit={params.orbit.toFixed(3)}
   data-engine-trails={params.trails ? 'true' : 'false'}
   data-engine-seed={params.seed}
+  data-engine-variant={params.variant}
   data-preset={selectedPreset ?? 'custom'}
   data-sim-time="0.000"
   data-sim-frames="0"
@@ -996,11 +1145,15 @@
             systemReducedMotion={motionPreference.systemReduced}
             {sceneStep}
             sceneStepCount={activeSceneStepCount}
+            shareMessage={shareStatus?.message}
+            shareOk={shareStatus?.ok}
+            sharePending={sharing}
             onTogglePaused={togglePaused}
             onReplay={replay}
             onSpeedChange={changeSpeed}
             onStepScene={stepScene}
             onToggleReducedMotion={changeReducedMotion}
+            onShare={shareCurrentState}
           />
         </StoryStage>
       </div>
@@ -1018,6 +1171,17 @@
         </div>
       {/if}
 
+      {#if enhanced && urlNotices.length > 0}
+        <div class="story-notices" data-url-notices role="status" aria-live="polite">
+          <p class="story-notices__title">Shared link adjusted</p>
+          <ul class="story-notices__list">
+            {#each urlNotices as notice, index (index)}
+              <li class="story-notices__item" data-url-notice={notice.code}>{notice.message}</li>
+            {/each}
+          </ul>
+        </div>
+      {/if}
+
       {#if showStage}
         <section class="story-controls" aria-labelledby="story-controls-title" data-controls-panel>
           <div class="story-controls__head">
@@ -1025,6 +1189,11 @@
             <p class="story-controls__note">
               Changes apply live to the running simulation. Presets and the seed start a new run;
               the orbit and trail controls never recreate the runtime.
+            </p>
+            <p class="story-controls__note" data-share-scope>
+              <strong>Share links</strong> carry the chapter fragment, seed, orbit, variant, and trail
+              setting. They restart at iteration 0. Canvas and city-map edits stay local and are not
+              included.
             </p>
           </div>
 
@@ -1090,3 +1259,36 @@
     </div>
   </div>
 </div>
+
+<style>
+  .story-notices {
+    display: grid;
+    gap: var(--space-3xs);
+    margin-block-end: var(--space-sm);
+    padding: var(--space-sm);
+    border: var(--hairline) solid var(--color-rule-paper);
+    border-inline-start: var(--rule-strong) solid var(--color-accent-paper);
+    border-radius: var(--radius-sm);
+    background-color: var(--color-paper-inset);
+    color: var(--color-ink);
+  }
+
+  .story-notices__title {
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    font-weight: var(--weight-medium);
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+  }
+
+  .story-notices__list {
+    display: grid;
+    gap: var(--space-3xs);
+    margin: 0;
+    padding-inline-start: var(--space-md);
+    color: var(--color-paper-muted);
+    font-size: var(--text-sm);
+    line-height: var(--leading-normal);
+  }
+</style>

@@ -6,7 +6,7 @@
   import StoryStage from './StoryStage.svelte';
   import type { StoryStageHandle } from './story-stage-types';
 
-  const params: SmokeParams = { speed: 1, orbit: 1, trails: true, seed: 1 };
+  const params: SmokeParams = { speed: 1, orbit: 1, trails: true, seed: 1, variant: 'orbit' };
   const engine = new SmokeEngine(params);
   const clock = new FixedStepClock({ maxSubsteps: 8 });
 

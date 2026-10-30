@@ -9,7 +9,23 @@
  */
 
 import type { Engine } from '../engines/core/types';
+import type { UrlParameterSchema } from '../engines/core/url-state';
 import type { CameraState, HighlightTarget, SceneLabel, SceneLayer } from '../render/types';
+
+/**
+ * URL parameter contracts live beside the engine URL-state implementation so
+ * the pure parser can use them without importing story configuration. They are
+ * re-exported here because a `StoryConfig` is their public authoring surface.
+ */
+export type {
+  BooleanUrlParam,
+  EnumUrlParam,
+  IntegerUrlParam,
+  NumberUrlParam,
+  StringUrlParam,
+  UrlParameterSchema,
+  UrlParamSpec,
+} from '../engines/core/url-state';
 
 /**
  * Renderer ids known to release 1. Any string is accepted so a future renderer
@@ -78,74 +94,6 @@ export interface ChapterSpec<P extends object> {
   readonly annotations?: readonly string[];
   readonly reducedMotionSteps?: number;
   readonly tourAct?: number;
-}
-
-interface UrlParamBase<P extends object, K extends keyof P & string> {
-  /** Parameter key in the story's typed parameter object. */
-  readonly key: K;
-  /** Query-string field name. The chapter is always the fragment, not a query. */
-  readonly query: string;
-  /** Structural changes restart the run at iteration 0; others apply live. */
-  readonly structural: boolean;
-  /** Human-readable name for notices such as "adjusted to X". */
-  readonly label?: string;
-}
-
-export interface IntegerUrlParam<P extends object, K extends keyof P & string>
-  extends UrlParamBase<P, K> {
-  readonly kind: 'integer';
-  readonly min: number;
-  readonly max: number;
-}
-
-export interface NumberUrlParam<P extends object, K extends keyof P & string>
-  extends UrlParamBase<P, K> {
-  readonly kind: 'number';
-  readonly min: number;
-  readonly max: number;
-  readonly step?: number;
-}
-
-export interface EnumUrlParam<P extends object, K extends keyof P & string>
-  extends UrlParamBase<P, K> {
-  readonly kind: 'enum';
-  readonly values: readonly P[K][];
-}
-
-export interface BooleanUrlParam<P extends object, K extends keyof P & string>
-  extends UrlParamBase<P, K> {
-  readonly kind: 'boolean';
-}
-
-export interface StringUrlParam<P extends object, K extends keyof P & string>
-  extends UrlParamBase<P, K> {
-  readonly kind: 'string';
-}
-
-/**
- * One declared URL field. The union is keyed by the parameter object, so a
- * spec cannot reference a parameter that does not exist; the value kind follows
- * the parameter's TypeScript type. Defaults live in `StoryConfig.defaults`, so
- * there is one source of truth for a run's starting values.
- *
- * Step 1.8 consumes these specs to serialize, parse, validate, and clamp.
- */
-export type UrlParamSpec<P extends object> = {
-  [K in keyof P & string]:
-    | (P[K] extends number
-        ? IntegerUrlParam<P, K> | NumberUrlParam<P, K> | EnumUrlParam<P, K>
-        : never)
-    | (P[K] extends string ? EnumUrlParam<P, K> | StringUrlParam<P, K> : never)
-    | (P[K] extends boolean ? BooleanUrlParam<P, K> : never);
-}[keyof P & string];
-
-/**
- * The story's URL contract: query parameters plus the canonical chapter
- * fragment. The slug is a path segment supplied by `StoryConfig.slug`.
- */
-export interface UrlParameterSchema<P extends object> {
-  readonly params: readonly UrlParamSpec<P>[];
-  readonly chapter: { readonly source: 'fragment' };
 }
 
 /**

@@ -26,6 +26,10 @@
     readonly onSpeedChange: (speed: number) => void;
     readonly onStepScene?: (direction: 1 | -1) => void;
     readonly onToggleReducedMotion?: (reduced: boolean) => void;
+    readonly onShare?: () => void;
+    readonly shareMessage?: string;
+    readonly shareOk?: boolean;
+    readonly sharePending?: boolean;
   }
 
   let {
@@ -42,6 +46,10 @@
     onSpeedChange,
     onStepScene,
     onToggleReducedMotion,
+    onShare,
+    shareMessage,
+    shareOk = true,
+    sharePending = false,
   }: Props = $props();
 
   const SPEEDS = [0.5, 1, 2, 4] as const;
@@ -167,6 +175,32 @@
     </p>
   {/if}
 
+  {#if onShare}
+    <button
+      type="button"
+      class="stage-chrome__button"
+      data-testid="stage-share"
+      aria-label="Share this story state"
+      disabled={sharePending}
+      onclick={onShare}
+    >
+      {sharePending ? 'Copying…' : 'Share'}
+    </button>
+  {/if}
+
+  {#if shareMessage}
+    <p
+      class="stage-chrome__share-status"
+      class:stage-chrome__share-status--error={!shareOk}
+      data-share-status
+      data-share-ok={shareOk ? 'true' : 'false'}
+      role="status"
+      aria-live="polite"
+    >
+      {shareMessage}
+    </p>
+  {/if}
+
   <details class="stage-chrome__details" data-testid="stage-details">
     <summary class="stage-chrome__summary">Details</summary>
     <div class="stage-chrome__panel">
@@ -194,6 +228,8 @@
       </dl>
       <p class="stage-chrome__note">
         Canvas 2D · DPR capped at 2 · simulation pauses when the stage leaves the viewport.
+        Share links carry the chapter, seed, orbit, variant, and trail setting; canvas map edits
+        stay local.
       </p>
     </div>
   </details>
@@ -325,6 +361,23 @@
     color: var(--color-stage-muted);
     font-size: var(--text-2xs);
     line-height: var(--leading-normal);
+  }
+
+  .stage-chrome__share-status {
+    flex-basis: 100%;
+    max-inline-size: 46ch;
+    margin: 0;
+    padding: var(--space-3xs) var(--space-2xs);
+    border: var(--hairline) solid var(--color-rule-stage);
+    border-radius: var(--radius-sm);
+    background-color: color-mix(in srgb, var(--color-stage) 82%, transparent);
+    color: var(--color-accent-stage);
+    font-size: var(--text-2xs);
+    line-height: var(--leading-normal);
+  }
+
+  .stage-chrome__share-status--error {
+    color: var(--color-stage-ink);
   }
 
   .stage-chrome__field {
