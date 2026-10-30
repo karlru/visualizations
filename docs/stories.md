@@ -205,7 +205,7 @@ The story should use **Ant System** for transparency. It may mention Ant Colony 
 - Fewer ants than cities: still valid; ants choose among unvisited cities.
 - A city dragged onto another city: distance zero; clamp the distance and keep the engine finite. Any city edit pauses the run, restarts it at iteration 0, and invalidates best/mean history.
 - All transition weights zero: choose uniformly among the allowed cities instead of dividing by zero.
-- A city edit is local to the session and is not included in a share URL; the UI says so.
+- A city edit is local to the session and is not included in a share URL; the UI says so. The structural city count follows the edited count, so a share restores a seeded map with that count rather than the edited coordinates.
 
 ### 2.9 Accessibility fallback
 

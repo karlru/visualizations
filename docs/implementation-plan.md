@@ -1149,38 +1149,47 @@ pnpm add katex remark-math rehype-katex shiki @astrojs/markdown-remark
 
 Verified 2026-10-30 with `pnpm lint`, `pnpm test` (378 passing, 1 existing todo; 8 new cases in `tests/unit/pseudocode.test.ts`), `pnpm build`, `pnpm check:links` (84 internal references across 9 HTML files), `pnpm check:citations` (8 citations: 6 ok, 2 warnings, 0 failed; 3 of 4 ACO citations resolved, floor met), and `CI=1 pnpm test:e2e` (86 Playwright tests). Astro 7 defaults to Sätteri, which ignores remark/rehype plugins, so the MDX pipeline uses `@astrojs/markdown-remark`'s `unified()` with `remark-math` and `rehype-katex` (`throwOnError`, `output: 'htmlAndMathml'`); MDX inherits it. `Math.astro` renders the three `docs/stories.md` §2.7 formulas with `katex.renderToString` at build time and labels each with a visible caption and MathML output. `katex/dist/katex.min.css` is imported only by `StoryLayout.astro`; Vite emits the KaTeX fonts as same-origin `/_astro/KaTeX_*.woff2|woff|ttf` assets, and the home and index routes contain no KaTeX CSS. `src/lib/pseudocode.ts` holds the canonical ten-line listing, a small custom TextMate grammar, and a Shiki core highlighter with a CSS-variable theme; the output has `data-line="0…9"` on every line and no script. `src/lib/story-pseudocode.ts` generates the panel HTML once at build time in the page, and the island receives it as a string prop. `StoryController` mounts the panel only in the enhanced stage layout and moves exactly one `data-active`/`aria-current="step"` line in an `$effect` keyed on `activeChapterId`; `pseudocodeLine` values (2, 3, 4, 4, 7, 6, 8, 4, 9, 2) are unchanged. The article/no-JS path keeps a `<Pseudocode>` block in `the-probability-rule` with a static line 4. E2E asserts three display formulas in stage, article, and no-JS modes, the panel appearing only in stage mode, the active line moving from chapter 01 line 2 to `leaving-a-trace` line 7 and `forgetting` line 6, unique ids, no page overflow at 320 px with the listing and formula scrolling inside their own containers, and a clean ACO axe scan. The stage column gives up vertical room for the panel and is non-sticky below 60rem until Step 3.6 designs the mobile stage layout.
 
-### Step 3.5 — ACO lab
+### (DONE) Step 3.5 — ACO lab
 
 **Goal:** A complete free-play sandbox.
 
 **Tasks**
 
-1. Add controls for city count, ant count, `α`, `β`, `ρ`, speed, and seed. Do not add a Q control; Q is fixed at 1.
-2. Add city dragging, adding, removing, and map reset. Each edit pauses, restarts at iteration 0, invalidates best/mean history, and shows the local-map notice.
-3. Add presets and a seed randomizer.
-4. Add play, pause, step, and restart.
-5. Add share URL and disclose that custom map edits are not included.
-6. Add a layer panel for pheromone, ants, best tour, and probability fan.
-7. Add a "compare" mode if the SHOULD requirement is implemented; otherwise document its deferral.
-8. Add camera framing presets and zoom buttons for keyboard users.
-9. Add a text summary of the current best tour and metrics.
+1. (DONE) Add controls for city count, ant count, `α`, `β`, `ρ`, speed, and seed. Do not add a Q control; Q is fixed at 1.
+2. (DONE) Add city dragging, adding, removing, and map reset. Each edit pauses, restarts at iteration 0, invalidates best/mean history, and shows the local-map notice.
+3. (DONE) Add presets and a seed randomizer.
+4. (DONE) Add play, pause, step, and restart.
+5. (DONE) Add share URL and disclose that custom map edits are not included.
+6. (DONE) Add a layer panel for pheromone, ants, best tour, and probability fan.
+7. (DONE) Add a "compare" mode if the SHOULD requirement is implemented; otherwise document its deferral. Compare mode is deferred and documented in the lab and below.
+8. (DONE) Add camera framing presets and zoom buttons for keyboard users.
+9. (DONE) Add a text summary of the current best tour and metrics.
 
 **Files**
 
 - `src/content/stories/ant-colony-optimization/index.mdx`
 - `src/components/controls/*`
 - `src/stories/aco/config.ts`
+- `src/components/story/AcoLabPanel.svelte`
+- `src/components/story/StoryMapOverlay.svelte`
+- `src/components/story/StoryController.svelte`
+- `src/stories/runtime.ts`
+- `src/stories/aco/module.ts`
+- `src/stories/aco/map.ts`
+- `src/stories/aco/camera.ts`
 
 **Acceptance criteria**
 
-- [ ] Every documented control works.
-- [ ] Dragging a city updates distances, tours, rendering, and restarts the run.
-- [ ] Adding and removing cities keep the instance valid and restart the run.
-- [ ] Reset restores a valid default map.
-- [ ] Share restores the starting state and discloses that custom map edits are local.
-- [ ] The lab is usable by keyboard and touch; camera presets and zoom buttons work without dragging.
-- [ ] The text summary matches the visible best tour length.
-- [ ] The edge cases (1 ant, 2 cities, `α = 0`, `β = 0`, `ρ = 1`, collinear cities) are reachable in the lab or the test fixtures.
+- [x] Every documented control works.
+- [x] Dragging a city updates distances, tours, rendering, and restarts the run.
+- [x] Adding and removing cities keep the instance valid and restart the run.
+- [x] Reset restores a valid default map.
+- [x] Share restores the starting state and discloses that custom map edits are local.
+- [x] The lab is usable by keyboard and touch; camera presets and zoom buttons work without dragging.
+- [x] The text summary matches the visible best tour length.
+- [x] The edge cases (1 ant, 2 cities, `α = 0`, `β = 0`, `ρ = 1`, collinear cities) are reachable in the lab or the test fixtures.
+
+Verified 2026-10-30 with `pnpm lint`, `pnpm test` (389 passing, 1 existing todo; 11 new cases in `tests/unit/aco-lab.test.ts`), `pnpm build`, `pnpm check:links` (87 internal references across 9 HTML files), `pnpm check:citations` (7 ok, 1 warning, 0 failed; ACO floor 3 of 4 met), and `CI=1 pnpm test:e2e` (98 Playwright tests, including the 12-test `tests/e2e/aco-lab.spec.ts`). The shared runtime gained only generic seams: `StoryModuleView.lab`, `StoryRuntime.auxiliary()`/`map()`, `StoryAuxiliaryView` (history, fan, tour, summary, camera presets, map view), `StoryMapRuntime`, and optional `screenToWorld`/`worldToScreen` on the renderer/stage handle. `src/stories/aco/module.ts` owns every ACO call (fan, summary, camera presets, map adapter); `AcoLabPanel.svelte` is ACO-specific and renders only after the lab chapter is entered; `StoryMapOverlay.svelte` is generic world-space handles. City add/remove updates the structural `cities` count, so a share restores a seeded map with that count and the UI says so; coordinates never enter the URL. Lab layer toggles and camera framing are presentation overrides cleared on chapter entry; the graph stays visible. Compare mode (FR-ACO-17) remains deferred and is named in the lab copy and `docs/requirements.md` §7. To keep city handles usable at 360 px, the one-column layout is a flex column (a sticky item in a one-row grid cannot pin across the story), the lab hides the stage pseudocode listing, and map handles appear only in Edit map mode so dense cities do not create overlapping target-size violations. Step 3.6 still owns the full responsive/perf gate and Step 3.7 owns the complete ACO E2E/visual matrix.
 
 ### Step 3.6 — ACO responsive and performance pass
 

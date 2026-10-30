@@ -216,6 +216,7 @@ A run is identified by `(story, seed, structural parameters, city set or generat
 - Chapter entry resets deterministically. Scrolling interpolates camera, opacity, and reveal only; it never morphs engine parameters.
 - The URL encodes the run's **starting state**, not the current frame. Sharing from mid-run restarts at iteration 0.
 - ACO city edits pause the run, rebuild distances, restart at iteration 0, invalidate best/mean history, and are not included in share URLs.
+- An ACO add or remove updates the structural `cities` field to the edited count. A share link therefore restores a **seeded** map with that count, never the edited coordinates; the UI states this beside the map editor and share action. A city-count change or map reset regenerates the seeded map.
 - Deep-link entry, forward-scroll entry, reverse-scroll entry, and reload MUST converge on the same state at chapter entry.
 - The same elapsed simulation time at 30, 60, and 120 fps MUST produce the same engine state within tolerance.
 
