@@ -289,6 +289,10 @@ test.describe('URL state and sharing', () => {
           id,
         chapter,
       );
+      // Let the previous smooth scroll settle before the next rail click. The
+      // assertion is about history length, not about stacking navigations in
+      // the same animation frame.
+      await page.waitForTimeout(150);
     }
 
     await page.waitForFunction(() => window.location.hash === '#the-turn');

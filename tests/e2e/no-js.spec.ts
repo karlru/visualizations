@@ -101,4 +101,34 @@ test.describe('no-JavaScript article layout', () => {
     await expect(rail.getByRole('link')).toHaveCount(4);
     await expect(rail.getByRole('link', { name: /The turn/ })).toHaveAttribute('href', '#the-turn');
   });
+
+  test('the second config also renders as a readable article with no empty stage', async ({
+    page,
+  }) => {
+    await page.goto('/dev/pulse-smoke');
+
+    await expect(page.locator('[data-story-controller]')).toHaveCount(1);
+    await expect(page.locator('[data-story-stage]')).toHaveCount(0);
+    await expect(page.locator('canvas')).toHaveCount(0);
+    await expect(page.locator('[data-controls-panel]')).toHaveCount(0);
+
+    const chapters = page.locator('[data-story-chapter]');
+    await expect(chapters).toHaveCount(4);
+    await expect(page.locator('.story-chapter__title')).toHaveText([
+      'The pulse',
+      'The interval',
+      'The lattice',
+      'The return',
+    ]);
+    for (let index = 0; index < 4; index += 1) {
+      await expect(chapters.nth(index).locator('.story-chapter__prose p').first()).toBeVisible();
+    }
+
+    const rail = page.getByRole('navigation', { name: 'Chapters' });
+    await expect(rail.getByRole('link')).toHaveCount(4);
+    await expect(rail.getByRole('link', { name: /The lattice/ })).toHaveAttribute(
+      'href',
+      '#the-lattice',
+    );
+  });
 });
