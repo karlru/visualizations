@@ -31,12 +31,10 @@ const {
   nav = [],
 } = Astro.props;
 
-// The only routes that exist in Phase 0 are the home page and the dev
-// specimen. `/#stories` is a real fragment target on the home page; the story
-// index replaces it once `/stories` ships.
+// `/stories` is the Phase 0 catalogue placeholder; Step 6.2 replaces the page.
 const navItems: NavItem[] = [
   { label: 'Index', href: '/' },
-  { label: 'Essays', href: '/#stories' },
+  { label: 'Essays', href: '/stories' },
   ...nav,
 ].filter((item, index, all) => all.findIndex((candidate) => candidate.href === item.href) === index);
 

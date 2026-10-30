@@ -390,13 +390,13 @@ pnpm add -D subfont
 **Tasks**
 
 1. (DONE) Create `Seo.astro` with title, description, canonical, Open Graph, and social-card tags.
-2. Add a custom `404.astro`.
-3. Create `content.config.ts` with the story collection schema.
-4. Add required fields: title, dek, slug, category, difficulty, difficulty note (optional), visual mode, fallback (optional), learning objectives, prerequisites, references, and status.
-5. Use enums that match the content: category includes Optimization, Randomness, Graphs, Emergence, Physics, Generative, and Data; difficulty is introductory, intermediate, or advanced; visual mode is 2d, 3d, or mixed, with an optional 2d fallback for 3d.
-6. Create placeholder story entries for ACO and RANDU using the schema.
-7. Add a build-time validation test that a missing required field fails.
-8. Add a placeholder bidirectional chapter↔scene test that will be completed once scenes exist.
+2. (DONE) Add a custom `404.astro`.
+3. (DONE) Create `content.config.ts` with the story collection schema.
+4. (DONE) Add required fields: title, dek, slug, category, difficulty, difficulty note (optional), visual mode, fallback (optional), learning objectives, prerequisites, references, and status.
+5. (DONE) Use enums that match the content: category includes Optimization, Randomness, Graphs, Emergence, Physics, Generative, and Data; difficulty is introductory, intermediate, or advanced; visual mode is 2d, 3d, or mixed, with an optional 2d fallback for 3d.
+6. (DONE) Create placeholder story entries for ACO and RANDU using the schema.
+7. (DONE) Add a build-time validation test that a missing required field fails.
+8. (DONE) Add a placeholder bidirectional chapter↔scene test that will be completed once scenes exist.
 
 **Files**
 

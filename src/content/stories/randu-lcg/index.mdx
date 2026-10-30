@@ -1,0 +1,39 @@
+---
+title: "Fifteen Planes: How RANDU Broke Randomness"
+dek: "A generator used for years looked random in one dimension, plausible in two, and collapsed onto fifteen planes in three."
+slug: "randu-lcg"
+category: "Randomness"
+difficulty: "intermediate"
+visualMode: "3d"
+fallback: "2d"
+learningObjectives:
+  - "Explain how a linear congruential generator works."
+  - "Explain why parameter choice determines the quality of the output."
+  - "Derive RANDU's 3D plane relation from its multiplier and modulus."
+  - "Explain why 2D tests can miss a failure that 3D exposes."
+  - "Explain why the low bits of an LCG are especially weak."
+  - "Compare RANDU with a modern seeded PRNG."
+  - "Explain why high-dimensional testing matters for simulation."
+prerequisites:
+  - "Modular arithmetic"
+  - "Basic probability"
+  - "Comfort with 3D plots"
+references:
+  - title: "Random numbers fall mainly in the planes"
+    authors: "Marsaglia, G."
+    year: 1968
+    doi: "10.1073/pnas.61.1.25"
+  - title: "The Art of Computer Programming, Volume 2: Seminumerical Algorithms"
+    authors: "Knuth, D. E."
+    url: "https://www-cs-faculty.stanford.edu/~knuth/taocp.html"
+  - title: "PCG: A Family of Simple Fast Space-Efficient Statistically Good Algorithms for Random Number Generation"
+    authors: "O'Neill, M. E."
+    url: "https://www.pcg-random.org/pdf/hmc-cs-2014-0905.pdf"
+  - title: "xoshiro / xoroshiro generators"
+    authors: "Blackman, D., & Vigna, S."
+    url: "https://prng.di.unimi.it/"
+status: "initial-release"
+---
+
+Placeholder entry. The ten-chapter narrative, plane derivation, and 3D lab arrive in Phase 5;
+this body exists only so the content collection and schema can be validated in Phase 0.

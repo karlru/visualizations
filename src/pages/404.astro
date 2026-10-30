@@ -1,0 +1,72 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+
+<BaseLayout
+  title="Page not found"
+  description="That page does not exist. Return to the Algorithm Stories index or browse the essay catalogue."
+  noindex
+>
+  <section class="not-found page-shell" aria-labelledby="not-found-title">
+    <p class="not-found__code" aria-hidden="true">404</p>
+    <p class="eyebrow">No such page</p>
+    <h1 class="not-found__title" id="not-found-title">Page not found</h1>
+    <p class="not-found__dek">
+      The address may be mistyped, or the page may not exist yet. The essays are still where you
+      left them.
+    </p>
+    <nav class="not-found__links" aria-label="Recovery">
+      <a class="not-found__link" href="/">Return to the index</a>
+      <a class="not-found__link" href="/stories">Browse the essay index</a>
+    </nav>
+  </section>
+</BaseLayout>
+
+<style>
+  .not-found {
+    display: grid;
+    align-content: center;
+    min-block-size: calc(100dvh - var(--header-height) - var(--space-4xl));
+    padding-block: var(--space-3xl);
+  }
+
+  .not-found__code {
+    color: var(--color-paper-inset);
+    font-family: var(--font-display);
+    font-size: var(--text-display);
+    line-height: var(--leading-none);
+    letter-spacing: var(--tracking-tighter);
+    user-select: none;
+  }
+
+  .not-found__title {
+    margin-block-start: var(--space-sm);
+    font-size: var(--text-h1);
+    line-height: var(--leading-none);
+    letter-spacing: var(--tracking-tighter);
+  }
+
+  .not-found__dek {
+    max-inline-size: var(--measure-narrow);
+    margin-block-start: var(--space-md);
+    color: var(--color-paper-muted);
+    line-height: var(--leading-relaxed);
+  }
+
+  .not-found__links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-sm) var(--space-lg);
+    margin-block-start: var(--space-xl);
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+  }
+
+  .not-found__link {
+    display: inline-flex;
+    align-items: center;
+    min-block-size: var(--tap-target);
+  }
+</style>

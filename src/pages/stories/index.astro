@@ -1,0 +1,160 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+
+// Minimal Phase 0 catalogue. Step 6.2 replaces this page with the full index:
+// category and status labels, future-story backlog, and links into each story.
+const stories = await getCollection('stories');
+const orderedStories = stories.toSorted((a, b) => a.data.slug.localeCompare(b.data.slug));
+---
+
+<BaseLayout
+  title="Essays"
+  description="Browse the Algorithm Stories essays, with the category, difficulty, and visual mode of each."
+>
+  <section class="catalogue page-shell" aria-labelledby="catalogue-title">
+    <header class="catalogue__intro">
+      <p class="eyebrow">The catalogue</p>
+      <h1 class="catalogue__title" id="catalogue-title">Essays</h1>
+      <p class="catalogue__dek">
+        Two long-form visual essays are in production for the first release. Each one is a
+        scroll-driven argument with a working system on a dark stage and prose on warm paper.
+      </p>
+    </header>
+
+    <ol class="story-list">
+      {
+        orderedStories.map((story, index) => (
+          <li class="story-card">
+            <p class="story-card__index">{String(index + 1).padStart(2, '0')}</p>
+            <h2 class="story-card__title">{story.data.title}</h2>
+            <p class="story-card__dek">{story.data.dek}</p>
+            <dl class="story-card__meta">
+              <div>
+                <dt>Category</dt>
+                <dd>{story.data.category}</dd>
+              </div>
+              <div>
+                <dt>Difficulty</dt>
+                <dd>{story.data.difficulty}</dd>
+              </div>
+              <div>
+                <dt>Visual mode</dt>
+                <dd>{story.data.visualMode}</dd>
+              </div>
+            </dl>
+            <p class="story-card__status">{story.data.status}</p>
+          </li>
+        ))
+      }
+    </ol>
+
+    <p class="catalogue__note">
+      This is a Phase 0 placeholder catalogue. Story pages and the full index with backlog
+      arrive in later steps.
+    </p>
+  </section>
+</BaseLayout>
+
+<style>
+  .catalogue {
+    padding-block: clamp(var(--space-2xl), 10vw, var(--space-5xl)) var(--space-3xl);
+  }
+
+  .catalogue__title {
+    margin-block-start: var(--space-sm);
+    font-size: var(--text-h1);
+    line-height: var(--leading-none);
+    letter-spacing: var(--tracking-tighter);
+  }
+
+  .catalogue__dek {
+    max-inline-size: var(--measure-prose);
+    margin-block-start: var(--space-md);
+    color: var(--color-paper-muted);
+    font-family: var(--font-display);
+    font-size: var(--text-lead);
+    line-height: var(--leading-snug);
+  }
+
+  .story-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+    gap: var(--space-lg);
+    margin-block-start: var(--space-2xl);
+    padding: 0;
+    list-style: none;
+  }
+
+  .story-list li + li {
+    margin-block-start: 0;
+  }
+
+  .story-card {
+    padding-block-start: var(--space-md);
+    border-block-start: var(--rule-strong) solid var(--color-ink);
+  }
+
+  .story-card__index {
+    color: var(--color-accent-paper);
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    letter-spacing: var(--tracking-wide);
+  }
+
+  .story-card__title {
+    margin-block-start: var(--space-2xs);
+    font-size: var(--text-h3);
+  }
+
+  .story-card__dek {
+    margin-block-start: var(--space-xs);
+    max-inline-size: 38ch;
+    color: var(--color-paper-muted);
+    line-height: var(--leading-relaxed);
+  }
+
+  .story-card__meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-sm) var(--space-lg);
+    margin-block-start: var(--space-md);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    letter-spacing: var(--tracking-wide);
+  }
+
+  .story-card__meta div {
+    display: grid;
+    gap: var(--space-3xs);
+  }
+
+  .story-card__meta dt {
+    color: var(--color-paper-muted);
+    font-size: var(--text-2xs);
+    text-transform: uppercase;
+  }
+
+  .story-card__meta dd {
+    text-transform: uppercase;
+  }
+
+  .story-card__status {
+    margin-block-start: var(--space-md);
+    color: var(--color-accent-paper);
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+  }
+
+  .catalogue__note {
+    max-inline-size: var(--measure-prose);
+    margin-block-start: var(--space-2xl);
+    padding-block-start: var(--space-md);
+    border-block-start: var(--hairline) solid var(--color-rule-paper);
+    color: var(--color-paper-muted);
+    font-size: var(--text-sm);
+    line-height: var(--leading-relaxed);
+  }
+</style>
