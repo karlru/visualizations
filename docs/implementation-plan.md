@@ -557,20 +557,20 @@ The story runtime is built once and used by both stories. It is tested with a hi
 - [x] Pausing stops simulation advancement.
 - [x] Unit tests cover all of the above.
 
-### Step 1.3 — Scroll director
+### (DONE) Step 1.3 — Scroll director
 
 **Goal:** A reusable scroll controller that reports chapter entry, progress, and exit without hijacking scroll.
 
 **Tasks**
 
-1. Integrate GSAP and ScrollTrigger.
-2. Integrate Lenis with ScrollTrigger, disabled on touch, reduced motion, and test mode.
-3. Create `ScrollDirector` with `registerChapter`, `unregisterChapter`, `onEnter`, `onProgress`, `onExit`, and `refresh`.
-4. Ensure all triggers are scoped and reverted with `gsap.context()`.
-5. Add cleanup on `astro:before-swap` and component destroy.
-6. Add a development overlay showing the active chapter and progress (removed or dev-only in production).
-7. Verify native scroll, keyboard scrolling, and browser back/forward.
-8. Confirm the GSAP ticker is the single simulation driver; Lenis and ScrollTrigger only update scroll state.
+1. (DONE) Integrate GSAP and ScrollTrigger.
+2. (DONE) Integrate Lenis with ScrollTrigger, disabled on touch, reduced motion, and test mode.
+3. (DONE) Create `ScrollDirector` with `registerChapter`, `unregisterChapter`, `onEnter`, `onProgress`, `onExit`, and `refresh`.
+4. (DONE) Ensure all triggers are scoped and reverted with `gsap.context()`.
+5. (DONE) Add cleanup on `astro:before-swap` and component destroy.
+6. (DONE) Add a development overlay showing the active chapter and progress (removed or dev-only in production).
+7. (DONE) Verify native scroll, keyboard scrolling, and browser back/forward.
+8. (DONE) Confirm the GSAP ticker is the single simulation driver; Lenis and ScrollTrigger only update scroll state.
 
 **Commands**
 
@@ -582,18 +582,31 @@ pnpm add gsap lenis
 
 - `src/components/story/StoryController.svelte`
 - `src/lib/scroll-director.ts`
+- `src/lib/scroll-policy.ts` (pure Lenis policy, unit-tested)
 - `src/styles/story.css`
+- `src/pages/dev/scroll-smoke.astro` (temporary Step 1.3 fixture)
+- `tests/e2e/scroll.spec.ts`
+- `tests/unit/scroll-policy.test.ts`
+- `package.json` / `pnpm-lock.yaml`
+
+**Test mode and Lenis policy**
+
+Test mode is explicit: append `?lenis=off`, or author `data-lenis="off"` on `<html>` before the controller mounts. StoryController mirrors the effective state to `data-lenis="on|off"` and the reason to `data-lenis-reason`; `debugState()` reports the same flags. Lenis is also disabled whenever `prefers-reduced-motion: reduce` or `(pointer: coarse)` matches, and at runtime when either media query changes. It is never stopped in a way that adds `overflow: hidden`/`clip`; the document stays the native scroller and Lenis RAF runs only from `gsap.ticker`.
+
+The `/dev/scroll-smoke` harness is the Step 1.3 test fixture. Step 1.5 replaces it with `/dev/story-smoke`; that page must reuse `ScrollDirector` and keep the same trigger-count and navigation-stress assertions.
 
 **Acceptance criteria**
 
-- [ ] Scrolling updates the active chapter and progress.
-- [ ] The scrollbar remains visible and native.
-- [ ] PageDown, PageUp, Arrow keys, Home, and End work.
-- [ ] Lenis is disabled under reduced motion, on coarse pointers, and in test mode.
-- [ ] Only the GSAP ticker advances simulation time.
-- [ ] Navigating between stories does not leave duplicate triggers.
-- [ ] A stress test of ten navigations leaves no more than one set of active triggers.
-- [ ] No console errors occur.
+- [x] Scrolling updates the active chapter and progress.
+- [x] The scrollbar remains visible and native.
+- [x] PageDown, PageUp, Arrow keys, Home, and End work.
+- [x] Lenis is disabled under reduced motion, on coarse pointers, and in test mode.
+- [x] Only the GSAP ticker advances simulation time.
+- [x] Navigating between stories does not leave duplicate triggers.
+- [x] A stress test of ten navigations leaves no more than one set of active triggers.
+- [x] No console errors occur.
+
+Verified 2026-10-30 with `pnpm lint`, `pnpm test`, `pnpm build`, and `CI=1 pnpm test:e2e`. The scroll suite covers chapter/progress reporting, native document scrolling, all five keyboard controls, reduced motion, coarse-pointer detection, `?lenis=off`, idempotent destroy (0 remaining triggers), ten navigations, and back/forward. `debugState()` and `data-scroll-triggers` are the leak detectors.
 
 ### Step 1.4 — Stage shell and Canvas 2D renderer
 
