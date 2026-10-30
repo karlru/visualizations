@@ -383,7 +383,7 @@ pnpm add -D subfont
 - [x] The page has no horizontal overflow at 320 px.
 - [x] The font fallback metrics are configured to minimize layout shift.
 
-### Step 0.5 — Base SEO, 404, and content schema skeleton
+### (DONE) Step 0.5 — Base SEO, 404, and content schema skeleton
 
 **Goal:** Every page has correct metadata, a custom 404, and a typed story schema.
 
@@ -402,20 +402,24 @@ pnpm add -D subfont
 
 - `src/components/ui/Seo.astro`
 - `src/pages/404.astro`
+- `src/pages/stories/index.astro` (Phase 0 placeholder; replaced in Step 6.2)
+- `src/config/site.ts`
 - `src/content.config.ts`
+- `src/lib/story-schema.ts`
 - `src/content/stories/ant-colony-optimization/index.mdx`
 - `src/content/stories/randu-lcg/index.mdx`
 - `tests/unit/content-schema.test.ts`
+- `tests/e2e/seo.spec.ts`
 
 **Acceptance criteria**
 
-- [ ] Every route has a unique title and meta description.
-- [ ] `404.astro` returns a 404 status and links home and to `/stories`.
-- [ ] A story with a missing required field fails the build.
-- [ ] The schema accepts the ACO and RANDU metadata as written in `docs/stories.md`.
-- [ ] A placeholder bidirectional chapter↔scene test exists.
-- [ ] The placeholder stories appear in the content collection.
-- [ ] Canonical URLs are absolute and use the configured site URL.
+- [x] Every route has a unique title and meta description.
+- [x] `404.astro` returns a 404 status and links home and to `/stories`.
+- [x] A story with a missing required field fails the build.
+- [x] The schema accepts the ACO and RANDU metadata as written in `docs/stories.md`.
+- [x] A placeholder bidirectional chapter↔scene test exists.
+- [x] The placeholder stories appear in the content collection.
+- [x] Canonical URLs are absolute and use the configured site URL.
 
 ### Step 0.6 — Cloudflare configuration, headers, and CI deployment
 
