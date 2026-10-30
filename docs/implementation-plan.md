@@ -527,7 +527,7 @@ The story runtime is built once and used by both stories. It is tested with a hi
 - [x] A fake 3D renderer passes the contract test with async mount, orbit pose, and label registration.
 - [x] The story config can be imported without side effects.
 
-### Step 1.2 — Seeded RNG and fixed-timestep clock
+### (DONE) Step 1.2 — Seeded RNG and fixed-timestep clock
 
 **Goal:** Deterministic randomness and a stable simulation clock.
 
@@ -537,7 +537,7 @@ The story runtime is built once and used by both stories. It is tested with a hi
 2. (DONE) Add a seed-to-state helper and a `randomInt`/`randomFloat` API.
 3. (DONE) Implement a fixed-timestep accumulator with a maximum number of substeps.
 4. (DONE) Add a speed multiplier and a pause flag.
-5. Add tests for determinism, range, large time deltas, and frame-rate independence (30/60/120 fps converge to the same state for the same elapsed time).
+5. (DONE) Add tests for determinism, range, large time deltas, and frame-rate independence (30/60/120 fps converge to the same state for the same elapsed time).
 
 **Files**
 
@@ -548,14 +548,14 @@ The story runtime is built once and used by both stories. It is tested with a hi
 
 **Acceptance criteria**
 
-- [ ] The same seed produces the same sequence across runs.
-- [ ] Different seeds produce different sequences in practice.
-- [ ] Floats are in `[0, 1)`; integers are within the requested bounds.
-- [ ] The clock never performs more than the configured maximum substeps per frame.
-- [ ] A long tab-away gap does not cause a simulation spiral.
-- [ ] The same elapsed simulation time at 30, 60, and 120 fps produces the same state within tolerance.
-- [ ] Pausing stops simulation advancement.
-- [ ] Unit tests cover all of the above.
+- [x] The same seed produces the same sequence across runs.
+- [x] Different seeds produce different sequences in practice.
+- [x] Floats are in `[0, 1)`; integers are within the requested bounds.
+- [x] The clock never performs more than the configured maximum substeps per frame.
+- [x] A long tab-away gap does not cause a simulation spiral.
+- [x] The same elapsed simulation time at 30, 60, and 120 fps produces the same state within tolerance.
+- [x] Pausing stops simulation advancement.
+- [x] Unit tests cover all of the above.
 
 ### Step 1.3 — Scroll director
 
