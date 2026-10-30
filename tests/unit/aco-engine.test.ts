@@ -851,11 +851,15 @@ describe('parameter edge cases', () => {
   const cases: Array<{ name: string; overrides: Partial<AcoParams> }> = [
     { name: 'alpha = 0', overrides: { alpha: 0 } },
     { name: 'beta = 0', overrides: { beta: 0 } },
+    { name: 'rho = 0', overrides: { rho: 0 } },
     { name: 'rho = 1', overrides: { rho: 1 } },
     { name: 'one ant', overrides: { antCount: 1 } },
     { name: 'two cities', overrides: { cityCount: 2, antCount: 2 } },
     { name: 'one city', overrides: { cityCount: 1, antCount: 3 } },
     { name: 'alpha = beta = 0', overrides: { alpha: 0, beta: 0 } },
+    { name: 'alpha and beta at their maximum', overrides: { alpha: 5, beta: 10 } },
+    { name: 'alpha at maximum with beta = 0', overrides: { alpha: 5, beta: 0 } },
+    { name: 'alpha = 0 with beta at maximum', overrides: { alpha: 0, beta: 10 } },
   ];
 
   for (const testCase of cases) {
@@ -1385,5 +1389,66 @@ describe('ACO invariants (docs/requirements.md §4.1)', () => {
     single[0 * size + 1] = 2;
     single[1 * size + 0] = 2;
     expect(normalizedPheromoneEntropy(instance, single)).toBeCloseTo(0, 12);
+  });
+});
+
+describe('invalid parameters and inputs', () => {
+  it('rejects out-of-range structural parameters with a named message', () => {
+    const cases: Array<[string, Partial<AcoParams>, RegExp]> = [
+      ['low cityCount', { cityCount: 0 }, /cityCount must be a safe integer in \[1, 150\]/],
+      ['high cityCount', { cityCount: ACO_LIMITS.cityCount.max + 1 }, /cityCount/],
+      ['fractional cityCount', { cityCount: 2.5 }, /cityCount/],
+      ['low antCount', { antCount: 0 }, /antCount must be a safe integer in \[1, 200\]/],
+      ['high antCount', { antCount: ACO_LIMITS.antCount.max + 1 }, /antCount/],
+      ['non-finite antCount', { antCount: Number.NaN }, /antCount/],
+      ['negative alpha', { alpha: -0.01 }, /alpha must be a finite number in \[0, 5\]/],
+      ['high alpha', { alpha: ACO_LIMITS.alpha.max + 0.01 }, /alpha/],
+      ['non-finite alpha', { alpha: Number.NaN }, /alpha/],
+      ['negative beta', { beta: -0.01 }, /beta must be a finite number in \[0, 10\]/],
+      ['high beta', { beta: ACO_LIMITS.beta.max + 0.01 }, /beta/],
+      ['non-finite beta', { beta: Number.POSITIVE_INFINITY }, /beta/],
+      ['negative rho', { rho: -0.01 }, /rho must be a finite number in \[0, 1\]/],
+      ['high rho', { rho: 1.01 }, /rho/],
+      ['non-finite rho', { rho: Number.NaN }, /rho/],
+    ];
+
+    for (const [label, overrides, message] of cases) {
+      expect(() => engineWith(overrides), label).toThrow(message);
+    }
+  });
+
+  it('rejects invalid transition-helper inputs with a clear RangeError', () => {
+    const instance = createTspInstance(1, 3);
+    const pheromone = uniformPheromone(3);
+    const allowed = allowedMask(3);
+
+    expect(() => transitionProbabilities(instance, pheromone, -1, allowed, 1, 2)).toThrow(
+      /currentCity/,
+    );
+    expect(() => transitionProbabilities(instance, pheromone, 0, new Uint8Array(2), 1, 2)).toThrow(
+      /allowed/,
+    );
+    expect(() => transitionProbabilities(instance, pheromone, 0, allowed, -0.5, 2)).toThrow(
+      /alpha/,
+    );
+    expect(() =>
+      transitionProbabilities(instance, pheromone, 0, allowed, 1, Number.NaN),
+    ).toThrow(/beta/);
+    expect(() => buildTransitionWeights(instance, new Float64Array(4), 1, 2)).toThrow(/pheromone/);
+    expect(() => buildTransitionWeights(instance, pheromone, 1, 2, new Float64Array(4))).toThrow(
+      /weights/,
+    );
+  });
+
+  it('rejects invalid city edits with a clear RangeError', () => {
+    const engine = engineWith({ cityCount: 4 });
+
+    expect(() => engine.setCities([])).toThrow(/at least one city/);
+    expect(() =>
+      engine.setCities(
+        Array.from({ length: ACO_LIMITS.cityCount.max + 1 }, () => ({ x: 0, y: 0 })),
+      ),
+    ).toThrow(/at most 150 cities/);
+    expect(() => engine.setCities([{ x: -0.1, y: 0.5 }])).toThrow(/unit square/);
   });
 });
