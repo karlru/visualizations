@@ -1,4 +1,6 @@
 ---
+import Seo from '../components/ui/Seo.astro';
+import { SITE_DESCRIPTION, SITE_NAME } from '../config/site';
 import '../styles/tokens.css';
 import '../styles/base.css';
 import '../styles/story.css';
@@ -15,22 +17,19 @@ export interface Props {
   description?: string;
   /** Keep development and utility pages out of search indexes. */
   noindex?: boolean;
+  /** Open Graph object type; story pages will pass `article`. */
+  type?: 'website' | 'article';
   /** Extra primary-nav entries. Later steps pass story and about routes. */
   nav?: NavItem[];
 }
 
-const SITE_NAME = 'Algorithm Stories';
-const DEFAULT_DESCRIPTION =
-  'Interactive, scroll-driven visual essays that explain algorithms from the inside.';
-
 const {
   title = SITE_NAME,
-  description = DEFAULT_DESCRIPTION,
+  description = SITE_DESCRIPTION,
   noindex = false,
+  type = 'website',
   nav = [],
 } = Astro.props;
-
-const documentTitle = title === SITE_NAME ? SITE_NAME : `${title} — ${SITE_NAME}`;
 
 // The only routes that exist in Phase 0 are the home page and the dev
 // specimen. `/#stories` is a real fragment target on the home page; the story
@@ -54,8 +53,7 @@ const isCurrent = (href: string): boolean => {
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="generator" content={Astro.generator} />
-    <meta name="description" content={description} />
-    {noindex && <meta name="robots" content="noindex, nofollow" />}
+    <Seo title={title} description={description} noindex={noindex} type={type} />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="icon" href="/favicon.ico" sizes="32x32" />
     <link
@@ -72,7 +70,6 @@ const isCurrent = (href: string): boolean => {
       type="font/woff2"
       crossorigin
     />
-    <title>{documentTitle}</title>
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to content</a>

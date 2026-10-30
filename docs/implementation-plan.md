@@ -389,7 +389,7 @@ pnpm add -D subfont
 
 **Tasks**
 
-1. Create `Seo.astro` with title, description, canonical, Open Graph, and social-card tags.
+1. (DONE) Create `Seo.astro` with title, description, canonical, Open Graph, and social-card tags.
 2. Add a custom `404.astro`.
 3. Create `content.config.ts` with the story collection schema.
 4. Add required fields: title, dek, slug, category, difficulty, difficulty note (optional), visual mode, fallback (optional), learning objectives, prerequisites, references, and status.

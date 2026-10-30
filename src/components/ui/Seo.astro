@@ -1,0 +1,61 @@
+---
+import { SITE_DESCRIPTION, SITE_NAME, SITE_URL } from '../../config/site';
+import tokensCss from '../../styles/tokens.css?raw';
+
+export interface Props {
+  /** Page title without the site suffix. Defaults to the site name. */
+  title?: string;
+  /** Page-specific meta description. */
+  description?: string;
+  /** Absolute URL, root-relative path, or other URL accepted by `new URL()`. */
+  canonical?: string;
+  /** Keep utility and error pages out of search indexes. */
+  noindex?: boolean;
+  /** Open Graph object type; story pages will pass `article`. */
+  type?: 'website' | 'article';
+}
+
+const {
+  title = SITE_NAME,
+  description = SITE_DESCRIPTION,
+  canonical,
+  noindex = false,
+  type = 'website',
+} = Astro.props;
+
+const documentTitle = title === SITE_NAME ? SITE_NAME : `${title} — ${SITE_NAME}`;
+const metaDescription = description.trim() || SITE_DESCRIPTION;
+
+// `Astro.site` is the configured production origin. The fallback keeps local
+// builds sensible if `site` is ever removed from the Astro config.
+const site = Astro.site ?? new URL(SITE_URL);
+const canonicalUrl = new URL(canonical ?? Astro.url.pathname, site).href;
+
+// A meta tag cannot consume a CSS custom property, so read the paper token at
+// build time instead of duplicating its value in a component.
+const themeColor = tokensCss.match(/--color-paper:\s*(#[0-9a-f]{6})\b/i)?.[1];
+if (!themeColor) {
+  throw new Error('Seo.astro could not read --color-paper from tokens.css.');
+}
+
+// No og:image or twitter:image yet: Step 6.4 generates the social cards. Until
+// then, omit the tags rather than advertise an asset that does not exist.
+---
+
+<title>{documentTitle}</title>
+<meta name="description" content={metaDescription} />
+{noindex && <meta name="robots" content="noindex, nofollow" />}
+<link rel="canonical" href={canonicalUrl} />
+
+<meta property="og:title" content={documentTitle} />
+<meta property="og:description" content={metaDescription} />
+<meta property="og:type" content={type} />
+<meta property="og:url" content={canonicalUrl} />
+<meta property="og:site_name" content={SITE_NAME} />
+<meta property="og:locale" content="en_GB" />
+
+<meta name="twitter:card" content="summary" />
+<meta name="twitter:title" content={documentTitle} />
+<meta name="twitter:description" content={metaDescription} />
+
+<meta name="theme-color" content={themeColor} />
