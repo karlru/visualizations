@@ -3,9 +3,9 @@
    * Stage chrome: play/pause, replay, speed, and a details affordance.
    *
    * The component is presentational. The controller owns the clock and engine;
-   * this component only reports reader intent. Step 1.6 deepens keyboard
-   * shortcuts and adds focus-visible/touch-target coverage; the labels, states,
-   * and native controls here are already fully keyboard operable.
+   * this component only reports reader intent. Step 1.6 added the stage-level
+   * keyboard contract in `StoryStage`/`StoryController`; the labels, states, and
+   * native controls here stay fully keyboard operable on their own.
    */
 
   interface Props {
@@ -54,6 +54,7 @@
     data-testid="stage-play-pause"
     aria-label={paused ? 'Resume simulation' : 'Pause simulation'}
     aria-pressed={paused}
+    aria-keyshortcuts="Space"
     onclick={onTogglePaused}
   >
     {paused ? 'Play' : 'Pause'}

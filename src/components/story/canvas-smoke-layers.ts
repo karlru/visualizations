@@ -225,7 +225,8 @@ function pheromoneLayer(): Canvas2DLayer<SmokeParams, SmokeSnapshot> {
     draw(frame: Canvas2DLayerFrame<SmokeParams, SmokeSnapshot>): void {
       style.color = frame.theme.cool;
       inner.color = frame.theme.amber;
-      const pulse = 1.15 + frame.snapshot.pulse * 0.28;
+      const scale = frame.snapshot.orbit;
+      const pulse = (1.15 + frame.snapshot.pulse * 0.28) * scale;
       drawArc(frame.ctx, FOCAL_CITY.x, FOCAL_CITY.y, pulse, 0, FULL_CIRCLE, style);
       drawArc(frame.ctx, FOCAL_CITY.x, FOCAL_CITY.y, pulse * 1.55, -1.1, 1.4, inner);
       drawArc(frame.ctx, FOCAL_CITY.x, FOCAL_CITY.y, pulse * 1.55, 2.1, 3.5, inner);
@@ -246,19 +247,22 @@ function antsLayer(): Canvas2DLayer<SmokeParams, SmokeSnapshot> {
     id: 'ants',
     draw(frame: Canvas2DLayerFrame<SmokeParams, SmokeSnapshot>): void {
       const phase = frame.snapshot.phase;
+      const scale = frame.snapshot.orbit;
       for (let index = 0; index < ants.length; index += 1) {
         const ant = ants[index];
         if (ant === undefined) continue;
         const angle = phase + (index * FULL_CIRCLE) / ants.length;
-        ant.x = FOCAL_CITY.x + Math.cos(angle) * 1.7;
-        ant.y = FOCAL_CITY.y + Math.sin(angle) * 1.15;
+        ant.x = FOCAL_CITY.x + Math.cos(angle) * 1.7 * scale;
+        ant.y = FOCAL_CITY.y + Math.sin(angle) * 1.15 * scale;
       }
 
-      trailStyle.color = frame.theme.amber;
-      for (let index = 0; index < ants.length; index += 1) {
-        const ant = ants[index];
-        if (ant === undefined) continue;
-        drawLine(frame.ctx, FOCAL_CITY.x, FOCAL_CITY.y, ant.x, ant.y, trailStyle);
+      if (frame.params.trails) {
+        trailStyle.color = frame.theme.amber;
+        for (let index = 0; index < ants.length; index += 1) {
+          const ant = ants[index];
+          if (ant === undefined) continue;
+          drawLine(frame.ctx, FOCAL_CITY.x, FOCAL_CITY.y, ant.x, ant.y, trailStyle);
+        }
       }
 
       style.fill = frame.theme.amber;

@@ -38,10 +38,17 @@
   } from '../../stories/dev/canvas-smoke-engine';
   import { devStoryConfig } from '../../stories/dev/config';
   import type { ChapterSpec } from '../../stories/registry';
+  import Metrics from '../controls/Metrics.svelte';
+  import type { MetricItem } from '../controls/metrics-types';
+  import PresetPicker from '../controls/PresetPicker.svelte';
+  import SeedControl from '../controls/SeedControl.svelte';
+  import Slider from '../controls/Slider.svelte';
+  import Toggle from '../controls/Toggle.svelte';
   import { createSmokeLayers } from './canvas-smoke-layers';
   import ProgressRail from './ProgressRail.svelte';
   import StageChrome from './StageChrome.svelte';
   import StoryStage from './StoryStage.svelte';
+  import type { StoryStageHandle } from './story-stage-types';
 
   interface Props {
     /** CSS selector for chapter elements. One director owns every match. */
@@ -57,14 +64,15 @@
     readonly title: string;
     readonly sceneId: string;
     readonly overrides: ChapterSceneOverrides;
-    readonly params: SmokeParams;
     readonly element: HTMLElement;
     readonly spec: ChapterSpec<SmokeParams> | undefined;
   }
 
   const story = devStoryConfig;
-  const EMPTY_SNAPSHOT: SmokeSnapshot = { time: 0, phase: 0, pulse: 0 };
+  const EMPTY_SNAPSHOT: SmokeSnapshot = { time: 0, phase: 0, pulse: 0, orbit: 1 };
   const clamp01 = (value: number): number => Math.max(0, Math.min(1, value));
+  /** Backward stepping replays from reset; cap the work a long run can cause. */
+  const MAX_REPLAY_STEPS = 10_000;
 
   let root: HTMLElement | null = null;
 
@@ -79,13 +87,26 @@
   let scene = $state<SceneState | null>(null);
   let params = $state<SmokeParams>({ ...story.defaults });
   let chapters = $state<readonly RailChapterInfo[]>([]);
+  let selectedPreset = $state<string | null>('default');
+  let metricItems = $state<readonly MetricItem[]>([
+    { id: 'sim-time', label: 'Simulated time', value: '0.0 s' },
+    { id: 'steps', label: 'Fixed steps', value: '0' },
+    { id: 'orbit', label: 'Orbit radius', value: `${story.defaults.orbit.toFixed(2)} ×` },
+    { id: 'seed', label: 'Seed', value: String(story.defaults.seed) },
+  ]);
 
   let director: ScrollDirector | null = null;
   let engine: Engine<SmokeParams, SmokeSnapshot, SmokeMetrics> | null = null;
   let clock: FixedStepClock | null = null;
+  let stageHandle: StoryStageHandle | null = null;
   let runtimeChapters = new Map<string, RuntimeChapter>();
+  /** Reader overrides persist across chapter entry; chapters reset the run only. */
+  let readerParams: Partial<SmokeParams> = {};
   let simulatedSeconds = 0;
+  let stepCount = 0;
   let frameCount = 0;
+  let metricSignature = '';
+  let metricTimer: ReturnType<typeof setInterval> | null = null;
   let mounted = false;
   let cleanupDone = false;
   let listeners: AbortController | null = null;
@@ -124,14 +145,57 @@
     if (root === null) return;
     root.dataset.simTime = simulatedSeconds.toFixed(3);
     root.dataset.simFrames = String(frameCount);
+    root.dataset.simSteps = String(stepCount);
     root.dataset.paused = paused ? 'true' : 'false';
     root.dataset.speed = String(speed);
+    root.dataset.engineOrbit = params.orbit.toFixed(3);
+    root.dataset.engineTrails = params.trails ? 'true' : 'false';
+    root.dataset.engineSeed = String(params.seed);
+    root.dataset.preset = selectedPreset ?? 'custom';
+  }
+
+  /**
+   * Rebuild the metrics rows only when the signature changes. The controller
+   * calls this on chapter entry, pause/replay, and a one-second timer — never
+   * from `handleFrame`.
+   */
+  function sampleMetrics(force = false): void {
+    const next: readonly MetricItem[] = [
+      {
+        id: 'sim-time',
+        label: 'Simulated time',
+        value: `${simulatedSeconds.toFixed(1)} s`,
+      },
+      {
+        id: 'steps',
+        label: 'Fixed steps',
+        value: String(stepCount),
+      },
+      {
+        id: 'orbit',
+        label: 'Orbit radius',
+        value: `${params.orbit.toFixed(2)} ×`,
+      },
+      {
+        id: 'seed',
+        label: 'Seed',
+        value: String(params.seed),
+      },
+    ];
+
+    const signature = next.map((item) => `${item.id}=${item.value}`).join('|');
+    if (!force && signature === metricSignature) return;
+    metricSignature = signature;
+    metricItems = next;
   }
 
   function resolveParams(spec: ChapterSpec<SmokeParams> | undefined): SmokeParams {
     const overrides = spec?.sceneOverrides?.params;
-    // Parameter changes happen on chapter entry only, never on progress.
-    return overrides === undefined ? { ...story.defaults } : { ...story.defaults, ...overrides };
+    // Parameter changes happen on chapter entry only, never on progress. Reader
+    // control overrides sit on top so a slider or toggle does not get wiped out
+    // when the next chapter applies its own typed defaults.
+    const base = overrides === undefined ? { ...story.defaults } : { ...story.defaults, ...overrides };
+    return { ...base, ...readerParams };
   }
 
   function readChapters(): {
@@ -177,7 +241,6 @@
         title,
         sceneId: definition.id,
         overrides,
-        params: resolveParams(spec),
         element,
         spec,
       });
@@ -223,11 +286,15 @@
 
       if (changed) {
         // Chapter entry is the only place simulation configuration changes.
-        params = chapter.params;
-        engine?.setParams(chapter.params);
+        // Reader overrides are re-applied so live controls survive scrolling.
+        params = resolveParams(chapter.spec);
+        engine?.setParams(params);
         engine?.reset();
         clock?.reset();
         simulatedSeconds = 0;
+        stepCount = 0;
+        frameCount = 0;
+        sampleMetrics(true);
         writeDebug();
       }
 
@@ -270,15 +337,21 @@
 
     if (steps === 0) return;
 
-    simulatedSeconds = currentClock.simulatedSeconds;
+    stepCount += steps;
+    simulatedSeconds = stepCount * currentClock.fixedStepSeconds;
     frameCount += 1;
     if (frameCount % 10 === 0) writeDebug();
   }
 
-  function togglePaused(): void {
-    paused = !paused;
-    if (clock !== null) clock.paused = paused;
+  function setPaused(next: boolean): void {
+    paused = next;
+    if (clock !== null) clock.paused = next;
     writeDebug();
+    sampleMetrics(true);
+  }
+
+  function togglePaused(): void {
+    setPaused(!paused);
   }
 
   function changeSpeed(next: number): void {
@@ -292,11 +365,159 @@
     engine?.reset();
     clock?.reset();
     simulatedSeconds = 0;
-    paused = false;
-    if (clock !== null) clock.paused = false;
+    stepCount = 0;
+    setPaused(false);
     const chapter = activeChapterId === null ? undefined : runtimeChapters.get(activeChapterId);
     if (chapter !== undefined) applyScene(chapter, activeProgress);
+    stageHandle?.redraw();
     writeDebug();
+    sampleMetrics(true);
+  }
+
+  /**
+   * Apply reader parameter changes live, without recreating the runtime.
+   *
+   * Slider and toggle edits update the existing engine and renderer. Seed and
+   * preset changes pass `reset: true` because they define a new run.
+   */
+  function applyParams(next: Partial<SmokeParams>, options: { reset?: boolean } = {}): void {
+    params = { ...params, ...next };
+    readerParams = { ...readerParams, ...next };
+    engine?.setParams(params);
+
+    if (options.reset === true) {
+      engine?.reset();
+      clock?.reset();
+      simulatedSeconds = 0;
+      stepCount = 0;
+      stageHandle?.redraw();
+    }
+
+    writeDebug();
+    sampleMetrics(true);
+  }
+
+  function changeOrbit(next: number): void {
+    selectedPreset = null;
+    applyParams({ orbit: next });
+  }
+
+  function changeTrails(next: boolean): void {
+    selectedPreset = null;
+    applyParams({ trails: next });
+  }
+
+  function applyPreset(id: string): void {
+    const preset = story.presets.find((candidate) => candidate.id === id);
+    if (preset === undefined) return;
+
+    selectedPreset = id;
+    // A preset is relative to the story defaults, but the seed is the reader's
+    // run identity, not a preset field; keep it across preset changes.
+    const base: SmokeParams = { ...story.defaults, ...preset.params, seed: params.seed };
+    readerParams = { ...readerParams, ...preset.params };
+    applyParams(base, { reset: true });
+  }
+
+  function changeSeed(seed: number): void {
+    applyParams({ seed }, { reset: true });
+  }
+
+  /**
+   * Deterministic single-step. Forward stepping runs one fixed step on the
+   * existing engine. Backward stepping replays from reset, which is exact for a
+   * pure seeded engine; the replay is capped for very long runs.
+   */
+  function stepSimulation(direction: 1 | -1): void {
+    const currentEngine = engine;
+    const currentClock = clock;
+    if (currentEngine === null || currentClock === null) return;
+
+    setPaused(true);
+    const stepSeconds = currentClock.fixedStepSeconds;
+
+    if (direction > 0) {
+      currentEngine.step(stepSeconds);
+      stepCount += 1;
+    } else {
+      const target = Math.max(0, stepCount - 1);
+      if (stepCount > MAX_REPLAY_STEPS) {
+        currentEngine.reset();
+        stepCount = 0;
+      } else {
+        currentEngine.reset();
+        for (let step = 0; step < target; step += 1) {
+          currentEngine.step(stepSeconds);
+        }
+        stepCount = target;
+      }
+    }
+
+    simulatedSeconds = stepCount * stepSeconds;
+    stageHandle?.redraw();
+    writeDebug();
+    sampleMetrics(true);
+  }
+
+  /**
+   * Stage shortcuts are scoped to the focusable region itself. `StoryStage`
+   * only forwards events whose target is the region, so a focused button,
+   * slider, or number input keeps its native Space/arrow behaviour.
+   *
+   * - Space: toggle play/pause.
+   * - ArrowRight / ArrowUp: pause and advance one fixed step (1/60 s).
+   * - ArrowLeft / ArrowDown: pause and step back one fixed step.
+   * - Escape: leave the stage and focus the first simulation control.
+   *
+   * Keys are never intercepted globally; page scrolling is untouched unless
+   * the stage region itself has focus.
+   */
+  function handleStageKeydown(event: KeyboardEvent): void {
+    switch (event.key) {
+      case ' ':
+      case 'Spacebar':
+        event.preventDefault();
+        togglePaused();
+        return;
+      case 'ArrowRight':
+      case 'ArrowUp':
+        event.preventDefault();
+        stepSimulation(1);
+        return;
+      case 'ArrowLeft':
+      case 'ArrowDown':
+        event.preventDefault();
+        stepSimulation(-1);
+        return;
+      case 'Escape':
+        event.preventDefault();
+        focusAfterStage();
+        return;
+      default:
+        return;
+    }
+  }
+
+  function focusAfterStage(): void {
+    const panel = root?.querySelector<HTMLElement>('[data-controls-panel]');
+    const firstControl = panel?.querySelector<HTMLElement>(
+      'input:not([disabled]), select:not([disabled]), button:not([disabled]), summary',
+    );
+    if (firstControl !== null && firstControl !== undefined) {
+      firstControl.focus();
+      return;
+    }
+
+    const heading = root?.querySelector<HTMLElement>('.story-chapter__title');
+    if (heading !== null && heading !== undefined) {
+      heading.tabIndex = -1;
+      heading.focus();
+    }
+  }
+
+  function handleStageReady(handle: StoryStageHandle): void {
+    stageHandle = handle;
+    director?.refresh();
   }
 
   function scrollToChapter(id: string): boolean {
@@ -381,6 +602,11 @@
     listeners?.abort();
     listeners = null;
 
+    if (metricTimer !== null) {
+      clearInterval(metricTimer);
+      metricTimer = null;
+    }
+
     const instance = director;
     director = null;
     instance?.destroy();
@@ -392,6 +618,7 @@
 
     engine = null;
     clock = null;
+    stageHandle = null;
     runtimeChapters = new Map();
     scene = null;
     status = 'destroyed';
@@ -413,6 +640,7 @@
     engine = story.createEngine(params);
     clock = new FixedStepClock({ paused, speed });
     writeDebug();
+    sampleMetrics(true);
 
     const instance = new ScrollDirector();
     director = instance;
@@ -461,6 +689,12 @@
 
     status = 'ready';
 
+    // Metrics are sampled at UI frequency, never from the ticker. One second is
+    // below the 2 Hz ceiling and keeps the polite live region quiet.
+    metricTimer = setInterval(() => {
+      if (mounted) sampleMetrics();
+    }, 1_000);
+
     return cleanup;
   });
 
@@ -478,24 +712,29 @@
   data-scroll-event={lastEvent || undefined}
   data-chapter-count={chapters.length}
   data-engine-params={JSON.stringify(params)}
+  data-engine-orbit={params.orbit.toFixed(3)}
+  data-engine-trails={params.trails ? 'true' : 'false'}
+  data-engine-seed={params.seed}
+  data-preset={selectedPreset ?? 'custom'}
   data-sim-time="0.000"
   data-sim-frames="0"
+  data-sim-steps="0"
   data-paused="false"
   data-speed="1"
   data-scene-zoom=""
   data-scene-reveal=""
   data-scene-layers=""
 >
+  <ProgressRail
+    {chapters}
+    activeId={activeChapterId}
+    progress={activeProgress}
+    {activeIndex}
+    onNavigate={navigateToChapter}
+  />
+
   <div class="story-layout">
     <div class="story-layout__stage">
-      <ProgressRail
-        {chapters}
-        activeId={activeChapterId}
-        progress={activeProgress}
-        {activeIndex}
-        onNavigate={navigateToChapter}
-      />
-
       <StoryStage
         {createRenderer}
         {scene}
@@ -507,7 +746,12 @@
         testId="story-stage"
         ariaLabel="Development story stage"
         description="A moving point orbits a focal city while four chapters change the camera, layers, and highlighted object. The canvas is decorative; chapter prose and stage labels carry the meaning."
-        onReady={() => director?.refresh()}
+        interactive
+        roledescription="interactive simulation stage"
+        describedBy="story-shortcuts"
+        ariaKeyshortcuts="Space ArrowLeft ArrowRight ArrowUp ArrowDown Escape"
+        onStageKeydown={handleStageKeydown}
+        onReady={handleStageReady}
       >
         <StageChrome
           {paused}
@@ -521,8 +765,69 @@
       </StoryStage>
     </div>
 
-    <div class="story-layout__chapters" data-story-chapters>
-      {@render children?.()}
+    <div class="story-layout__column">
+      <section class="story-controls" aria-labelledby="story-controls-title" data-controls-panel>
+        <div class="story-controls__head">
+          <h2 class="story-controls__title" id="story-controls-title">Simulation controls</h2>
+          <p class="story-controls__note">
+            Changes apply live to the running simulation. Presets and the seed start a new run;
+            the orbit and trail controls never recreate the runtime.
+          </p>
+        </div>
+
+        <div class="story-controls__grid">
+          <Slider
+            id="orbit"
+            label="Orbit radius"
+            value={params.orbit}
+            min={0.4}
+            max={2.4}
+            step={0.05}
+            formatValue={(value) => `${value.toFixed(2)} ×`}
+            hint="Scales the ant orbit and the focal pheromone ring."
+            onValueChange={changeOrbit}
+          />
+
+          <Toggle
+            id="trails"
+            label="Show ant trails"
+            checked={params.trails}
+            description="Draws a line from each ant to the focal city."
+            onCheckedChange={changeTrails}
+          />
+
+          <PresetPicker
+            id="preset"
+            presets={story.presets}
+            selected={selectedPreset}
+            onSelect={applyPreset}
+          />
+
+          <SeedControl id="seed" seed={params.seed} onSeedChange={changeSeed} />
+        </div>
+
+        <details class="story-controls__shortcuts" id="story-shortcuts" data-stage-shortcuts>
+          <summary class="story-controls__summary">Keyboard shortcuts</summary>
+          <ul class="story-controls__keys">
+            <li><kbd>Space</kbd> Play or pause the simulation.</li>
+            <li><kbd>ArrowRight</kbd> / <kbd>ArrowUp</kbd> Pause and advance one fixed step (1/60 s).</li>
+            <li><kbd>ArrowLeft</kbd> / <kbd>ArrowDown</kbd> Pause and step back one fixed step.</li>
+            <li><kbd>Escape</kbd> Leave the stage and move to the first simulation control.</li>
+          </ul>
+          <p class="story-controls__keys-note">
+            Backward stepping replays the run from its first fixed step, so it is exact; runs
+            longer than 10,000 fixed steps restart at zero when stepped back. Shortcuts apply only
+            while the stage region itself has focus. Buttons, sliders, and inputs keep their native
+            Space and arrow behaviour, and page scrolling is never hi-jacked from outside the stage.
+          </p>
+        </details>
+      </section>
+
+      <Metrics id="story-metrics" title="Live metrics" items={metricItems} />
+
+      <div class="story-layout__chapters" data-story-chapters>
+        {@render children?.()}
+      </div>
     </div>
   </div>
 </div>

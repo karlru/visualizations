@@ -28,6 +28,20 @@
     ariaLabel?: string;
     /** Low-frequency text alternative for the canvas content. */
     description?: string;
+    /**
+     * Make the stage a focusable keyboard region. Shortcuts are supplied by the
+     * story controller through `onStageKeydown`; this component only guarantees
+     * that the handler runs when the region itself has focus.
+     */
+    interactive?: boolean;
+    /** Human-readable role, e.g. "interactive simulation stage". */
+    roledescription?: string;
+    /** Id of the documented shortcut list read as the region description. */
+    describedBy?: string;
+    /** `aria-keyshortcuts` value for the shortcuts implemented by the host. */
+    ariaKeyshortcuts?: string;
+    /** Called only when the stage region, not one of its controls, has focus. */
+    onStageKeydown?: (event: KeyboardEvent) => void;
     /** Called once the renderer can accept frames. */
     onReady?: (handle: StoryStageHandle) => void;
     /** Overlay controls drawn above the canvas. */
@@ -46,6 +60,11 @@
     testId,
     ariaLabel = 'Interactive story stage',
     description,
+    interactive = false,
+    roledescription,
+    describedBy,
+    ariaKeyshortcuts,
+    onStageKeydown,
     onReady,
     children,
   }: Props = $props();
@@ -193,6 +212,17 @@
     applyPause();
   }
 
+  /**
+   * Keyboard events from the stage's overlay controls bubble here. Only events
+   * whose target is the region itself are forwarded, so a focused button,
+   * slider, or number input always keeps its native arrow/Space behaviour.
+   */
+  function handleStageKeydown(event: KeyboardEvent): void {
+    if (!interactive) return;
+    if (event.target !== event.currentTarget) return;
+    onStageKeydown?.(event);
+  }
+
   function handleTick(time: number): void {
     if (tornDown || !ready) {
       lastTickerTime = 0;
@@ -300,6 +330,10 @@
           control?.resetCamera();
           drawFrame(true);
         },
+        /** Repaint the last snapshot, for deterministic keyboard stepping. */
+        redraw: () => {
+          drawFrame(true);
+        },
         dispose: cleanup,
         debugState: () => ({
           status,
@@ -398,6 +432,7 @@
   onDestroy(cleanup);
 </script>
 
+<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 <section
   bind:this={root}
   class="stage story-stage"
@@ -407,7 +442,13 @@
   data-pause-reason="pending"
   data-frames="0"
   data-testid={testId}
+  role={interactive ? 'region' : undefined}
+  tabindex={interactive ? 0 : undefined}
   aria-label={ariaLabel}
+  aria-roledescription={roledescription}
+  aria-describedby={describedBy}
+  aria-keyshortcuts={ariaKeyshortcuts}
+  onkeydown={handleStageKeydown}
 >
   <div class="stage__surface story-stage__surface" bind:this={host}>
     <canvas class="story-stage__canvas" data-stage-canvas aria-hidden="true"></canvas>

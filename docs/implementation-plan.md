@@ -696,19 +696,19 @@ Verified 2026-10-30 with `pnpm lint`, `pnpm test`, `pnpm build`, and `CI=1 pnpm 
 
 Verified 2026-10-30 with `pnpm lint`, `pnpm test`, `pnpm build`, `pnpm check:links`, and `CI=1 pnpm test:e2e`. `/dev/story-smoke` renders four `Chapter.astro` sections inside the `StoryController` island and reuses `StoryStage` + `Canvas2DRenderer`; `StoryController` registers the chapter elements with `ScrollDirector` and owns the fixed-step clock and engine. Chapter entry resets the run and applies typed defaults; progress composes camera, layer opacity, highlights, and reveal through `composeSceneState` without touching engine parameters; exit settles the crossed edge. Deep links are resolved after `ScrollDirector.refresh()` and again after fonts settle. The renderer factory is constructed inside the island (Astro cannot pass functions across hydration) and remains the single concrete factory until Step 4.1 adds a renderer-id registry. `tests/e2e/story-runtime.spec.ts` covers four chapter/scene activations, deep links and reload, rail keyboard/click navigation, a pinned stage at 360 px and 1440 px, one stage/canvas, noindex/unlinked/sitemap exclusion, play/pause, 1×/4× simulated time, replay, and teardown. `tests/e2e/scroll.spec.ts` now targets `/dev/story-smoke` and keeps the Step 1.3 trigger-count, native-scroll, keyboard, Lenis-policy, ten-navigation, and back/forward assertions. `/dev/scroll-smoke` was removed; `/dev/canvas-smoke` remains as the renderer-lifecycle fixture.
 
-### Step 1.6 — Controls, keyboard support, and metrics
+### (DONE) Step 1.6 — Controls, keyboard support, and metrics
 
 **Goal:** Accessible controls that update the engine live.
 
 **Tasks**
 
-1. Create `Slider.svelte` with a label, value readout, keyboard support, and numeric input.
-2. Create `PresetPicker.svelte`, `Toggle.svelte`, and `SeedControl.svelte`.
-3. Create `Metrics.svelte` with polite live-region updates at a low frequency.
-4. Implement play/pause, replay chapter, and speed controls.
-5. Add keyboard shortcuts scoped to a focusable stage region: Space toggles play/pause, arrows step, Escape leaves stage focus. Do not use `role="application"`.
-6. Add focus-visible styles and 44 px minimum touch targets.
-7. Add a documented shortcut list and `aria-roledescription` for the stage region.
+1. (DONE) Create `Slider.svelte` with a label, value readout, keyboard support, and numeric input.
+2. (DONE) Create `PresetPicker.svelte`, `Toggle.svelte`, and `SeedControl.svelte`.
+3. (DONE) Create `Metrics.svelte` with polite live-region updates at a low frequency.
+4. (DONE) Implement play/pause, replay chapter, and speed controls.
+5. (DONE) Add keyboard shortcuts scoped to a focusable stage region: Space toggles play/pause, arrows step, Escape leaves stage focus. Do not use `role="application"`.
+6. (DONE) Add focus-visible styles and 44 px minimum touch targets.
+7. (DONE) Add a documented shortcut list and `aria-roledescription` for the stage region.
 
 **Files**
 
@@ -718,13 +718,15 @@ Verified 2026-10-30 with `pnpm lint`, `pnpm test`, `pnpm build`, `pnpm check:lin
 
 **Acceptance criteria**
 
-- [ ] Every control is reachable by Tab and operable by keyboard.
-- [ ] Sliders announce their label and current value.
-- [ ] Space toggles play/pause only when the stage has focus.
-- [ ] Metrics update without announcing every frame.
-- [ ] Touch targets meet the minimum size.
-- [ ] Focus is always visible.
-- [ ] Screen-reader reading order matches visual order.
+- [x] Every control is reachable by Tab and operable by keyboard.
+- [x] Sliders announce their label and current value.
+- [x] Space toggles play/pause only when the stage has focus.
+- [x] Metrics update without announcing every frame.
+- [x] Touch targets meet the minimum size.
+- [x] Focus is always visible.
+- [x] Screen-reader reading order matches visual order.
+
+Verified 2026-10-30 with `pnpm lint`, `pnpm test`, `pnpm build`, `pnpm check:links`, and `CI=1 pnpm test:e2e` (47 Playwright tests, including the new 11-test `tests/e2e/controls.spec.ts`). The control layer lives in `src/components/controls/`: `Slider` keeps a native range plus an exact number input, a visible label and readout, and `aria-valuetext`; `Toggle` is a native checkbox with a 44 px transparent target over a small switch; `PresetPicker` is a native select that applies typed config presets; `SeedControl` validates unsigned 32-bit seeds, reports invalid entries through a polite notice, and randomizes with `crypto.getRandomValues`. `Metrics` renders a key/value `<dl>` inside a polite live region; the controller samples it on chapter entry, pause/replay, seed/preset changes, and a one-second timer, never from the GSAP frame callback. The development story exposes orbit radius, ant trails, presets, and seed, all applied through `engine.setParams` and the renderer's existing `setParams` path without recreating the runtime. Its stage is a focusable `region` (no application role) described by a visible shortcut `<details>`: Space toggles playback, ArrowRight/Up advance one 1/60 s fixed step, ArrowLeft/Down replay one step back, and Escape focuses the first simulation control. `StoryStage` forwards key events only when the region itself is the target, so native button/slider/input keys are untouched and page scrolling is never hijacked. E2E verifies Tab reachability, slider naming/value, non-double-toggle on focused buttons and sliders, deterministic stepping, Escape without a trap, metrics mutation counts far below frame counts, 44 px target boxes, computed focus rings, DOM/visual reading order, a 360 px overlay rule for the pinned stage, and a clean WCAG 2.2 AA axe scan. Backward stepping replays from reset and is documented to restart runs longer than 10,000 fixed steps; a production engine that exposes a cheaper deterministic restore should replace that replay in Phase 2.
 
 ### Step 1.7 — Reduced motion and article mode
 

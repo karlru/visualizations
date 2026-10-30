@@ -21,6 +21,8 @@ export interface StoryStageHandle {
   zoomBy(factor: number): void;
   /** Remove user pan/orbit/zoom offsets. */
   resetCamera(): void;
+  /** Repaint the last snapshot without advancing simulation time. */
+  redraw(): void;
   /** Tear down the renderer, observers, listeners, and ticker callback. */
   dispose(): void;
   debugState(): StoryStageDebugState;

@@ -42,6 +42,13 @@ const chapters = devStoryConfig.chapters.map((chapter, index) => ({
         pinned while the prose scrolls past. Chapter fragments are canonical:
         <code>#the-turn</code> opens the third chapter directly.
       </p>
+      <p class="story-smoke__note">
+        The <strong>Simulation controls</strong> panel beside the stage changes engine parameters
+        live: orbit radius, ant trails, presets, and the run seed. It also includes the
+        <a href="#story-shortcuts">documented keyboard shortcut list</a>. Focus the stage region
+        with <kbd>Tab</kbd> and use <kbd>Space</kbd>, the arrow keys, or <kbd>Escape</kbd>; the
+        shortcuts never apply while a button, slider, or input has focus.
+      </p>
     </header>
 
     <StoryController client:load>
@@ -100,6 +107,23 @@ const chapters = devStoryConfig.chapters.map((chapter, index) => ({
     color: var(--color-paper-muted);
     font-size: var(--text-lead);
     line-height: var(--leading-relaxed);
+  }
+
+  .story-smoke__note {
+    margin-block-start: var(--space-md);
+    color: var(--color-paper-muted);
+    font-size: var(--text-sm);
+    line-height: var(--leading-relaxed);
+  }
+
+  .story-smoke__note kbd {
+    padding: 0.1em 0.35em;
+    border: var(--hairline) solid var(--color-rule-paper);
+    border-radius: var(--radius-xs);
+    background-color: var(--color-paper-inset);
+    color: var(--color-ink);
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
   }
 
   .story-smoke__outro {

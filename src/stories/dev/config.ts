@@ -40,19 +40,25 @@ export const devStoryConfig = defineStoryConfig<SmokeParams, SmokeSnapshot, Smok
   slug: 'story-smoke',
   rendererId: 'canvas2d',
   createEngine: (params) => new SmokeEngine(params),
-  defaults: { speed: 1 },
+  defaults: { speed: 1, orbit: 1, trails: true, seed: 20_261_030 },
   presets: [
     {
       id: 'default',
       label: 'Default',
       description: 'The fixture at its designed rate.',
-      params: {},
+      params: { speed: 1, orbit: 1, trails: true },
     },
     {
       id: 'brisk',
       label: 'Brisk',
-      description: 'A faster orbit for control testing.',
-      params: { speed: 2 },
+      description: 'A faster, wider orbit for control testing.',
+      params: { speed: 2, orbit: 1.35, trails: true },
+    },
+    {
+      id: 'sparse',
+      label: 'Sparse',
+      description: 'A tight orbit without trail lines.',
+      params: { speed: 1, orbit: 0.65, trails: false },
     },
   ],
   scenes: {
