@@ -10,6 +10,10 @@
  */
 
 import type { CollectionEntry } from 'astro:content';
+// KaTeX's stylesheet and self-hosted fonts are only needed on story routes.
+// Importing it here keeps the home/index pages free of that CSS while the
+// build emits the font files as same-origin hashed assets under `/_astro/`.
+import 'katex/dist/katex.min.css';
 import BaseLayout from './BaseLayout.astro';
 
 export interface Props {

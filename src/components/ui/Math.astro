@@ -1,0 +1,52 @@
+---
+/**
+ * Build-time display math.
+ *
+ * KaTeX renders the expression to static HTML + MathML during the build. The
+ * MathML output stays in the document for assistive technology; the styled
+ * HTML is `aria-hidden` by KaTeX. There is no runtime math library, so the
+ * formula is identical in the stage layout, article mode, and the no-JS
+ * document.
+ *
+ * `throwOnError` is deliberate: a malformed expression fails `pnpm build`.
+ * `output: 'htmlAndMathml'` guarantees the accessible MathML copy is present.
+ *
+ * The visible `label` names the rule; `caption` describes it in words so a
+ * reader who cannot use the notation still gets the relationship. The `<figure>`
+ * is the semantic wrapper and the caption is its accessible description.
+ */
+
+import katex from 'katex';
+
+interface Props {
+  /** Stable id used for the figure, label, and caption. Must be unique. */
+  id: string;
+  /** Short visible name of the rule, for example "Transition probability". */
+  label: string;
+  /** Plain-language description of the formula. */
+  caption: string;
+  /** TeX source. Rendered at build time with `throwOnError`. */
+  tex: string;
+}
+
+const { id, label, caption, tex } = Astro.props;
+
+const html = katex.renderToString(tex, {
+  displayMode: true,
+  throwOnError: true,
+  output: 'htmlAndMathml',
+  strict: 'ignore',
+});
+---
+
+<figure
+  class="formula-math"
+  id={id}
+  data-formula={id}
+  aria-labelledby={`${id}-label`}
+  aria-describedby={`${id}-caption`}
+>
+  <p class="formula-math__label" id={`${id}-label`}>{label}</p>
+  <div class="formula-math__display" set:html={html} />
+  <figcaption class="formula-math__caption" id={`${id}-caption`}>{caption}</figcaption>
+</figure>
