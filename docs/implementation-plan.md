@@ -216,7 +216,7 @@ git --version
 
 ## 4. Phase 0 — Foundation
 
-### Step 0.1 — Initialize the repository and Astro project
+### (DONE) Step 0.1 — Initialize the repository and Astro project
 
 **Goal:** A working Astro site in a Git repository.
 
@@ -226,9 +226,9 @@ git --version
 2. (DONE) Scaffold Astro in a temporary directory, then merge the generated files into the repository. The repository already contains `README.md` and `docs/`, and `create-astro` prompts or can overwrite the README when run in place.
 3. (DONE) Choose the minimal template and install dependencies. Strict TypeScript is the default; current `create-astro` has no `--typescript` flag. Do not initialize a nested Git repository.
 4. (DONE) Add a `packageManager` field to `package.json` for `pnpm/action-setup`.
-5. Confirm `src/pages/index.astro` renders.
-6. Add a `.gitignore` covering build output, dependencies, test artifacts, and local environment files.
-7. Make the first commit.
+5. (DONE) Confirm `src/pages/index.astro` renders.
+6. (DONE) Add a `.gitignore` covering build output, dependencies, test artifacts, and local environment files.
+7. (DONE) Make the first commit.
 
 **Commands**
 
@@ -240,7 +240,7 @@ pnpm install
 pnpm dev
 ```
 
-Use a separate terminal for `pnpm dev`; it blocks the shell.
+Astro's dev server runs in the background; check it with `pnpm astro dev status` and stop it with `pnpm astro dev stop`.
 
 **Files**
 
@@ -253,13 +253,13 @@ Use a separate terminal for `pnpm dev`; it blocks the shell.
 
 **Acceptance criteria**
 
-- [ ] `pnpm dev` serves a local page.
-- [ ] `pnpm build` completes and creates `dist/index.html`.
-- [ ] `src/engines/`, `src/render/`, `src/stories/`, and `docs/` exist or are created.
-- [ ] `git status` shows a clean repository after the first commit.
-- [ ] The lockfile is committed.
-- [ ] `package.json` has a `packageManager` field or the CI workflow passes an explicit pnpm version.
-- [ ] The existing `README.md` and `docs/` are preserved.
+- [x] `pnpm dev` serves a local page.
+- [x] `pnpm build` completes and creates `dist/index.html`.
+- [x] `src/engines/`, `src/render/`, `src/stories/`, and `docs/` exist or are created.
+- [x] `git status` shows a clean repository after the first commit.
+- [x] The lockfile is committed.
+- [x] `package.json` has a `packageManager` field or the CI workflow passes an explicit pnpm version.
+- [x] The existing `README.md` and `docs/` are preserved.
 
 ### Step 0.2 — Add Svelte, MDX, sitemap, and strict checks
 
