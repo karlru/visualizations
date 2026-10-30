@@ -133,7 +133,64 @@ Prerequisites: the current Node LTS release, pnpm, and a Cloudflare account for 
 
 The site is fully static. Cloudflare Workers static assets serve the build output directly; requests for static assets are not charged on the free plan. There is no server, database, or API to operate. The deployment uses `drop-trailing-slash` routing so `/stories` and `/stories/<slug>` are served without a redirect.
 
-Deployment is automated from the main branch with GitHub Actions and Wrangler. Preview deployments are optional. The exact setup is described in [`docs/implementation-plan.md`](docs/implementation-plan.md).
+Deployment is automated from the `main` branch with GitHub Actions and Wrangler. Pull requests do not deploy. The configuration lives in [`wrangler.jsonc`](wrangler.jsonc), [`public/_headers`](public/_headers), and [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml).
+
+The repository is configured but **has not been deployed yet**: the Cloudflare API token, account ID, and resulting `workers.dev` URL are still outstanding. Until the first deploy, `SITE_URL` in `src/config/site.ts` is the provisional `https://algorithm-stories.example.com`; do not treat it as the live origin.
+
+### One-time setup
+
+1. Create a Cloudflare account on the free plan (no paid service is required for static assets).
+2. Create an API token in the Cloudflare dashboard under **My Profile → API Tokens** using the **Edit Cloudflare Workers** template, scoped to the account that will host the site.
+3. Copy the account ID from the Workers overview (or the dashboard URL).
+4. Add both values as repository secrets under **Settings → Secrets and variables → Actions**:
+   - `CLOUDFLARE_API_TOKEN`
+   - `CLOUDFLARE_ACCOUNT_ID`
+
+### First manual deploy
+
+Authenticate Wrangler locally, then deploy. The deploy script builds first, so the uploaded `dist/` is always current.
+
+```bash
+pnpm install
+pnpm exec wrangler login
+pnpm deploy
+```
+
+`wrangler deploy` prints the assigned `https://algorithm-stories.<account-subdomain>.workers.dev` URL. Do not guess or hard-code this URL before it exists.
+
+Verify the live deployment before relying on CI:
+
+```bash
+curl -I https://algorithm-stories.<account-subdomain>.workers.dev/
+curl -I https://algorithm-stories.<account-subdomain>.workers.dev/stories
+curl -I https://algorithm-stories.<account-subdomain>.workers.dev/this-route-does-not-exist
+```
+
+The first two requests must return `200` without a trailing-slash redirect, the third must return `404` with the custom page, and all three must include the security headers from `public/_headers`.
+
+### Record the production URL
+
+After the first deploy, replace `SITE_URL` in `src/config/site.ts` with the real `workers.dev` origin, then rebuild and redeploy:
+
+```bash
+pnpm build
+pnpm deploy
+```
+
+This updates canonical URLs, Open Graph URLs, and the sitemap. Commit the `SITE_URL` change with the deployment. Step 8.3 replaces the `workers.dev` URL with the custom domain.
+
+### Continuous deployment
+
+Once the secrets exist, every push to `main` runs the `Deploy` workflow: install with a frozen lockfile, lint, unit test, build, check internal links and bundle budgets, then deploy with `cloudflare/wrangler-action`. The workflow can also be run manually from the Actions tab; it only deploys when the selected ref is `main`.
+
+To reproduce the edge behavior locally before pushing:
+
+```bash
+pnpm build
+pnpm exec wrangler dev --local
+```
+
+The local server applies `_headers`, serves `/stories` without a redirect, and returns the custom 404 page for unknown routes. Rollback is either `pnpm exec wrangler rollback` or redeploying the previous commit.
 
 Release 1 has no analytics beacon and no tracking cookies. Reader preferences are stored locally in `localStorage` and are not transmitted.
 

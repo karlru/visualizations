@@ -431,9 +431,9 @@ pnpm add -D subfont
 2. (DONE) Add `public/_headers` with baseline security headers, immutable caching for hashed assets, and explicit cache rules for `/fonts/*` and `/og/*`.
 3. (DONE) Add an internal link checker that fails on broken relative links.
 4. (DONE) Create a GitHub Actions workflow that installs dependencies, lints, tests, builds, checks links, checks bundles, and deploys.
-5. Store `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` as repository secrets.
-6. Deploy once manually to verify the account and permissions.
-7. Record the production workers.dev URL in the repository documentation and set Astro's `site` to it. Replace it with the custom domain at Step 8.3.
+5. Store `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` as repository secrets. — blocked: requires Cloudflare/GitHub credentials.
+6. Deploy once manually to verify the account and permissions. — blocked: requires Cloudflare credentials.
+7. Record the production workers.dev URL in the repository documentation and set Astro's `site` to it. Replace it with the custom domain at Step 8.3. — blocked: requires a live deployment URL.
 
 **Files**
 
@@ -481,14 +481,16 @@ pnpm add -D subfont
 
 - [x] `pnpm build` completes without errors.
 - [x] `pnpm exec wrangler deploy --dry-run` succeeds.
-- [ ] The production deployment returns 200 for `/` and `/stories` without a trailing-slash redirect.
-- [ ] `site` is set to the deployed workers.dev URL, not `example.com`.
-- [ ] The custom 404 is served for an unknown route.
+- [ ] The production deployment returns 200 for `/` and `/stories` without a trailing-slash redirect. — blocked: requires a live deployment; locally, `wrangler dev` returned 200 for both and a 307 from `/stories/` to `/stories`.
+- [ ] `site` is set to the deployed workers.dev URL, not `example.com`. — blocked: no deployed URL exists yet; `SITE_URL` remains the provisional placeholder.
+- [x] The custom 404 is served for an unknown route. (verified locally with `wrangler dev --local`, not yet against production)
 - [x] `curl -I` shows the security headers. (verified locally with `wrangler dev --local`)
 - [x] Hashed assets show the immutable cache header; fonts and OG images show their explicit cache rules. (verified locally; the `/og/*` rule used a temporary probe file that was removed)
-- [ ] The GitHub Actions workflow succeeds from a clean checkout.
+- [ ] The GitHub Actions workflow succeeds from a clean checkout. — blocked: requires a GitHub Actions run with repository secrets; the workflow YAML was parsed locally.
 - [x] The link checker passes on the built output and fails on a deliberately broken internal link.
-- [ ] No Cloudflare paid service is required.
+- [x] No Cloudflare paid service is required.
+
+Local verification (2026-10-30): `pnpm exec wrangler dev --port 8799 --local` parsed 4 header rules, served `/` and `/stories` with 200, redirected `/stories/` to `/stories` with 307, served the custom 404 with a 404 status, and applied the `_astro`, `fonts`, and `og` cache rules. The link checker passed on the real build and failed with a clear path when a temporary broken link was added to the home page. Development pages are now excluded from the sitemap, which satisfies the Step 1.5 exclusion ahead of schedule.
 
 ## 5. Phase 1 — Story runtime
 
