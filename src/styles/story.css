@@ -496,31 +496,12 @@ html[data-reduced-motion="true"] {
 
 /*
  * ── Article content primitives ─────────────────────────────────────────
- * Formula, ranked probability, preset, glossary, and reference blocks are
- * plain semantic HTML until Step 3.4 adds KaTeX/Shiki. They must stay readable
- * at 320 px: nothing relies on a fixed width, long tokens wrap, and the one
- * scrollable surface (the formula) scrolls inside itself rather than pushing
- * the page sideways.
+ * Ranked probability, preset, glossary, and reference blocks are plain
+ * semantic HTML. Math and pseudocode use their own build-time surfaces below.
+ * They must stay readable at 320 px: nothing relies on a fixed width, long
+ * tokens wrap, and scrollable surfaces scroll inside themselves rather than
+ * pushing the page sideways.
  */
-.formula {
-  margin: 0;
-  padding: var(--space-sm) var(--space-md);
-  overflow-x: auto;
-  border: var(--hairline) solid var(--color-rule-paper);
-  border-radius: var(--radius-md);
-  background-color: var(--color-paper-inset);
-  color: var(--color-ink);
-  font-family: var(--font-mono);
-  font-size: var(--text-sm);
-  line-height: var(--leading-relaxed);
-  overflow-wrap: anywhere;
-}
-
-.formula sub,
-.formula sup {
-  line-height: 0;
-}
-
 .fan-ranking {
   display: grid;
   gap: var(--space-3xs);
