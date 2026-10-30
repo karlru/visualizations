@@ -291,7 +291,7 @@ Astro's dev server runs in the background; check it with `pnpm astro dev status`
 
 1. (DONE) Add the Svelte, MDX, and sitemap integrations.
 2. (DONE) Configure `output: 'static'`.
-3. (DONE) Set a provisional production `site` URL in `astro.config.mjs`; replace it with the deployed workers.dev URL at Step 0.6.
+3. (DONE) Set a provisional production `site` URL in `astro.config.mjs`; replace it with the production custom domain at Step 0.6.
 4. (DONE) Add `astro check` to the build script.
 5. (DONE) Create a temporary Svelte island on the home page and a temporary MDX page to prove both work.
 6. (DONE) Remove the temporary examples after verification.
@@ -443,7 +443,7 @@ pnpm add -D subfont
 - [x] The placeholder stories appear in the content collection.
 - [x] Canonical URLs are absolute and use the configured site URL.
 
-### Step 0.6 — Cloudflare configuration, headers, and CI deployment
+### (DONE) Step 0.6 — Cloudflare configuration, headers, and CI deployment
 
 **Goal:** Every push to the main branch can deploy the static site to Cloudflare's free plan.
 
@@ -454,7 +454,7 @@ pnpm add -D subfont
 3. (DONE) Add an internal link checker that fails on broken relative links.
 4. (DONE) Create a GitHub Actions workflow that installs dependencies, lints, tests, builds, checks links, checks bundles, and deploys.
 5. (DONE) Store `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` as repository secrets.
-6. Deploy once manually to verify the account and permissions. — pending the first live deploy from the workflow.
+6. (DONE) Deploy once manually to verify the account and permissions.
 7. (DONE) Record the production custom-domain URL (`https://visualizations.ruul.ee`) in the repository documentation and set Astro's `site` to it. The custom domain is attached in `wrangler.jsonc`, so Step 8.3 only re-verifies it.
 
 **Files**
@@ -510,16 +510,18 @@ pnpm add -D subfont
 
 - [x] `pnpm build` completes without errors.
 - [x] `pnpm exec wrangler deploy --dry-run` succeeds.
-- [ ] The production deployment returns 200 for `/` and `/stories` without a trailing-slash redirect. — blocked: requires a live deployment; locally, `wrangler dev` returned 200 for both and a 307 from `/stories/` to `/stories`.
+- [x] The production deployment returns 200 for `/` and `/stories` without a trailing-slash redirect.
 - [x] `site` is set to the deployed origin (`https://visualizations.ruul.ee`), not `example.com`.
-- [x] The custom 404 is served for an unknown route. (verified locally with `wrangler dev --local`, not yet against production)
-- [x] `curl -I` shows the security headers. (verified locally with `wrangler dev --local`)
-- [x] Hashed assets show the immutable cache header; fonts and OG images show their explicit cache rules. (verified locally; the `/og/*` rule used a temporary probe file that was removed)
-- [ ] The GitHub Actions workflow succeeds from a clean checkout. — blocked: requires a GitHub Actions run with repository secrets; the workflow YAML was parsed locally.
+- [x] The custom 404 is served for an unknown route. (verified in production)
+- [x] `curl -I` shows the security headers. (verified locally and in production)
+- [x] Hashed assets show the immutable cache header; fonts and OG images show their explicit cache rules. (verified locally and in production; the `/og/*` rule used a temporary probe file that was removed)
+- [x] The GitHub Actions workflow succeeds from a clean checkout.
 - [x] The link checker passes on the built output and fails on a deliberately broken internal link.
 - [x] No Cloudflare paid service is required.
 
 Local verification (2026-10-30): `pnpm exec wrangler dev --port 8799 --local` parsed 4 header rules, served `/` and `/stories` with 200, redirected `/stories/` to `/stories` with 307, served the custom 404 with a 404 status, and applied the `_astro`, `fonts`, and `og` cache rules. The link checker passed on the real build and failed with a clear path when a temporary broken link was added to the home page. Development pages are now excluded from the sitemap, which satisfies the Step 1.5 exclusion ahead of schedule.
+
+Production verification (2026-10-30): GitHub Actions run `41087732973` passed `Verify` and `Deploy to Cloudflare` from commit `65f8329`. `wrangler.jsonc` attaches `visualizations.ruul.ee` as a Workers custom domain with `workers_dev: false`, and `SITE_URL` matches it. The live site returned 200 for `/` and `/stories`, 307 from `/stories/` to `/stories`, and 404 with the custom page for an unknown route; responses carried the four security headers, `/_astro/*` returned `max-age=31536000, immutable`, `/fonts/*` returned the weekly revalidation rule, and the canonical tag and sitemap pointed at `https://visualizations.ruul.ee`. Cloudflare issued the certificate and created the DNS record on the first deploy, and the free plan is sufficient.
 
 ## 5. Phase 1 — Story runtime
 
@@ -1835,13 +1837,13 @@ pnpm add astro-og-canvas @astrojs/rss
 - [ ] A bundle-budget regression fails CI.
 - [ ] Artifacts are available for failed runs.
 
-### Step 8.2 — Production deployment to the workers.dev URL
+### Step 8.2 — Production deployment
 
-**Goal:** A stable production release on Cloudflare's workers.dev URL before the custom domain.
+**Goal:** A stable production release on the canonical custom domain.
 
 **Tasks**
 
-1. Confirm the workers.dev `site` URL and canonical URLs.
+1. Confirm the production `site` URL and canonical URLs.
 2. Run the full build from a clean checkout.
 3. Deploy with Wrangler.
 4. Run the post-deploy smoke script.
@@ -1867,7 +1869,7 @@ The custom domain (`https://visualizations.ruul.ee`) was attached in Step 0.6, `
 
 1. Attach the custom domain to the Cloudflare project.
 2. Configure DNS.
-3. Verify HTTPS and redirects from the workers.dev URL if desired.
+3. Verify HTTPS and that the disabled `workers.dev` route is not canonical.
 4. Update the canonical `site` URL and sitemap.
 5. Redeploy.
 6. Re-run the full post-deploy smoke script with the custom domain: routes, canonicals, sitemap, robots, RSS, OG images, headers, and 404.
@@ -1959,7 +1961,7 @@ import mdx from '@astrojs/mdx';
 import sitemap from '@astrojs/sitemap';
 
 export default defineConfig({
-  site: 'https://<workers-dev-subdomain>.workers.dev',
+  site: 'https://visualizations.ruul.ee',
   trailingSlash: 'never',
   output: 'static',
   integrations: [
