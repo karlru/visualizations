@@ -203,14 +203,16 @@ describe('ACO story prose contract', () => {
     expect(chapterBody('the-lab')).toMatch(/0\.5×, 1×, 2×, 4×/);
     expect(chapterBody('the-lab')).toMatch(/seed/i);
     expect(chapterBody('the-lab')).toMatch(/share link/i);
-    expect(chapterBody('the-lab')).toMatch(/not encoded in a share URL/i);
+    expect(chapterBody('the-lab')).toMatch(/not encoded in a share link/i);
     expect(chapterBody('the-lab')).toMatch(/playback, replay, speed, and share/);
     expect(chapterBody('the-lab')).toMatch(
       /share link records the seed.*structural parameters.*speed.*chapter/is,
     );
-    expect(chapterBody('the-lab')).toMatch(/parameter panel, presets, city editor, and reset/);
-    expect(chapterBody('the-lab')).toMatch(/not part of this chapter yet/i);
-    expect(chapterBody('the-lab')).not.toMatch(/share button belong/i);
+    expect(chapterBody('the-lab')).toMatch(/parameter panel, presets, the city editor/i);
+    expect(chapterBody('the-lab')).toMatch(/step controls/i);
+    expect(chapterBody('the-lab')).toMatch(/layer toggles/i);
+    expect(chapterBody('the-lab')).toMatch(/camera buttons/i);
+    expect(chapterBody('the-lab')).not.toMatch(/not part of this chapter yet/i);
   });
 
   it('includes two native predictions, four callouts, and one static figure', () => {
