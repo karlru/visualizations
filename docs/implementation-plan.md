@@ -1217,25 +1217,33 @@ Verified 2026-10-30 with `pnpm lint`, `pnpm test` (389 passing, 1 existing todo;
 
 Verified 2026-10-31 with `pnpm lint`, `pnpm test` (407 passing, 1 existing todo; 5 new quality-cap cases), `pnpm build`, `pnpm check:links`, `pnpm check:citations`, `CI=1 pnpm exec playwright test tests/e2e/aco-responsive.spec.ts tests/e2e/aco-performance.spec.ts` (13 + 3 tests), and the full `CI=1 pnpm test:e2e`. `tests/e2e/aco-responsive.spec.ts` covers all seven widths, the 360 px stage/chrome/lab/pseudocode/formula surfaces, native vertical touch scroll with Edit map mode off, a captured city drag that does not move the page, and two quality tests: an explicit tier change (High → Low → High) swaps the canvas backing store between DPR 2 and 1 while paused iteration state and the page instance survive, and the 150 × 200 workload caps an explicit High choice to Low with the notice visible. `tests/e2e/aco-performance.spec.ts` installs a `requestAnimationFrame` wrapper with `page.addInitScript` before load, groups each callback's execution time by rAF timestamp, and asserts p95 **frame work** for the default 30 × 40 instance: ≤18.2 ms desktop (1440 × 900, DPR 2) and ≤22.2 ms mobile (390 × 844, DPR 2, 4× CDP CPU throttle). Measured frame-work p95 across the repeated gate runs was **0.6–1.3 ms desktop** and **2.6–4.8 ms mobile**, far inside their budgets; the 150 × 200 worst case reported **24.6–34.7 ms**. The wall-clock rAF interval p95 was **100–150 ms** desktop and **100–150 ms** mobile, reported in `test-results/aco-performance-*.json` but not asserted because headless Chromium's compositor and scheduler (software rasterization at ~10–20 Hz here) are not the reference display. The 150 × 200 worst case at 4× asserts no long task over 200 ms; its max long task was **up to 120 ms**. Long-task maxima were **up to 152 ms desktop**, **up to 164 ms mobile**, and **up to 120 ms worst case**, all below 200 ms. The engine now runs at most **one** iteration per `step(dt)` (`MAX_ITERATIONS_PER_STEP = 1`); the 8-iteration backlog cap and dropped-iteration count remain, and 4× still averages four iterations per simulated second because the pending-time budget accumulates across 60 Hz steps. The workload-quality cap lives in `src/lib/quality.ts` (`workloadQualityTier`, `capQualityForWorkload`): >80 cities or >120 ants resolves to `low`, >60 or >80 to `medium`, and the cap applies to an explicit reader choice as a hard presentation budget. `StoryController` derives it from the live `cityCount`/`antCount`, `StoryStage` forwards the tier to `Canvas2DRenderer.setQuality`, and `StageChrome` shows the reduced notice plus `data-quality-reduced`. The tier changes DPR, the rendered ant subset, trail samples, pheromone buckets, edge stride, and the tour halo only; it never changes city/ant counts, engine parameters, or the run identity, so the iteration state persists. Remaining caveat for Step 3.7/7.2: a real mid-tier device pass is still required for the reference-mobile criterion, and the artifact interval shows the current CI host renders at ~20 Hz under software rasterization, so use the frame-work and long-task numbers as regression signals rather than as a GPU-side fps claim.
 
-### Step 3.7 — ACO end-to-end and visual tests
+### (DONE) Step 3.7 — ACO end-to-end and visual tests
 
 **Goal:** The story is protected against regressions.
 
 **Tasks**
 
-1. Add E2E tests for chapter navigation, play/pause, replay, speed, presets, city editing, lab, share, article mode, and reduced motion.
-2. Add screenshot tests at fixed seeds and fixed scroll positions.
-3. Add an accessibility scan.
-4. Add a mobile project.
-5. Add a no-JavaScript reading test.
+1. (DONE) Add E2E tests for chapter navigation, play/pause, replay, speed, presets, city editing, lab, share, article mode, and reduced motion.
+2. (DONE) Add screenshot tests at fixed seeds and fixed scroll positions.
+3. (DONE) Add an accessibility scan.
+4. (DONE) Add a mobile project.
+5. (DONE) Add a no-JavaScript reading test.
 
 **Acceptance criteria**
 
-- [ ] The ACO E2E suite passes.
-- [ ] Screenshots are stable across runs with the fixed seed and frozen time.
-- [ ] axe reports no serious or critical violations.
-- [ ] The no-JS reading test passes.
-- [ ] The mobile project passes.
+- [x] The ACO E2E suite passes.
+- [x] Screenshots are stable across runs with the fixed seed and frozen time.
+- [x] axe reports no serious or critical violations.
+- [x] The no-JS reading test passes.
+- [x] The mobile project passes.
+
+Verified 2026-10-31 with Node 22.23.4 and `pnpm lint` (0 errors; the two existing `execCommand` deprecation hints remain in `src/lib/clipboard.ts`), `pnpm test` (407 passing, 1 existing todo), `pnpm build`, `pnpm check:links` (87 internal references across 9 HTML files), `pnpm check:citations` (7 ok, 1 warning, 0 failed; ACO floor 3 of 4 met), and the full `CI=1 pnpm test:e2e` (**151 passing: 122 `chromium` + 29 `mobile`, no retries or flakes**). `playwright.config.ts` adds a second project named **`mobile`** (`Pixel 7`, Chromium) whose `testMatch` covers `aco.spec.ts`, `aco-story.spec.ts`, `aco-lab.spec.ts`, `aco-mobile.spec.ts`, and `a11y.spec.ts`; `chromium` ignores only `aco-mobile.spec.ts`. The mobile project therefore reruns the cross-cutting reduced-motion/lifecycle and no-JS article cases as well as the desktop-only visual, responsive, and performance baselines. `tests/e2e/aco.spec.ts` owns the cross-cutting reduced-motion and route-lifecycle cases (starts paused, no autoplay or scroll scrubbing, discrete keyframe stepping/replay, article mode, one stage/canvas, ten triggers, teardown after `astro:before-swap`); `tests/e2e/aco-mobile.spec.ts` owns the Pixel 7 viewport/chrome/tap/overflow/lab assertions. The existing ACO suites supply the chapter matrix, speed, presets, city editing, share, edge cases, responsive widths, and performance gates.
+
+**Visual freeze.** `tests/e2e/visual.spec.ts` captures the home page plus four ACO baselines: colony at 1440×900, emergence after 50 frozen iterations at 1440×900, the lab with metrics/chart/controls at 1440×900, and the emergence stage at 390×844/DPR 2. Every ACO capture uses `?seed=42&lenis=off` plus `prefers-reduced-motion: reduce`, scrolls to an explicit chapter (or the lab), waits for the controller to report that chapter active, then calls `window.__storyRuntimeDebug.advanceFixedSteps(n)`. That acceptance-only hook pauses the reader clock, runs exactly `n` fixed 1/60 s steps through the normal seeded engine path (which still caps simulation at one iteration per step), then repaints and samples once. Tests then await `document.fonts.ready`/network idle and Playwright disables CSS animations; no wall-clock rAF, network font, or real-time step drives the pixels. `--repeat-each=3` produced **15/15 passing visual tests**; the four ACO PNGs are committed and all are non-trivial (1440×900, plus 350×263 for the mobile clip). The lab deep link is followed by an explicit `#the-lab` scroll because the browser applies the hash before the sticky stage settles; the mobile stage baseline uses a full-page `clip` instead of an element screenshot because the narrative stage is in normal flow above the chapters, so an element screenshot would scroll back to chapter 01 and change the active scene.
+
+**Accessibility and no-JS.** axe runs with `wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`, and `wcag22aa` on the home page and on the ACO route in stage, article, and settled reduced-motion modes, in both projects, plus the lab scan inside `aco-lab.spec.ts`; all report zero serious or critical violations and at least one pass. `Math.astro` keeps the overflow scroll region keyboard-pannable with a named `<section>` and `tabindex="0"` (the one documented Biome `noNoninteractiveTabindex` suppression) so axe's `scrollable-region-focusable` rule stays clean. The ACO no-JS block in `aco-story.spec.ts` still serves ten chapters, the rail, three build-time display formulas/MathML, the static pseudocode listing, the figure, prediction, and citations with no stage, canvas, controls, or metrics. The mobile project name and commands are unchanged from Appendix A; no README command edits were needed.
+
+**Fixes found by this gate.** Repeated paused redraws at fractional DPR were leaving a growing one-device-row fringe at the canvas edge because `Canvas2DRenderer` filled the CSS-sized rectangle without clearing the full backing store; it now clears the device-pixel buffer before each frame. `StoryStage` now repaints once whenever the stage re-enters view (or its pause state changes) even while the reader clock is paused, so scene composition that advanced offscreen is never presented as a stale frame. Caveats: visual baselines are Chromium/Linux only (the cross-browser matrix is Step 7.3), and a real mid-tier mobile-device and Safari pass remains part of the Phase 7.2 performance/quality gate.
 
 ## 8. Phase 4 — 3D foundation and RANDU math
 
