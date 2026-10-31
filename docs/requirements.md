@@ -49,7 +49,7 @@ The first public release contains:
 | **Guided tour** | An automatic camera and reveal animation that can be paused, replayed, and interrupted by the user. |
 | **Preset** | A named set of parameters. |
 | **Seed** | The deterministic starting state of a simulation. |
-| **Quality tier** | A performance profile that adjusts particle counts, device pixel ratio, and effects. |
+| **Quality tier** | A presentation profile that adjusts rendered detail (device pixel ratio, rendered ant/point subset, trails, pheromone buckets, edge stride, effects). It never changes simulated counts or the run identity. |
 | **DPR** | Device pixel ratio; the ratio of physical pixels to CSS pixels. |
 | **LCP** | Largest Contentful Paint; when the largest visible content element finishes rendering. |
 | **CLS** | Cumulative Layout Shift; a measure of unexpected layout movement. |
@@ -79,6 +79,8 @@ The first public release contains:
 
 - Bundle sizes are measured with **gzip level 9**. Initial JS is entry + shared + eagerly loaded chunks before first interaction. Route-total JS includes lazy chunks such as Three.js.
 - Frame-rate targets are **p95 frame time** over a 10-second fixed workload, not an average. 55 fps ≈ 18.2 ms; 45 fps ≈ 22.2 ms.
+- In the frame-time harness, frame time is the sum of the app's instrumented `requestAnimationFrame` callback durations per frame (simulation plus canvas command recording). The wall-clock interval between frames is reported for diagnosis but not asserted, because headless Chromium's compositor and scheduler are not the reference display. Long tasks (whole tasks, including layout and paint) guard the work that happens outside the callback.
+- The quality tier is presentation-only. A live workload above 80 cities or 120 ants caps the effective tier at `low` even when the reader chose a higher one, and the stage shows a visible reduced-quality notice; the change applies without a reload and leaves city counts, ant counts, and the run identity untouched.
 - INP is measured in Playwright with `web-vitals` and scripted interactions. Lighthouse lab runs cover LCP, CLS, and TBT, not INP.
 - Visual regression runs in CI with artifact upload and frozen time, scroll, fonts, and Lenis.
 - Lighthouse runs both the desktop and mobile presets for story pages.

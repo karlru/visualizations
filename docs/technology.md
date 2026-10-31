@@ -524,6 +524,7 @@ This avoids the common failure mode where simulation time is tied directly to sc
 - One driver: GSAP ticker → fixed-timestep clock → engine → renderer. Lenis and ScrollTrigger update scroll only.
 - Pause rendering and simulation when the stage is offscreen or the tab is hidden.
 - Cap device pixel ratio; expose a quality tier.
+- Treat the quality tier as presentation only: it changes DPR, the rendered ant subset, trail samples, pheromone buckets, edge stride, and the tour halo. It never changes city or ant counts, engine parameters, or the deterministic run identity. A workload above 80 cities or 120 ants caps the effective tier at `low` even under `auto`, with a visible notice and no reload.
 - Use `setDrawRange` for progressive point reveals.
 - Reuse typed arrays and GPU buffers; do not allocate per frame.
 - Batch DOM metric updates to a low frequency.
