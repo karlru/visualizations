@@ -39,7 +39,7 @@
     readonly qualityPreference?: QualityPreference;
     /** Effective quality tier after detection, preference, and the workload cap. */
     readonly qualityTier?: QualityTier;
-    /** True when the current workload, not the reader, lowered the tier. */
+    /** True when a large workload band drives the effective tier. */
     readonly qualityReduced?: boolean;
     /** Current city count, used only by the workload notice. */
     readonly workloadCities?: number;

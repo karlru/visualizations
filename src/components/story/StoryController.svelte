@@ -303,8 +303,13 @@
   });
   let workloadTier = $derived(workloadQualityTier(workload));
   let qualityTier = $derived(capQualityForWorkload(qualityBaseTier, workload));
-  /** True when the workload, not the reader, lowered the tier. */
-  let qualityReduced = $derived(qualityTier !== qualityBaseTier);
+  /**
+   * True when the workload band is large and the effective tier equals the
+   * workload cap. This is host-independent: a 150 × 200 run shows the notice
+   * even when detection would already have chosen `low`, because the workload
+   * is the reason the presentation is sparse.
+   */
+  let qualityReduced = $derived(workloadTier !== 'high' && qualityTier === workloadTier);
   /** True once the reader has entered the lab and has not entered another chapter. */
   let labOpen = $state(false);
   /** The ACO lab panel appears at the end of the story after the lab is entered. */
