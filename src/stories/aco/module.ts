@@ -116,6 +116,10 @@ export const acoStoryHooks: StoryModuleHooks<AcoParams, AcoSnapshot, AcoMetrics>
         canRemove: cityCount > ACO_MAP_MIN_CITIES,
         nudgeStep: ACO_MAP_NUDGE_STEP,
       },
+      health: {
+        droppedIterations: metrics.droppedIterations,
+        degraded: metrics.degraded,
+      },
     };
   },
 

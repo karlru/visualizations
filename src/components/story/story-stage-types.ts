@@ -6,6 +6,8 @@
  * stage-owned lifecycle facts rather than renderer internals.
  */
 
+import type { QualityTier } from '../../engines/core/types';
+
 export interface StoryStageDebugState {
   readonly status: 'pending' | 'ready' | 'error' | 'destroyed';
   readonly frames: number;
@@ -14,6 +16,7 @@ export interface StoryStageDebugState {
   readonly visible: boolean;
   readonly hidden: boolean;
   readonly dprCap: number;
+  readonly quality: QualityTier;
 }
 
 export interface StoryStagePoint {

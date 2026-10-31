@@ -60,6 +60,14 @@ describe('reader preference persistence', () => {
     expect(writePreference(PREFERENCE_KEYS.reducedMotion, 'reduced', throwingStorage)).toBe(false);
     expect(removePreference(PREFERENCE_KEYS.reducedMotion, throwingStorage)).toBe(false);
   });
+
+  it('stores the quality preference under its own key', () => {
+    const storage = new MemoryStorage();
+    expect(writePreference(PREFERENCE_KEYS.quality, 'low', storage)).toBe(true);
+    expect(readPreference(PREFERENCE_KEYS.quality, storage)).toBe('low');
+    expect(readPreference(PREFERENCE_KEYS.reducedMotion, storage)).toBeNull();
+    expect(PREFERENCE_KEYS.quality).toBe('algorithm-stories.quality');
+  });
 });
 
 describe('motion preference policy', () => {

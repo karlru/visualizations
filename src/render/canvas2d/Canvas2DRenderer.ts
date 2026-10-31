@@ -22,6 +22,8 @@
  * `DEBUG_DRAW_INTERVAL` draws rather than on every frame.
  */
 
+import type { QualityTier } from '../../engines/core/types';
+import { type QualityProfile, qualityProfile } from '../../lib/quality';
 import type { Camera2DState, SceneLabel, SceneLayer, SceneState, StageRenderer } from '../types';
 import {
   cameraMatrixInto,
@@ -63,12 +65,20 @@ export interface Canvas2DLayerFrame<P extends object, S> {
   readonly revealProgress: number;
   /** Highlight intensity for this layer in [0, 1]; 0 when not targeted. */
   readonly highlight: number;
+  /**
+   * Effective presentation tier. Layers use it to reduce rendered ant subset,
+   * trail samples, pheromone buckets, and edge detail. It never changes engine
+   * state. Optional so hand-written test frames keep working.
+   */
+  readonly quality?: QualityTier;
 }
 
 export interface Canvas2DRendererOptions<P extends object, S> {
   readonly layers: readonly Canvas2DLayer<P, S>[];
   /** Maximum device pixel ratio. Defaults to 2. */
   readonly dprCap?: number;
+  /** Initial quality tier. Defaults to `high`. */
+  readonly quality?: QualityTier;
   /** Set false to disable pointer orbit (for example under reduced motion). */
   readonly interactive?: boolean;
 }
@@ -83,6 +93,7 @@ export interface Canvas2DRendererDebugState {
   readonly labels: number;
   readonly layerIds: readonly string[];
   readonly camera: Camera2DState;
+  readonly quality: QualityTier;
 }
 
 /** Attribute refreshed at this cadence instead of every frame. */
@@ -131,6 +142,7 @@ class WorkingFrame<P extends object, S> implements Canvas2DLayerFrame<P, S> {
   dpr = 1;
   revealProgress = 1;
   highlight = 0;
+  quality: QualityTier = 'high';
 }
 
 interface LabelRecord {
@@ -171,6 +183,8 @@ export class Canvas2DRenderer<P extends object, S> implements StageRenderer<P, S
   private disposed = false;
   private paused = false;
   private draws = 0;
+  private quality: QualityTier;
+  private profile: QualityProfile;
 
   private userRotation = 0;
   private userZoom = 1;
@@ -182,6 +196,8 @@ export class Canvas2DRenderer<P extends object, S> implements StageRenderer<P, S
 
   constructor(options: Canvas2DRendererOptions<P, S>) {
     this.options = options;
+    this.quality = options.quality ?? 'high';
+    this.profile = qualityProfile(this.quality);
     for (const layer of options.layers) {
       this.layersById.set(layer.id, layer);
     }
@@ -253,7 +269,7 @@ export class Canvas2DRenderer<P extends object, S> implements StageRenderer<P, S
 
   resize(width: number, height: number, dpr: number): void {
     if (this.disposed) return;
-    this.size = computeCanvasSize(width, height, this.options.dprCap ?? 2, dpr);
+    this.size = computeCanvasSize(width, height, this.effectiveDprCap(), dpr);
 
     const canvas = this.canvas;
     if (!canvas) return;
@@ -302,6 +318,26 @@ export class Canvas2DRenderer<P extends object, S> implements StageRenderer<P, S
   setParams(params: P): void {
     if (this.disposed) return;
     this.params = params;
+  }
+
+  /**
+   * Apply a presentation tier without remounting.
+   *
+   * The backing store is recomputed immediately so a DPR change is observable
+   * even while the simulation is paused, and the next draw passes the tier to
+   * every layer. Engine state is untouched.
+   */
+  setQuality(quality: QualityTier): void {
+    if (this.disposed || this.quality === quality) return;
+    this.quality = quality;
+    this.profile = qualityProfile(quality);
+    if (this.canvas !== null) {
+      const deviceDpr =
+        typeof window === 'undefined' ? 1 : Math.max(1, window.devicePixelRatio || 1);
+      this.resize(this.size.cssWidth, this.size.cssHeight, deviceDpr);
+      this.drawLastFrame();
+      this.syncDebugAttributes();
+    }
   }
 
   setPaused(paused: boolean): void {
@@ -420,7 +456,13 @@ export class Canvas2DRenderer<P extends object, S> implements StageRenderer<P, S
         zoom: this.workingCamera.zoom,
         rotation: this.workingCamera.rotation,
       },
+      quality: this.quality,
     };
+  }
+
+  /** The strictest of the constructor cap and the active quality profile. */
+  private effectiveDprCap(): number {
+    return Math.min(this.options.dprCap ?? 2, this.profile.dprCap);
   }
 
   private readonly handlePointerDown = (event: PointerEvent): void => {
@@ -499,6 +541,7 @@ export class Canvas2DRenderer<P extends object, S> implements StageRenderer<P, S
     frame.height = cssHeight;
     frame.dpr = dpr;
     frame.revealProgress = Math.max(0, Math.min(1, this.scene.revealProgress));
+    frame.quality = this.quality;
 
     const layers = this.scene.layers;
     for (let index = 0; index < layers.length; index += 1) {
@@ -665,5 +708,6 @@ export class Canvas2DRenderer<P extends object, S> implements StageRenderer<P, S
     canvas.dataset.panX = this.workingCamera.panX.toFixed(4);
     canvas.dataset.panY = this.workingCamera.panY.toFixed(4);
     canvas.dataset.paused = String(this.paused);
+    canvas.dataset.quality = this.quality;
   }
 }

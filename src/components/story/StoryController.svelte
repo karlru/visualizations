@@ -32,6 +32,7 @@
   import { onDestroy, onMount, type Snippet } from 'svelte';
   import { SITE_URL } from '../../config/site';
   import { FixedStepClock } from '../../engines/core/clock';
+  import type { QualityTier } from '../../engines/core/types';
   import {
     parseUrlState,
     serializeUrlState,
@@ -55,6 +56,15 @@
     writePreference,
   } from '../../lib/persistence';
   import { setPseudocodeActiveLine } from '../../lib/pseudocode-dom';
+  import {
+    capQualityForWorkload,
+    detectQualityTier,
+    parseStoredQualityPreference,
+    type QualityPreference,
+    resolveQualityTier,
+    serializeQualityPreference,
+    workloadQualityTier,
+  } from '../../lib/quality';
   import { composeSceneState } from '../../lib/scene-composition';
   import { type ScrollChapterEvent, ScrollDirector } from '../../lib/scroll-director';
   import type { CameraState, SceneState } from '../../render/types';
@@ -139,6 +149,12 @@
     readonly spec: ChapterSpec<StoryParamBag> | undefined;
   }
 
+  /** Browser hints used only to pick the initial presentation tier. */
+  interface NavigatorQualityHints extends Navigator {
+    readonly deviceMemory?: number;
+    readonly connection?: { readonly saveData?: boolean };
+  }
+
   const EMPTY_SNAPSHOT: Readonly<object> = Object.freeze({});
   const clamp01 = (value: number): number => Math.max(0, Math.min(1, value));
   /** Backward stepping replays from reset; cap the work a long run can cause. */
@@ -185,6 +201,8 @@
     'Map edits are local and are not included in share links. Every edit pauses the run and restarts it at iteration 0.',
   );
   let coarsePointer = $state(false);
+  let qualityPreference = $state<QualityPreference>('auto');
+  let detectedQuality = $state<QualityTier>('high');
   let stageRevision = $state(0);
   let mapRevision = $state(0);
 
@@ -272,6 +290,21 @@
   );
   let reducedMotion = $derived(motionPreference.reduced);
   let showStage = $derived(enhanced && !articleMode);
+  /**
+   * Effective presentation tier: the reader's choice (or detection) capped by
+   * the current city/ant workload. The cap protects the frame budget at the
+   * 150-city worst case and is presentation-only, so it can change without a
+   * reload while the run identity and iteration state stay put.
+   */
+  let qualityBaseTier = $derived(resolveQualityTier(qualityPreference, detectedQuality));
+  let workload = $derived({
+    cities: numberParam(params, 'cityCount') ?? 0,
+    ants: numberParam(params, 'antCount') ?? 0,
+  });
+  let workloadTier = $derived(workloadQualityTier(workload));
+  let qualityTier = $derived(capQualityForWorkload(qualityBaseTier, workload));
+  /** True when the workload, not the reader, lowered the tier. */
+  let qualityReduced = $derived(qualityTier !== qualityBaseTier);
   /** True once the reader has entered the lab and has not entered another chapter. */
   let labOpen = $state(false);
   /** The ACO lab panel appears at the end of the story after the lab is entered. */
@@ -496,6 +529,13 @@
     root.dataset.entryCount = String(entryCount);
     root.dataset.lab = story?.lab ?? 'none';
     root.dataset.labActive = labActive ? 'true' : 'false';
+    root.dataset.quality = qualityTier;
+    root.dataset.qualityPreference = qualityPreference;
+    root.dataset.qualityDetected = detectedQuality;
+    root.dataset.qualityWorkload = workloadTier;
+    root.dataset.qualityReduced = qualityReduced ? 'true' : 'false';
+    root.dataset.engineDroppedIterations = String(auxiliary?.health?.droppedIterations ?? 0);
+    root.dataset.engineDegraded = auxiliary?.health?.degraded ? 'true' : 'false';
     root.dataset.stageRevision = String(stageRevision);
     root.dataset.mapRevision = String(mapRevision);
     root.dataset.mapCustom = auxiliary?.map?.custom ? 'true' : 'false';
@@ -1165,8 +1205,35 @@
   const handlePointerQueryChange = (): void => {
     if (!mounted || pointerQuery === null) return;
     coarsePointer = pointerQuery.matches;
+    detectedQuality = detectBrowserQuality();
     writeDebug();
   };
+
+  /** Detect the initial tier from coarse-pointer and hardware hints only. */
+  function detectBrowserQuality(): QualityTier {
+    if (typeof navigator === 'undefined') return 'high';
+    const hints = navigator as NavigatorQualityHints;
+    return detectQualityTier({
+      coarsePointer,
+      hardwareConcurrency: hints.hardwareConcurrency,
+      deviceMemory: hints.deviceMemory,
+      saveData: hints.connection?.saveData === true,
+    });
+  }
+
+  /**
+   * Change presentation quality without a reload.
+   *
+   * The tier is UI state, not a shareable run parameter: it is persisted with
+   * the safe wrapper, forwarded to the renderer through `StoryStage`, and never
+   * reaches the engine. The iteration state therefore survives the change.
+   */
+  function changeQuality(preference: QualityPreference): void {
+    qualityPreference = preference;
+    writePreference(PREFERENCE_KEYS.quality, serializeQualityPreference(preference));
+    writeDebug();
+    sampleMetrics();
+  }
 
   /** The manual toggle may only reduce motion. A system preference locks it. */
   function changeReducedMotion(next: boolean): void {
@@ -1557,6 +1624,8 @@
     systemReducedMotion = motionQuery.matches;
     pointerQuery = window.matchMedia('(pointer: coarse)');
     coarsePointer = pointerQuery.matches;
+    detectedQuality = detectBrowserQuality();
+    qualityPreference = parseStoredQualityPreference(readPreference(PREFERENCE_KEYS.quality));
     manualReducedMotion = parseStoredMotionPreference(
       readPreference(PREFERENCE_KEYS.reducedMotion),
     );
@@ -1605,6 +1674,11 @@
   data-active-scene={activeSceneId ?? undefined}
   data-active-chapter-title={activeChapterTitle || undefined}
   data-lab-active={labActive ? 'true' : 'false'}
+  data-quality={qualityTier}
+  data-quality-preference={qualityPreference}
+  data-quality-detected={detectedQuality}
+  data-quality-workload={workloadTier}
+  data-quality-reduced={qualityReduced ? 'true' : 'false'}
   data-scroll-progress={activeProgress.toFixed(4)}
   data-scroll-event={lastEvent || undefined}
   data-chapter-count={chapters.length}
@@ -1655,6 +1729,7 @@
           onFrame={handleFrame}
           {paused}
           dprCap={2}
+          quality={qualityTier}
           testId="story-stage"
           ariaLabel={stageLabel}
           description={stageDescription}
@@ -1673,6 +1748,11 @@
             sceneId={activeSceneId}
             {reducedMotion}
             systemReducedMotion={motionPreference.systemReduced}
+            qualityPreference={qualityPreference}
+            qualityTier={qualityTier}
+            qualityReduced={qualityReduced}
+            workloadCities={workload.cities}
+            workloadAnts={workload.ants}
             {sceneStep}
             sceneStepCount={activeSceneStepCount}
             shareMessage={shareStatus?.message}
@@ -1684,6 +1764,7 @@
             onStepScene={stepScene}
             onToggleReducedMotion={changeReducedMotion}
             onShare={shareCurrentState}
+            onQualityChange={changeQuality}
           />
           {#if labActive && auxiliary?.map}
             <StoryMapOverlay

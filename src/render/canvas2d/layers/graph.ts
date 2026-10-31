@@ -13,6 +13,7 @@
  */
 
 import type { AcoParams, AcoSnapshot, City } from '../../../engines/aco/types';
+import { qualityProfile } from '../../../lib/quality';
 import { ACO_WORLD_SCALE } from '../../../stories/aco/world';
 import type { Canvas2DLayer, Canvas2DLayerFrame } from '../Canvas2DRenderer';
 import type { MutablePoint } from '../camera';
@@ -97,13 +98,16 @@ export function createGraphLayer(): Canvas2DLayer<AcoParams, AcoSnapshot> {
 
       const zoom = frame.camera.zoom;
       const highlight = clamp01(frame.highlight);
+      const profile = qualityProfile(frame.quality ?? 'high');
 
       edgeStyle.color = frame.theme.stageMuted;
       edgeStyle.width = pixelsToWorld(EDGE_WIDTH_PX + highlight * 0.35, zoom);
       edgeStyle.alpha = 0.16 + highlight * 0.1;
 
       const visibleEdges = Math.min(geometry.edgeCount, Math.ceil(geometry.edgeCount * reveal));
-      drawSegments(frame.ctx, geometry.edgeCoords, visibleEdges, edgeStyle);
+      // A low tier samples the deterministic edge order instead of building a
+      // second buffer. The all-pairs model and the city set are unchanged.
+      drawSegments(frame.ctx, geometry.edgeCoords, visibleEdges, edgeStyle, 0, profile.edgeStride);
 
       const visibleCities = Math.min(
         geometry.cityPoints.length,

@@ -9,10 +9,13 @@
  *
  * Ants with `visitedCount === 0` have no tour yet and are skipped. Dots are
  * batched into one `drawPoints` call; trails reuse one short point buffer.
- * Labels remain DOM overlays; no text is drawn.
+ * The quality tier may draw a deterministic subset of ants and shorten or
+ * omit the trail, but it never changes the engine's colony size. Labels remain
+ * DOM overlays; no text is drawn.
  */
 
 import type { AcoParams, AcoSnapshot, City } from '../../../engines/aco/types';
+import { qualityProfile } from '../../../lib/quality';
 import { ACO_WORLD_SCALE } from '../../../stories/aco/world';
 import type { Canvas2DLayer, Canvas2DLayerFrame } from '../Canvas2DRenderer';
 import type { MutablePoint } from '../camera';
@@ -136,25 +139,33 @@ export function createAntsLayer(): Canvas2DLayer<AcoParams, AcoSnapshot> {
       const progress = snapshot.iterationProgress;
       const highlight = clamp01(frame.highlight);
       const zoom = frame.camera.zoom;
+      const profile = qualityProfile(frame.quality ?? 'high');
+      // Quality reduces the *rendered* subset and trail length only. The
+      // engine still simulates every ant, so metrics and the run identity are
+      // unchanged.
+      const samples = Math.min(TRAIL_SAMPLES, Math.max(0, Math.floor(profile.trailSamples)));
+      const stride = Math.max(1, Math.ceil(visibleAnts / Math.max(1, profile.maxRenderedAnts)));
 
       trailStyle.color = frame.theme.amber;
       trailStyle.width = pixelsToWorld(TRAIL_WIDTH_PX + highlight * 0.5, zoom);
       trailStyle.alpha = 0.28 + highlight * 0.2;
 
       let drawn = 0;
-      for (let index = 0; index < visibleAnts; index += 1) {
+      for (let index = 0; index < visibleAnts; index += stride) {
         const ant = ants[index];
         if (ant === undefined || ant.visitedCount === 0) continue;
         const dot = antPoints[drawn];
         if (dot === undefined) continue;
 
-        for (let sample = 0; sample < TRAIL_SAMPLES; sample += 1) {
-          const point = trailPoints[sample];
-          if (point === undefined) continue;
-          const back = ((TRAIL_SAMPLES - 1 - sample) / (TRAIL_SAMPLES - 1)) * TRAIL_SPAN;
-          antPositionAt(cityPoints, ant.tour, progress - back, point);
+        if (samples >= 2) {
+          for (let sample = 0; sample < samples; sample += 1) {
+            const point = trailPoints[sample];
+            if (point === undefined) continue;
+            const back = ((samples - 1 - sample) / (samples - 1)) * TRAIL_SPAN;
+            antPositionAt(cityPoints, ant.tour, progress - back, point);
+          }
+          drawPolyline(frame.ctx, trailPoints, trailStyle, false, samples);
         }
-        drawPolyline(frame.ctx, trailPoints, trailStyle, false);
 
         antPositionAt(cityPoints, ant.tour, progress, dot);
         drawn += 1;

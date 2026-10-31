@@ -21,13 +21,15 @@
  *
  * Edges are bucketed by intensity and drawn as one batched path per bucket.
  * That keeps a 150-city map at twenty stroke calls instead of 11,175 and
- * allocates nothing per frame. Colours come from a ramp cached per theme; text
- * never enters the canvas.
+ * allocates nothing per frame. Lower quality tiers use fewer buckets and a
+ * deterministic edge stride; the underlying pheromone buffer is unchanged.
+ * Colours come from a ramp cached per theme; text never enters the canvas.
  */
 
 import { color, type RGBColor } from 'd3-color';
 import { INITIAL_PHEROMONE } from '../../../engines/aco/engine';
 import type { AcoParams, AcoSnapshot, City } from '../../../engines/aco/types';
+import { qualityProfile } from '../../../lib/quality';
 import { ACO_WORLD_SCALE } from '../../../stories/aco/world';
 import type { Canvas2DLayer, Canvas2DLayerFrame } from '../Canvas2DRenderer';
 import { drawSegments, type StrokeStyle } from '../primitives';
@@ -162,19 +164,22 @@ export function createPheromoneLayer(): Canvas2DLayer<AcoParams, AcoSnapshot> {
       }
 
       const pheromone = snapshot.pheromone;
+      const profile = qualityProfile(frame.quality ?? 'high');
+      const activeBuckets = Math.max(2, Math.min(PHEROMONE_BUCKETS, profile.pheromoneBuckets));
+      const stride = Math.max(1, Math.floor(profile.edgeStride));
       const counts = bucketCounts;
       counts.fill(0);
 
-      // Pass 1: classify each edge into an intensity bucket.
-      for (let edge = 0; edge < geometry.edgeCount; edge += 1) {
+      // Pass 1: classify each sampled edge into an intensity bucket.
+      for (let edge = 0; edge < geometry.edgeCount; edge += stride) {
         const index = geometry.pheromoneIndex[edge];
         const value = index === undefined ? 0 : pheromone[index];
         const bucket =
           value === undefined
             ? 0
             : Math.min(
-                PHEROMONE_BUCKETS - 1,
-                Math.floor(pheromoneIntensity(value) * (PHEROMONE_BUCKETS - 1) + 0.5),
+                activeBuckets - 1,
+                Math.floor(pheromoneIntensity(value) * (activeBuckets - 1) + 0.5),
               );
         edgeBucket[edge] = bucket;
         counts[bucket] = (counts[bucket] ?? 0) + 1;
@@ -182,13 +187,13 @@ export function createPheromoneLayer(): Canvas2DLayer<AcoParams, AcoSnapshot> {
 
       // Prefix offsets for a stable counting sort into `sortedCoords`.
       let offset = 0;
-      for (let bucket = 0; bucket < PHEROMONE_BUCKETS; bucket += 1) {
+      for (let bucket = 0; bucket < activeBuckets; bucket += 1) {
         bucketOffsets[bucket] = offset;
         offset += counts[bucket] ?? 0;
       }
 
       writeOffsets.set(bucketOffsets);
-      for (let edge = 0; edge < geometry.edgeCount; edge += 1) {
+      for (let edge = 0; edge < geometry.edgeCount; edge += stride) {
         const bucket = edgeBucket[edge] ?? 0;
         const target = writeOffsets[bucket] ?? 0;
         const source = edge * 4;
@@ -203,12 +208,15 @@ export function createPheromoneLayer(): Canvas2DLayer<AcoParams, AcoSnapshot> {
       const zoom = frame.camera.zoom;
       const highlight = clamp01(frame.highlight);
       const revealAlpha = 0.25 + 0.75 * reveal;
+      const rampLast = PHEROMONE_BUCKETS - 1;
 
-      for (let bucket = 0; bucket < PHEROMONE_BUCKETS; bucket += 1) {
+      for (let bucket = 0; bucket < activeBuckets; bucket += 1) {
         const count = counts[bucket] ?? 0;
         if (count === 0) continue;
-        const intensity = bucket / (PHEROMONE_BUCKETS - 1);
-        style.color = ramp[bucket] ?? frame.theme.cool;
+        const intensity = bucket / (activeBuckets - 1);
+        const rampIndex =
+          activeBuckets <= 1 ? 0 : Math.round((bucket / (activeBuckets - 1)) * rampLast);
+        style.color = ramp[rampIndex] ?? frame.theme.cool;
         style.width = pixelsToWorld(pheromoneWidthPx(intensity) * (1 + highlight * 0.35), zoom);
         style.alpha = Math.min(1, pheromoneAlpha(intensity) * revealAlpha * (1 + highlight * 0.3));
         drawSegments(frame.ctx, sortedCoords, count, style, bucketOffsets[bucket] ?? 0);

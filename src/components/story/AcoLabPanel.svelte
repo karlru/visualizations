@@ -171,6 +171,37 @@
       Side-by-side comparison of two parameter sets is a documented <em>should</em> requirement
       deferred for release 1. Run one configuration at a time and use share links to compare runs.
     </p>
+    <p class="aco-lab__note" data-quality-note>
+      The stage <strong>Details</strong> panel sets presentation quality (Auto, High, Medium, Low).
+      Quality changes DPR, rendered ants and trails, pheromone buckets, and edge detail without
+      changing the colony size, seed, or iteration state.
+    </p>
+    {#if cityCount >= 100 && antCount >= 150}
+      <p
+        class="aco-lab__notice"
+        data-testid="aco-lab-guard"
+        data-lab-guard="worst-case"
+        role="status"
+        aria-live="polite"
+      >
+        Worst-case guard: at {cityCount} cities × {antCount} ants the engine runs at most one
+        iteration per frame and drops excess backlog rather than freezing. Presentation quality
+        also drops to the Low profile (a rendered ant subset, fewer pheromone buckets, and sampled
+        edges) while the colony size and seed stay unchanged.
+      </p>
+    {/if}
+    {#if auxiliary?.health?.degraded}
+      <p
+        class="aco-lab__status"
+        data-testid="aco-lab-degraded"
+        data-lab-degraded="true"
+        role="status"
+        aria-live="polite"
+      >
+        Quality degraded: {auxiliary?.health?.droppedIterations ?? 0} whole iterations were dropped
+        to keep the frame responsive. Lower the colony size for an exact run.
+      </p>
+    {/if}
   </header>
 
   <fieldset class="aco-lab__transport">

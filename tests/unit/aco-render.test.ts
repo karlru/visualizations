@@ -7,6 +7,7 @@ import {
 } from '../../src/engines/aco/engine';
 import { createTspInstance } from '../../src/engines/aco/tsp';
 import type { AcoParams, AcoSnapshot } from '../../src/engines/aco/types';
+import type { QualityTier } from '../../src/engines/core/types';
 import type { Canvas2DLayerFrame } from '../../src/render/canvas2d/Canvas2DRenderer';
 import { createAcoLayers } from '../../src/render/canvas2d/layers';
 import {
@@ -184,6 +185,7 @@ interface FrameOptions {
   readonly visible?: boolean;
   readonly opacity?: number;
   readonly ctx?: StubContext;
+  readonly quality?: QualityTier;
 }
 
 function createFrame(
@@ -220,6 +222,7 @@ function createFrame(
       dpr: 2,
       revealProgress: options.revealProgress ?? 1,
       highlight: options.highlight ?? 0,
+      quality: options.quality ?? 'high',
     },
   };
 }
@@ -548,6 +551,40 @@ describe('ACO canvas layers', () => {
       layer.draw(transparent.frame);
       expect(transparent.ctx.calls, `${id} transparent`).toEqual([]);
     }
+  });
+
+  it('reduces rendered ants, trails, edges, and the tour halo at a low tier', () => {
+    const run = runEngine(1);
+    const snapshot = run.snapshot();
+
+    const highGraph = createFrame(snapshot, 'graph', { quality: 'high' });
+    layerFor('graph').draw(highGraph.frame);
+    const lowGraph = createFrame(snapshot, 'graph', { quality: 'low' });
+    layerFor('graph').draw(lowGraph.frame);
+    expect(highGraph.ctx.count('lineTo')).toBe((30 * 29) / 2);
+    expect(lowGraph.ctx.count('lineTo')).toBe(Math.ceil((30 * 29) / 2 / 4));
+
+    const highPheromone = createFrame(snapshot, 'pheromone', { quality: 'high' });
+    layerFor('pheromone').draw(highPheromone.frame);
+    const lowPheromone = createFrame(snapshot, 'pheromone', { quality: 'low' });
+    layerFor('pheromone').draw(lowPheromone.frame);
+    expect(lowPheromone.ctx.count('lineTo')).toBeLessThan(highPheromone.ctx.count('lineTo'));
+
+    const highAnts = createFrame(snapshot, 'ants', { quality: 'high' });
+    layerFor('ants').draw(highAnts.frame);
+    const lowAnts = createFrame(snapshot, 'ants', { quality: 'low' });
+    layerFor('ants').draw(lowAnts.frame);
+    // 40 ants at the high tier; the low tier draws every third ant (14).
+    expect(highAnts.ctx.arcs).toHaveLength(40);
+    expect(lowAnts.ctx.arcs).toHaveLength(14);
+    expect(lowAnts.ctx.arcs.length).toBeLessThan(highAnts.ctx.arcs.length);
+
+    const highTour = createFrame(snapshot, 'best-tour', { quality: 'high' });
+    layerFor('best-tour').draw(highTour.frame);
+    const lowTour = createFrame(snapshot, 'best-tour', { quality: 'low' });
+    layerFor('best-tour').draw(lowTour.frame);
+    expect(highTour.ctx.count('stroke')).toBe(2);
+    expect(lowTour.ctx.count('stroke')).toBe(1);
   });
 
   it('never draws text into the canvas', () => {

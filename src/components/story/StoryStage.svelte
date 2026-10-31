@@ -2,6 +2,8 @@
   import { gsap } from 'gsap';
   import { ScrollTrigger } from 'gsap/ScrollTrigger';
   import { onDestroy, onMount, type Snippet } from 'svelte';
+  import type { QualityTier } from '../../engines/core/types';
+  import { qualityProfile } from '../../lib/quality';
   import type { Camera2DState, SceneState, StageRenderer } from '../../render/types';
   import type { StoryStageDebugState, StoryStageHandle } from './story-stage-types';
 
@@ -22,6 +24,8 @@
     paused?: boolean;
     /** Maximum device pixel ratio for the backing store. */
     dprCap?: number;
+    /** Presentation quality tier. Defaults to `high`. */
+    quality?: QualityTier;
     /** Optional `data-testid` for the stage root. */
     testId?: string;
     /** Optional accessible name for the stage region. */
@@ -57,6 +61,7 @@
     onFrame,
     paused = false,
     dprCap = 2,
+    quality = 'high',
     testId,
     ariaLabel = 'Interactive story stage',
     description,
@@ -93,6 +98,11 @@
   let intersectionObserver: IntersectionObserver | null = null;
   let refreshTimer: ReturnType<typeof setTimeout> | null = null;
   let listeners: AbortController | null = null;
+
+  /** The stricter of the caller's cap and the active presentation profile. */
+  let effectiveDprCap = $derived(
+    Math.min(Math.max(1, dprCap), qualityProfile(quality).dprCap),
+  );
 
   let frames = 0;
   let visible = true;
@@ -195,7 +205,7 @@
     const rect = container.getBoundingClientRect();
     const deviceDpr = typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1;
     // The renderer contract expects the host to cap DPR before calling resize.
-    const cappedDpr = Math.min(Math.max(1, deviceDpr), Math.max(1, dprCap));
+    const cappedDpr = Math.min(Math.max(1, deviceDpr), effectiveDprCap);
 
     if (root) {
       root.dataset.cssWidth = String(Math.round(rect.width * 100) / 100);
@@ -366,7 +376,8 @@
           pauseReason,
           visible,
           hidden,
-          dprCap,
+          dprCap: effectiveDprCap,
+          quality,
         }),
       };
       onReady?.(stageHandle);
@@ -397,6 +408,17 @@
     // an effect dependency even though the function lives outside this block.
     if (!ready) return;
     applyPause();
+  });
+
+  $effect(() => {
+    // Quality is presentation-only: forward it to the renderer (when it
+    // implements the optional seam) and re-size the backing store at the new
+    // DPR cap. The engine and clock are never touched, so the iteration state
+    // survives a reader changing the tier.
+    const tier = quality;
+    if (!ready || rendererInstance === null) return;
+    rendererInstance.setQuality?.(tier);
+    measure();
   });
 
   onMount(() => {
@@ -466,6 +488,7 @@
   data-pause-reason="pending"
   data-frames="0"
   data-testid={testId}
+  data-quality={quality}
   role={interactive ? 'region' : undefined}
   tabindex={interactive ? 0 : undefined}
   aria-label={ariaLabel}

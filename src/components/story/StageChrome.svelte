@@ -6,7 +6,19 @@
    * this component only reports reader intent. Step 1.6 added the stage-level
    * keyboard contract in `StoryStage`/`StoryController`; the labels, states, and
    * native controls here stay fully keyboard operable on their own.
+   *
+   * Step 3.6 adds the quality-tier control. The visible badge always names the
+   * effective tier; the Auto/High/Medium/Low select lives in the details panel
+   * so the compact mobile chrome does not grow another row of controls.
    */
+
+  import type { QualityTier } from '../../engines/core/types';
+  import {
+    QUALITY_PREFERENCE_OPTIONS,
+    type QualityPreference,
+    qualityProfile,
+    qualityTierLabel,
+  } from '../../lib/quality';
 
   interface Props {
     readonly paused: boolean;
@@ -23,12 +35,23 @@
     readonly sceneStep?: number;
     /** Number of keyframes declared by the active chapter (at least one). */
     readonly sceneStepCount?: number;
+    /** Reader's quality preference; `auto` follows the detected tier. */
+    readonly qualityPreference?: QualityPreference;
+    /** Effective quality tier after detection, preference, and the workload cap. */
+    readonly qualityTier?: QualityTier;
+    /** True when the current workload, not the reader, lowered the tier. */
+    readonly qualityReduced?: boolean;
+    /** Current city count, used only by the workload notice. */
+    readonly workloadCities?: number;
+    /** Current ant count, used only by the workload notice. */
+    readonly workloadAnts?: number;
     readonly onTogglePaused: () => void;
     readonly onReplay: () => void;
     readonly onSpeedChange: (speed: number) => void;
     readonly onStepScene?: (direction: 1 | -1) => void;
     readonly onToggleReducedMotion?: (reduced: boolean) => void;
     readonly onShare?: () => void;
+    readonly onQualityChange?: (preference: QualityPreference) => void;
     readonly shareMessage?: string;
     readonly shareOk?: boolean;
     readonly sharePending?: boolean;
@@ -44,12 +67,18 @@
     systemReducedMotion = false,
     sceneStep = 0,
     sceneStepCount = 1,
+    qualityPreference = 'auto',
+    qualityTier = 'high',
+    qualityReduced = false,
+    workloadCities = 0,
+    workloadAnts = 0,
     onTogglePaused,
     onReplay,
     onSpeedChange,
     onStepScene,
     onToggleReducedMotion,
     onShare,
+    onQualityChange,
     shareMessage,
     shareOk = true,
     sharePending = false,
@@ -59,6 +88,7 @@
 
   let stepBackDisabled = $derived(sceneStep <= 0);
   let stepForwardDisabled = $derived(sceneStep >= sceneStepCount - 1);
+  let dprCap = $derived(qualityProfile(qualityTier).dprCap);
 
   function formatSpeed(value: number): string {
     return value === 1 ? '1×' : `${value}×`;
@@ -88,6 +118,15 @@
     }
     onToggleReducedMotion?.(input.checked);
   }
+
+  function handleQuality(event: Event): void {
+    const select = event.currentTarget;
+    if (!(select instanceof HTMLSelectElement)) return;
+    const value = select.value;
+    if (value === 'auto' || value === 'high' || value === 'medium' || value === 'low') {
+      onQualityChange?.(value);
+    }
+  }
 </script>
 
 <div
@@ -99,6 +138,9 @@
   data-system-reduced-motion={systemReducedMotion ? 'true' : 'false'}
   data-scene-step={sceneStep}
   data-scene-step-count={sceneStepCount}
+  data-quality={qualityTier}
+  data-quality-preference={qualityPreference}
+  data-quality-reduced={qualityReduced ? 'true' : 'false'}
 >
   <button
     type="button"
@@ -163,6 +205,30 @@
       {/each}
     </select>
   </label>
+
+  <span
+    class="stage-chrome__quality"
+    data-testid="stage-quality"
+    data-quality-tier={qualityTier}
+    data-quality-preference={qualityPreference}
+    data-quality-reduced={qualityReduced ? 'true' : 'false'}
+    aria-live="polite"
+  >
+    Quality {qualityTierLabel(qualityTier)}
+  </span>
+
+  {#if qualityReduced}
+    <p
+      class="stage-chrome__quality-notice"
+      data-testid="stage-quality-notice"
+      data-quality-reduced="true"
+      role="status"
+      aria-live="polite"
+    >
+      Quality reduced to {qualityTierLabel(qualityTier)} for {workloadCities} cities × {workloadAnts}
+      ants. Presentation only: the colony size, seed, and iteration state are unchanged.
+    </p>
+  {/if}
 
   <label class="stage-chrome__motion">
     <input
@@ -234,11 +300,39 @@
           <dt>Speed</dt>
           <dd class="data">{formatSpeed(speed)}</dd>
         </div>
+        <div>
+          <dt>Quality</dt>
+          <dd class="data">
+            {qualityTierLabel(qualityTier)}
+            {qualityPreference === 'auto' ? '(auto)' : '(chosen)'}
+          </dd>
+        </div>
       </dl>
+
+      <label class="stage-chrome__quality-field">
+        <span class="stage-chrome__field-label">Presentation quality</span>
+        <select
+          class="stage-chrome__select"
+          data-testid="stage-quality-select"
+          aria-label="Presentation quality tier"
+          value={qualityPreference}
+          onchange={handleQuality}
+        >
+          {#each QUALITY_PREFERENCE_OPTIONS as option (option.value)}
+            <option value={option.value}>{option.label}</option>
+          {/each}
+        </select>
+      </label>
       <p class="stage-chrome__note">
-        {formatRenderer(rendererId)} · DPR capped at 2 · simulation pauses when the stage leaves the
-        viewport. Share links carry the chapter, seed, and structural parameters; canvas and map
-        edits stay local.
+        Quality changes presentation cost only: DPR, rendered ants and trails, pheromone
+        buckets, and edge detail. City and ant counts, the seed, and the iteration state never
+        change.
+      </p>
+
+      <p class="stage-chrome__note">
+        {formatRenderer(rendererId)} · DPR capped at {dprCap} · simulation pauses when the stage
+        leaves the viewport. Share links carry the chapter, seed, and structural parameters;
+        canvas and map edits stay local.
       </p>
     </div>
   </details>
@@ -327,6 +421,37 @@
     font-family: var(--font-mono);
     font-size: var(--text-2xs);
     text-align: center;
+  }
+
+  .stage-chrome__quality {
+    display: inline-flex;
+    align-items: center;
+    min-block-size: var(--tap-target);
+    padding-inline: var(--space-2xs);
+    color: var(--color-stage-muted);
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .stage-chrome__quality-field {
+    display: grid;
+    gap: var(--space-3xs);
+  }
+
+  .stage-chrome__quality-notice {
+    flex-basis: 100%;
+    max-inline-size: 52ch;
+    margin: 0;
+    padding: var(--space-3xs) var(--space-2xs);
+    border: var(--hairline) solid var(--color-accent-stage);
+    border-radius: var(--radius-sm);
+    background-color: color-mix(in srgb, var(--color-stage) 88%, transparent);
+    color: var(--color-stage-ink);
+    font-size: var(--text-2xs);
+    line-height: var(--leading-normal);
   }
 
   .stage-chrome__motion {

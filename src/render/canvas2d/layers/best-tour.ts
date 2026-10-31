@@ -17,6 +17,7 @@
  */
 
 import type { AcoParams, AcoSnapshot, City } from '../../../engines/aco/types';
+import { qualityProfile } from '../../../lib/quality';
 import { ACO_WORLD_SCALE } from '../../../stories/aco/world';
 import type { Canvas2DLayer, Canvas2DLayerFrame } from '../Canvas2DRenderer';
 import type { MutablePoint } from '../camera';
@@ -102,11 +103,14 @@ export function createBestTourLayer(): Canvas2DLayer<AcoParams, AcoSnapshot> {
 
       const zoom = frame.camera.zoom;
       const highlight = clamp01(frame.highlight);
+      const profile = qualityProfile(frame.quality ?? 'high');
 
-      haloStyle.color = frame.theme.amber;
-      haloStyle.width = pixelsToWorld(HALO_WIDTH_PX + highlight * 2, zoom);
-      haloStyle.alpha = 0.26 + highlight * 0.18;
-      drawPolyline(frame.ctx, tourPoints, haloStyle, false, pointCount);
+      if (profile.tourHalo) {
+        haloStyle.color = frame.theme.amber;
+        haloStyle.width = pixelsToWorld(HALO_WIDTH_PX + highlight * 2, zoom);
+        haloStyle.alpha = 0.26 + highlight * 0.18;
+        drawPolyline(frame.ctx, tourPoints, haloStyle, false, pointCount);
+      }
 
       dash[0] = pixelsToWorld(DASH_ON_PX, zoom);
       dash[1] = pixelsToWorld(DASH_OFF_PX, zoom);

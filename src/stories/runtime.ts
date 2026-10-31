@@ -183,6 +183,15 @@ export interface StoryAuxiliaryView {
   readonly summary: string;
   readonly cameraPresets: readonly StoryCameraPreset[];
   readonly map: StoryMapView | null;
+  /**
+   * Engine health when the story has a bounded backlog. `degraded` is true
+   * only after whole iterations were dropped; the presentation can then show a
+   * visible quality notice rather than pretending nothing was lost.
+   */
+  readonly health?: {
+    readonly droppedIterations: number;
+    readonly degraded: boolean;
+  };
 }
 
 /** Story-specific map adapter. All engine calls stay inside the story module. */
@@ -587,6 +596,9 @@ export function createStoryModule<P extends object, S, M>(
               inner.resize(width, height, dpr),
             setScene: (scene) => inner.setScene(scene),
             setParams: (next) => inner.setParams(toConcreteParams<P>(next)),
+            setQuality: (quality) => {
+              inner.setQuality?.(quality);
+            },
             setPaused: (paused: boolean) => inner.setPaused(paused),
             // The snapshot is taken here from the typed engine rather than
             // trusting the shell's opaque object, so the renderer never sees

@@ -125,8 +125,10 @@ export function drawLine(
  * Draw many independent line segments with one path and one stroke.
  *
  * `segments` is a flat `[x1, y1, x2, y2, …]` buffer and only the first
- * `segmentCount` entries are read. This is the all-pairs candidate-edge path:
- * one `beginPath`/`stroke` pair instead of one save/restore per edge keeps a
+ * `segmentCount` entries are read. `stride` samples every Nth entry so a
+ * low-quality tier can paint a deterministic subset without building a second
+ * buffer. This is the all-pairs candidate-edge path: one
+ * `beginPath`/`stroke` pair instead of one save/restore per edge keeps a
  * 150-city graph within budget, and it allocates nothing.
  */
 export function drawSegments(
@@ -135,18 +137,20 @@ export function drawSegments(
   segmentCount: number,
   style: StrokeStyle,
   startSegment = 0,
+  stride = 1,
 ): void {
   if (segmentCount <= 0) return;
   const total = Math.floor(segments.length / 4);
   const start = Math.max(0, Math.floor(startSegment));
   const limit = Math.min(segmentCount, total - start);
   if (limit <= 0) return;
+  const step = Number.isFinite(stride) && stride >= 1 ? Math.floor(stride) : 1;
 
   ctx.save();
   applyAlpha(ctx, style.alpha);
   applyStroke(ctx, style);
   ctx.beginPath();
-  for (let index = 0; index < limit; index += 1) {
+  for (let index = 0; index < limit; index += step) {
     const offset = (start + index) * 4;
     const x1 = segments[offset];
     const y1 = segments[offset + 1];

@@ -13,7 +13,7 @@
  * part of the scene, so every `setScene` call is the single source of truth.
  */
 
-import type { Vec3 } from '../engines/core/types';
+import type { QualityTier, Vec3 } from '../engines/core/types';
 
 /**
  * 2D camera.
@@ -156,6 +156,16 @@ export interface StageRenderer<P extends object, S> {
    * fields; the engine remains the owner of simulation state.
    */
   setParams(params: P): void;
+
+  /**
+   * Apply a presentation quality tier.
+   *
+   * Optional so the existing contract and simple fake renderers stay valid. A
+   * renderer that implements it recomputes its DPR/canvas size and passes the
+   * tier to its layers. Quality affects presentation cost only; it never
+   * changes engine parameters or the run identity.
+   */
+  setQuality?(quality: QualityTier): void;
 
   /**
    * Pause or resume visual animation. The last frame remains visible. Pausing

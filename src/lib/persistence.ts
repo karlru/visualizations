@@ -17,6 +17,8 @@ export const PREFERENCE_KEYS = {
   articleMode: 'algorithm-stories.article-mode',
   /** `reduced` or `full`. `reduced` may only reduce motion further than the OS. */
   reducedMotion: 'algorithm-stories.reduced-motion',
+  /** `auto`, `high`, `medium`, or `low`. Presentation-only quality profile. */
+  quality: 'algorithm-stories.quality',
 } as const;
 
 export type PreferenceKey = (typeof PREFERENCE_KEYS)[keyof typeof PREFERENCE_KEYS];
