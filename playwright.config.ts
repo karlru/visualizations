@@ -31,6 +31,18 @@ export default defineConfig({
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
+      // The focused mobile gate runs in the `mobile` project only.
+      testIgnore: /aco-mobile\.spec\.ts/,
+    },
+    {
+      // Mobile gate for Step 3.7. It reuses the production build and the same
+      // preview server. The matrix is deliberately scoped: the desktop visual
+      // baselines, the explicit viewport responsive matrix, and the frame-time
+      // harness must not run twice, while the mobile-appropriate ACO specs and
+      // the accessibility scans do.
+      name: 'mobile',
+      use: { ...devices['Pixel 7'] },
+      testMatch: /(?:aco(?:-story|-lab|-mobile)?|a11y)\.spec\.ts/,
     },
   ],
   webServer: {

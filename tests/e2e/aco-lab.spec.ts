@@ -352,6 +352,13 @@ test.describe('ACO lab', () => {
     );
     await page.waitForTimeout(250);
 
+    // Bring the layer checkboxes into view before capturing. On a phone the
+    // lab panel sits below the sticky stage, so the first check() would
+    // otherwise scroll the page and let a progress event repaint the scene
+    // between the two signatures.
+    await page.locator('#aco-layer-pheromone').scrollIntoViewIfNeeded();
+    await page.waitForTimeout(250);
+
     const before = await readLab(page);
     const signature = await canvasSignature(page);
     expect(before.stageMounts).toBeGreaterThan(0);
