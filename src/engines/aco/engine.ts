@@ -74,10 +74,13 @@ export const BASE_ITERATIONS_PER_SECOND = 1;
  * Maximum whole iterations one `step(dt)` call may run.
  *
  * At the release-1 worst case (150 cities × 200 ants) one iteration evaluates
- * about 2.25 million candidate transitions. Two iterations per call stays well
- * inside the 200 ms long-task budget even on the reference mobile device.
+ * about 2.25 million candidate transitions, which is already a large slice of
+ * a 200 ms budget in a browser. One iteration per call keeps a single frame
+ * task below the long-task limit even on the reference mobile device; at the
+ * normal 1×–4× speeds the pending-time budget still averages one iteration per
+ * 250 ms–1 s, so the cap does not slow an ordinary run.
  */
-export const MAX_ITERATIONS_PER_STEP = 2;
+export const MAX_ITERATIONS_PER_STEP = 1;
 
 /**
  * Maximum whole-iteration backlog retained across calls (about two simulated
