@@ -523,6 +523,13 @@ export class Canvas2DRenderer<P extends object, S> implements StageRenderer<P, S
 
     const { cssWidth, cssHeight, dpr } = this.size;
 
+    // Clear the whole backing store, not just the CSS-sized rectangle. At a
+    // fractional DPR (for example 1.5) the last device row is only partially
+    // covered, and a plain fillRect would blend the edge over the previous
+    // frame on every redraw. Clearing first keeps repeated paused redraws
+    // pixel-identical and prevents a growing fringe at the canvas edge.
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.globalAlpha = 1;
     ctx.fillStyle = theme.stage;

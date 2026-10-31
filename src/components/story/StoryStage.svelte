@@ -190,10 +190,15 @@
     lastTickerTime = 0;
 
     if (!ready) return;
-    if (nextPaused) {
-      syncFrames(true);
-    } else {
+    if (visible && !hidden) {
+      // Repaint whenever the stage (re)enters view or its pause state changes,
+      // even if the reader clock stays paused. Scene composition continues to
+      // update while the stage is offscreen, so a paused stage that scrolls
+      // back into view would otherwise present a stale frame. This is
+      // presentation-only: it never advances the clock or the engine.
       drawFrame(true);
+    } else {
+      syncFrames(true);
     }
   }
 
