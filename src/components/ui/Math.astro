@@ -14,6 +14,12 @@
  * The visible `label` names the rule; `caption` describes it in words so a
  * reader who cannot use the notation still gets the relationship. The `<figure>`
  * is the semantic wrapper and the caption is its accessible description.
+ *
+ * Display math can still overflow at narrow widths, so the display is a named
+ * `<section>` (a `region` landmark) with `tabindex="0"`. That keeps the scroll
+ * surface keyboard-pannable and satisfies axe's scrollable-region-focusable
+ * rule; see the inline suppression note for why Biome's
+ * noNoninteractiveTabindex rule is intentionally excepted here.
  */
 
 import katex from 'katex';
@@ -47,6 +53,7 @@ const html = katex.renderToString(tex, {
   aria-describedby={`${id}-caption`}
 >
   <p class="formula-math__label" id={`${id}-label`}>{label}</p>
-  <div class="formula-math__display" set:html={html} />
+  <!-- biome-ignore lint/a11y/noNoninteractiveTabindex: display math can overflow, so this is an intentional keyboard-pannable scroll region; axe's scrollable-region-focusable rule requires it -->
+  <section class="formula-math__display" aria-label={`${label} formula`} tabindex="0" set:html={html} />
   <figcaption class="formula-math__caption" id={`${id}-caption`}>{caption}</figcaption>
 </figure>
