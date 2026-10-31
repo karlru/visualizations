@@ -47,6 +47,14 @@ export interface StoryRuntimeDebug {
   readonly storyKey: string;
   readonly debugState: () => StoryRuntimeDebugState;
   readonly entryState: () => StoryRuntimeEntryState | null;
+  /**
+   * Acceptance and visual-regression hook: pause the reader clock, run exactly
+   * `count` fixed 1/60 s steps on the existing engine, then repaint and sample
+   * once. The engine still applies its own bounded iteration rate, so the same
+   * count always produces the same seeded state. It is a test surface, not a
+   * reader feature; the production UI never calls it.
+   */
+  readonly advanceFixedSteps: (count: number) => void;
 }
 
 declare global {

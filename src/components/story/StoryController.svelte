@@ -1156,6 +1156,30 @@
   }
 
   /**
+   * Deterministic acceptance/visual-regression advance. It pauses first, so no
+   * reader-clock frame can race the requested count, and reuses the same
+   * `runtime.step` path as live playback. The engine's own seeded order and
+   * per-call iteration cap make the resulting state independent of frame rate.
+   */
+  function advanceFixedSteps(count: number): void {
+    const currentRuntime = runtime;
+    const currentClock = clock;
+    if (currentRuntime === null || currentClock === null) return;
+    if (!Number.isSafeInteger(count) || count <= 0 || count > MAX_REPLAY_STEPS) return;
+
+    setPaused(true);
+    const stepSeconds = currentClock.fixedStepSeconds;
+    for (let step = 0; step < count; step += 1) {
+      currentRuntime.step(stepSeconds);
+    }
+    stepCount += count;
+    simulatedSeconds = stepCount * stepSeconds;
+    stageHandle?.redraw();
+    writeDebug();
+    sampleMetrics(true);
+  }
+
+  /**
    * Step between discrete scene keyframes. This is the reduced-motion reading
    * path: it pauses the clock, never scrubs scroll progress, and composes the
    * scene at an exact keyframe. Under full motion a later scroll event simply
@@ -1410,6 +1434,7 @@
     window.__storyRuntimeDebug = {
       storyKey,
       entryState: () => entryState,
+      advanceFixedSteps,
       debugState: (): StoryRuntimeDebugState => ({
         storyKey,
         status,
@@ -1544,9 +1569,16 @@
       runtimeChapters = new Map(chaptersInDocument.map((chapter) => [chapter.id, chapter]));
       chapters = rail;
 
-      for (const chapter of chaptersInDocument) {
+      for (const [index, chapter] of chaptersInDocument.entries()) {
+        // The final chapter owns everything the stage renders below it: the
+        // story shell places the lab panel after the chapter list, so the last
+        // trigger must extend to the document end. With the default
+        // `bottom center` end, scrolling from the lab prose into the lab
+        // controls exited the chapter and re-entered it, resetting the run.
+        const isLast = index === chaptersInDocument.length - 1;
         instance.registerChapter(chapter.element, {
           id: chapter.id,
+          end: isLast ? 'max' : undefined,
           onEnter: (event) => handleChapterEvent('enter', chapter, event),
           onProgress: (event) => handleChapterEvent('progress', chapter, event),
           onExit: (event) => handleChapterEvent('exit', chapter, event),
