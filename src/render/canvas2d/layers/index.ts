@@ -11,6 +11,12 @@ import type { Canvas2DLayer } from '../Canvas2DRenderer';
 import { createAntsLayer } from './ants';
 import { createBestTourLayer } from './best-tour';
 import { createGraphLayer } from './graph';
+import {
+  createLessonAntLayer,
+  createLessonEnumerateLayer,
+  createLessonGrowthLayer,
+  createLessonTourLayer,
+} from './lesson';
 import { createPheromoneLayer } from './pheromone';
 import { createProbabilityFanLayer, type ProbabilityFanLayerOptions } from './probability-fan';
 
@@ -27,6 +33,10 @@ export function createAcoLayers(
 ): readonly Canvas2DLayer<AcoParams, AcoSnapshot>[] {
   return [
     createGraphLayer(),
+    createLessonGrowthLayer(),
+    createLessonEnumerateLayer(),
+    createLessonTourLayer(),
+    createLessonAntLayer(),
     createPheromoneLayer(),
     createAntsLayer(),
     createBestTourLayer(),

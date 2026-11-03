@@ -56,23 +56,16 @@ async function waitForLab(page: Page): Promise<void> {
 }
 
 async function scrollToChapter(page: Page, id: string): Promise<void> {
-  const target = await page.evaluate((chapterId) => {
+  await page.evaluate((chapterId) => {
     const element = document.getElementById(chapterId);
     if (!element) throw new Error(`Missing chapter ${chapterId}`);
-    const top = element.getBoundingClientRect().top + window.scrollY - 96;
-    const clamped = Math.max(
-      0,
-      Math.min(top, document.documentElement.scrollHeight - window.innerHeight),
-    );
     const html = document.documentElement;
     const previous = html.style.scrollBehavior;
     html.style.scrollBehavior = 'auto';
-    window.scrollTo(0, clamped);
+    element.scrollIntoView({ block: 'center', inline: 'nearest' });
     html.style.scrollBehavior = previous;
-    return clamped;
   }, id);
 
-  await page.waitForFunction((top) => Math.abs(window.scrollY - top) <= 2, target);
   await page.waitForFunction(
     (chapterId) =>
       document.querySelector<HTMLElement>('[data-story-controller]')?.dataset.activeChapter ===
@@ -89,10 +82,14 @@ async function overflow(page: Page): Promise<{ document: number; body: number }>
 }
 
 test.describe('ACO on the mobile project', () => {
-  test('keeps the stage, chrome, rail, and ten chapters inside the viewport', async ({ page }) => {
+  test('keeps the stage, chrome, rail, and thirteen chapters inside the viewport', async ({
+    page,
+  }) => {
     const errors = watchErrors(page);
-    await page.goto(`${STORY}?lenis=off`);
+    // Start in the lab so the full chrome (speed and playback) is mounted.
+    await page.goto(LAB);
     await waitForRuntime(page);
+    await waitForLab(page);
 
     const viewport = page.viewportSize();
     if (viewport === null) throw new Error('Missing mobile viewport');
@@ -105,9 +102,9 @@ test.describe('ACO on the mobile project', () => {
     await expect(page.locator('[data-story-stage]')).toBeVisible();
     await expect(page.locator('canvas[data-stage-canvas]')).toBeVisible();
     await expect(page.getByRole('navigation', { name: 'Chapters' }).getByRole('link')).toHaveCount(
-      10,
+      13,
     );
-    await expect(page.locator('[data-story-chapter]')).toHaveCount(10);
+    await expect(page.locator('[data-story-chapter]')).toHaveCount(13);
 
     // Scroll just the stage into view. On the narrative chapters the one-column
     // layout deliberately leaves the stage in normal flow so the pseudocode
@@ -138,13 +135,13 @@ test.describe('ACO on the mobile project', () => {
     await expect(page.getByTestId('article-mode-toggle')).toBeVisible();
 
     // Scrolling into the story keeps one stage and never widens the page.
-    await scrollToChapter(page, 'emergence');
+    await scrollToChapter(page, 'the-problem');
     expect(await overflow(page)).toEqual({ document: 0, body: 0 });
     await expect(page.locator('[data-story-stage]')).toHaveCount(1);
     await expect(page.locator('canvas[data-stage-canvas]')).toHaveCount(1);
     await expect(page.locator('[data-story-controller]')).toHaveAttribute(
       'data-active-chapter',
-      'emergence',
+      'the-problem',
     );
 
     expect(errors).toEqual([]);
@@ -156,7 +153,7 @@ test.describe('ACO on the mobile project', () => {
     await waitForRuntime(page);
 
     const rail = page.getByRole('navigation', { name: 'Chapters' });
-    await rail.getByRole('link', { name: /Emergence/ }).tap();
+    await rail.getByRole('link', { name: /A few more ants/ }).tap();
     await page.waitForFunction(
       () =>
         document.querySelector<HTMLElement>('[data-story-controller]')?.dataset.activeChapter ===
@@ -164,7 +161,7 @@ test.describe('ACO on the mobile project', () => {
     );
     await expect(page.locator('[data-story-controller]')).toHaveAttribute(
       'data-active-scene',
-      'emergence',
+      'colony',
     );
 
     const playPause = page.getByTestId('stage-play-pause');

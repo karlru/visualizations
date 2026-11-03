@@ -6,7 +6,9 @@ starts. This note maps every `FR-STORY-*` requirement in
 All rows were run on 2026-10-30 with `pnpm lint`, `pnpm test`, `pnpm build`,
 `pnpm check:links`, and `CI=1 pnpm test:e2e`. Step 3.3 added the public ACO
 route; `tests/e2e/aco-story.spec.ts` extends the same runtime checks to the real
-story and its ten chapters.
+story. Step 3.8 rewrote that story as a thirteen-chapter guided lesson: the first
+four chapters are scroll-driven and non-interactive, chapters 5–12 allow only
+pause/replay, and chapter 13 is the sole free-play lab.
 
 ## Runtime architecture
 

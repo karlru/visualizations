@@ -60,84 +60,170 @@ export const ACO_STORY_PRESETS: readonly Preset<AcoParams>[] = Object.freeze(
 
 /**
  * Chapter ↔ scene map. Ids, titles, and scene names are part of the contract
- * that Step 3.3 prose and Step 3.7 tests rely on.
+ * that the prose, lesson layers, and E2E tests rely on.
+ *
+ * The opening chapters are scripted teaching scenes (`lockParams`): they always
+ * show the five-city instance, even after the reader has played in the lab.
+ * Chapter entry is the only place simulation configuration changes. Formal
+ * notation appears in chapters 9–10, after the reader has seen the mechanism;
+ * the lab is the only free-play chapter.
  *
  * `pseudocodeLine` is a 0-based line into the Ant System pseudocode in
- * `docs/stories.md` §2.7; Step 3.4 refines the highlight ranges but the
- * starting line stays meaningful. ACO has no guided `tourAct`.
+ * `docs/stories.md` §2.7 and is present only where the panel is visible.
+ * ACO has no guided `tourAct`.
  */
+const DEMO_CHAPTER_PARAMS: Partial<AcoParams> = Object.freeze({
+  cityCount: 5,
+  seed: 42,
+  alpha: 1,
+  beta: 2,
+  rho: 0.5,
+});
+
+function demoParams(antCount: number, speed = 1): Partial<AcoParams> {
+  return { ...DEMO_CHAPTER_PARAMS, antCount, speed };
+}
+
+/** A scroll-driven teaching scene with no simulation controls at all. */
+const SCRIPTED_PRESENTATION = Object.freeze({
+  metrics: false,
+  pseudocode: false,
+  chrome: 'none' as const,
+  lockParams: true,
+});
+
+/** A guided scene the reader may pause or replay, but not retune. */
+const GUIDED_PLAYBACK_PRESENTATION = Object.freeze({
+  metrics: false,
+  pseudocode: false,
+  chrome: 'playback' as const,
+  lockParams: true,
+});
+
+/** A formal scene with the live metrics panel but no parameter controls. */
+const FORMAL_PRESENTATION = Object.freeze({
+  metrics: true,
+  pseudocode: false,
+  chrome: 'playback' as const,
+  lockParams: true,
+});
+
 export const ACO_CHAPTERS: readonly ChapterSpec<AcoParams>[] = Object.freeze([
   {
-    id: 'the-colony',
-    title: 'The colony',
-    scene: 'colony-overview',
-    pseudocodeLine: 2,
-    annotations: ['colony-map', 'colony-ants'],
-    reducedMotionSteps: 3,
+    id: 'the-problem',
+    title: 'Five cities, one round trip',
+    scene: 'five-cities',
+    sceneOverrides: { params: demoParams(1) },
+    annotations: ['demo-tour', 'demo-home'],
+    reducedMotionSteps: 6,
+    presentation: SCRIPTED_PRESENTATION,
   },
   {
-    id: 'the-problem',
-    title: 'The problem',
-    scene: 'tour-problem',
-    pseudocodeLine: 3,
-    annotations: ['candidate-tour', 'return-edge'],
-    reducedMotionSteps: 2,
+    id: 'try-every-tour',
+    title: 'Try every tour',
+    scene: 'enumerate-tours',
+    sceneOverrides: { params: demoParams(1) },
+    annotations: ['demo-twelve', 'demo-optimum'],
+    reducedMotionSteps: 13,
+    presentation: SCRIPTED_PRESENTATION,
+  },
+  {
+    id: 'too-many-tours',
+    title: 'Too many tours',
+    scene: 'factorial-wall',
+    sceneOverrides: { params: demoParams(1) },
+    annotations: ['demo-growth'],
+    reducedMotionSteps: 6,
+    presentation: SCRIPTED_PRESENTATION,
   },
   {
     id: 'one-ants-choice',
-    title: "One ant's choice",
-    scene: 'focal-choice',
-    pseudocodeLine: 4,
-    annotations: ['focal-city', 'allowed-neighbours'],
-    reducedMotionSteps: 3,
-  },
-  {
-    id: 'the-probability-rule',
-    title: 'The probability rule',
-    scene: 'probability-rule',
-    pseudocodeLine: 4,
-    annotations: ['pheromone-weight', 'distance-weight'],
-    reducedMotionSteps: 3,
+    title: 'One ant, alone',
+    scene: 'one-ant',
+    sceneOverrides: { params: demoParams(1) },
+    annotations: ['demo-one-ant', 'demo-allowed', 'demo-ant-trail'],
+    reducedMotionSteps: 6,
+    presentation: SCRIPTED_PRESENTATION,
   },
   {
     id: 'leaving-a-trace',
-    title: 'Leaving a trace',
+    title: 'Leaving a trail',
     scene: 'deposit',
-    pseudocodeLine: 7,
-    annotations: ['deposit-edge', 'shorter-tour-deposit'],
-    reducedMotionSteps: 3,
+    sceneOverrides: { params: demoParams(1) },
+    annotations: ['demo-trail'],
+    reducedMotionSteps: 4,
+    presentation: GUIDED_PLAYBACK_PRESENTATION,
   },
   {
     id: 'forgetting',
-    title: 'Forgetting',
+    title: 'Trails fade',
     scene: 'evaporation',
-    pseudocodeLine: 6,
-    annotations: ['evaporating-edge', 'remaining-trail'],
-    reducedMotionSteps: 3,
+    sceneOverrides: { params: demoParams(1) },
+    annotations: ['demo-fade'],
+    reducedMotionSteps: 4,
+    presentation: GUIDED_PLAYBACK_PRESENTATION,
+  },
+  {
+    id: 'two-ants',
+    title: 'A second ant',
+    scene: 'two-ants',
+    sceneOverrides: { params: demoParams(2, 0.5) },
+    annotations: ['demo-second-ant'],
+    reducedMotionSteps: 4,
+    presentation: GUIDED_PLAYBACK_PRESENTATION,
   },
   {
     id: 'emergence',
-    title: 'Emergence',
-    scene: 'emergence',
-    pseudocodeLine: 8,
-    annotations: ['best-tour', 'convergence-chart'],
+    title: 'A few more ants',
+    scene: 'colony',
+    sceneOverrides: { params: demoParams(4) },
+    annotations: ['demo-colony', 'demo-match'],
     reducedMotionSteps: 4,
+    presentation: GUIDED_PLAYBACK_PRESENTATION,
+  },
+  {
+    id: 'the-probability-rule',
+    title: 'The rule behind the choice',
+    scene: 'probability-rule',
+    sceneOverrides: { params: demoParams(1) },
+    pseudocodeLine: 4,
+    annotations: ['transition-weight', 'distance-weight'],
+    reducedMotionSteps: 4,
+    presentation: {
+      ...GUIDED_PLAYBACK_PRESENTATION,
+      metrics: true,
+      pseudocode: true,
+    },
+  },
+  {
+    id: 'the-update-rule',
+    title: 'The rule behind the trail',
+    scene: 'update-rule',
+    sceneOverrides: { params: demoParams(4) },
+    pseudocodeLine: 6,
+    annotations: ['deposit-rule', 'update-rule'],
+    reducedMotionSteps: 4,
+    presentation: {
+      ...GUIDED_PLAYBACK_PRESENTATION,
+      metrics: true,
+      pseudocode: true,
+    },
   },
   {
     id: 'tuning-the-colony',
     title: 'Tuning the colony',
     scene: 'tuning',
-    pseudocodeLine: 4,
-    annotations: ['balanced-preset', 'greedy-preset'],
-    reducedMotionSteps: 3,
+    annotations: ['balanced-preset', 'greedy-preset', 'best-tour'],
+    reducedMotionSteps: 4,
+    presentation: FORMAL_PRESENTATION,
   },
   {
     id: 'when-it-fails',
     title: 'When it fails',
     scene: 'limits',
-    pseudocodeLine: 9,
     annotations: ['local-optimum', 'heuristic-limit'],
     reducedMotionSteps: 3,
+    presentation: FORMAL_PRESENTATION,
   },
   {
     id: 'the-lab',
@@ -146,6 +232,12 @@ export const ACO_CHAPTERS: readonly ChapterSpec<AcoParams>[] = Object.freeze([
     pseudocodeLine: 2,
     annotations: ['lab-controls', 'share-run'],
     reducedMotionSteps: 2,
+    presentation: {
+      metrics: true,
+      pseudocode: true,
+      chrome: 'full',
+      lockParams: false,
+    },
   },
 ]);
 

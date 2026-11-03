@@ -27,12 +27,15 @@ Both are described in detail in [`docs/stories.md`](docs/stories.md). Everything
 ## Experience principles
 
 1. **One idea per screen.** Chapters are short; the visualization carries the argument.
-2. **Show, then name.** The reader sees the behavior before the formal definition.
-3. **Direct manipulation.** Sliders, presets, seeds, and camera controls change the running system.
-4. **The lab is part of the story.** Each story ends with a sandbox, not a dead end.
-5. **Never trap the reader.** Native scrolling, pause controls, article mode, keyboard access, and reduced motion are mandatory.
-6. **Craft over volume.** Two polished stories beat ten unfinished demos.
-7. **3D only when the third dimension is the point.** RANDU qualifies; a bar chart does not.
+2. **Start with the smallest honest example.** Five cities before thirty; one ant before a colony.
+3. **Show, then name.** The reader sees the behavior before the formal definition.
+4. **Earn the math.** Notation and pseudocode appear only after the mechanism is visible.
+5. **The opening is a guided lesson.** The first chapters are non-interactive; the reader watches exactly what they need to see.
+6. **Direct manipulation belongs in the lab.** The final chapter is where the reader changes the system.
+7. **The lab is part of the story.** Each story ends with a sandbox, not a dead end.
+8. **Never trap the reader.** Native scrolling, pause controls, article mode, keyboard access, and reduced motion are mandatory.
+9. **Craft over volume.** Two polished stories beat ten unfinished demos.
+10. **3D only when the third dimension is the point.** RANDU qualifies; a bar chart does not.
 
 ## Design direction
 

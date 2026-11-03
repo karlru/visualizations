@@ -76,6 +76,34 @@ export interface Preset<P extends object> {
   readonly params: Partial<P>;
 }
 
+/** Stage controls available to a chapter. */
+export type ChapterChromeMode = 'none' | 'playback' | 'full';
+
+/**
+ * Per-chapter presentation switches.
+ *
+ * These are deliberately presentation-only. They let an authored story reveal
+ * one idea at a time: an opening chapter can hide the simulation controls,
+ * metrics, and pseudocode until the reader has seen the mechanism they explain.
+ * A story that omits this field keeps the release-1 behaviour (all controls and
+ * panels visible), so existing stories are unaffected.
+ *
+ * `lockParams` makes the chapter's typed parameter overrides win over the
+ * reader's live lab choices. It exists for scripted teaching scenes: after a
+ * reader experiments in the lab, scrolling back to the five-city explanation
+ * must show the five-city instance, not the reader's thirty-city run.
+ */
+export interface ChapterPresentation {
+  /** Show the live metrics panel. Defaults to true. */
+  readonly metrics?: boolean;
+  /** Show the highlighted pseudocode panel. Defaults to true. */
+  readonly pseudocode?: boolean;
+  /** Stage controls. Defaults to `full`. */
+  readonly chrome?: ChapterChromeMode;
+  /** Let this chapter's parameter overrides beat the reader's live choices. */
+  readonly lockParams?: boolean;
+}
+
 /**
  * A narrative chapter and the scene it activates.
  *
@@ -94,6 +122,7 @@ export interface ChapterSpec<P extends object> {
   readonly annotations?: readonly string[];
   readonly reducedMotionSteps?: number;
   readonly tourAct?: number;
+  readonly presentation?: ChapterPresentation;
 }
 
 /**

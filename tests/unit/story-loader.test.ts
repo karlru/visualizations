@@ -70,7 +70,7 @@ describe('story module registry', () => {
     expect(view.slug).toBe('ant-colony-optimization');
     expect(view.rendererId).toBe('canvas2d');
     expect(view.defaults).toEqual(ACO_DEFAULTS);
-    expect(view.chapters).toHaveLength(10);
+    expect(view.chapters).toHaveLength(13);
     expect(view.chapters.map(({ id, title, scene }) => ({ id, title, scene }))).toEqual(
       ACO_CHAPTERS.map(({ id, title, scene }) => ({ id, title, scene })),
     );

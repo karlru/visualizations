@@ -55,6 +55,47 @@ The rule is **one idea per screen**. If a chapter needs two ideas, split it.
 - **Article mode:** the complete story as prose, without the stage.
 - **Guided tour:** an automatic animation that can be paused, replayed, and interrupted.
 
+### 1.3 Teaching arc and progressive disclosure
+
+Every story is written for a curious reader who is **interested in the topic but
+has no previous knowledge of it**. The story must earn every abstraction before
+it uses it. The order below is normative:
+
+1. **Concrete problem.** Start with the smallest instance that still shows the
+   idea. Show the object, not the notation: five cities, one ant, one trail.
+2. **Obvious approach.** Show the straightforward method doing real work on the
+   small instance. Let the reader see it succeed before it is criticized.
+3. **Why it breaks.** Scale the instance until the obvious method is visibly
+   impossible. The failure must be shown, not merely asserted.
+4. **Mechanism.** Return to the small instance. Introduce one rule, agent, or
+   step at a time, with one visual change per chapter.
+5. **Growth.** Add more agents or parameters gradually. Show the shared
+   structure emerge from the interaction, not from a narrator's summary.
+6. **Formalism.** Only now introduce notation, formulas, and pseudocode. Every
+   symbol must map back to something the reader has already seen.
+7. **Lab.** The free-play playground is the last chapter. No essential
+   explanation may depend on it.
+
+Rules that follow from the arc:
+
+- The opening two or three chapters are **guided and non-interactive**: no
+  parameter sliders, presets, or simulation controls. The reader watches one
+  deterministic change at a time. Scrolling or the reduced-motion keyframe
+  stepper is the only way to advance.
+- **One idea per chapter.** Each chapter changes exactly one visual variable.
+  If a chapter needs two ideas, split it.
+- Define every term before using it. Do not use notation, acronyms, or jargon
+  before the reader has seen the thing they name.
+- The animation must be understandable **with the prose covered**. The prose
+  must be complete **with the stage hidden**.
+- Keep one running example until the mechanism is understood. Do not switch
+  datasets without saying why.
+- Hide metrics, probability fans, convergence charts, and pseudocode until
+  they explain something the reader can already see.
+- Reduced motion replaces every animated step with a discrete keyframe in the
+  same order.
+- If a control would let the reader skip the explanation, do not show it yet.
+
 ## 2. Initial story: Ant Colony Optimization
 
 ### 2.1 Metadata
@@ -65,54 +106,85 @@ The rule is **one idea per screen**. If a chapter needs two ideas, split it.
 | **Slug** | `ant-colony-optimization` |
 | **Category** | Optimization |
 | **Visual mode** | `2d` |
-| **Difficulty** | Intermediate |
-| **Difficulty note** | Starts at introductory level; assumes basic graphs and probability |
-| **Length** | Long-form, ten chapters including the lab |
-| **Prerequisites** | Basic graphs, distance, and probability |
+| **Difficulty** | Introductory |
+| **Difficulty note** | No prior knowledge assumed; the story starts with a five-city example. |
+| **Length** | Long-form, thirteen chapters including the lab |
+| **Prerequisites** | None. Tours, distance, probability, and pheromone are defined in the story. |
 | **Status** | Initial release |
 
-**Dek:** A colony has no leader and no map. Yet, through pheromones and local decisions, it can find short routes through a set of cities.
+**Dek:** Five cities, twelve possible round trips, and one salesman who wants the shortest one. When the map grows, checking every route stops being possible — so a colony of ants tries instead.
 
 ### 2.2 Learning objectives
 
 By the end, the reader should be able to:
 
-1. Explain the traveling salesman problem and why it is hard.
-2. Describe how one ant constructs a tour using pheromone and distance.
-3. Explain the transition probability formula and the roles of `α` and `β`.
+1. Explain the traveling salesman problem and why a tour is a closed cycle.
+2. Explain why checking every possible tour stops being feasible as cities are added.
+3. Describe how one ant chooses its next city from local information.
 4. Explain pheromone deposit and evaporation, and why forgetting matters.
 5. Explain stigmergy: indirect communication through a shared environment.
-6. Explain how positive feedback produces an emergent solution.
-7. Predict how extreme parameter values change the colony's behavior.
+6. Explain how more ants and positive feedback produce an emergent route.
+7. Read the transition and update formulas and explain the roles of `α`, `β`, and `ρ`.
 8. Name the limitations of Ant System and the situations where it is useful.
 
-### 2.3 Chapters
+### 2.3 Teaching sequence
 
-| # | Chapter | Scene | Key idea |
-|---|---|---|---|
-| 1 | **The colony** | Overview of a city map; a single ant wanders; then a colony appears | Many simple agents can outperform one clever agent. |
-| 2 | **The problem** | Cities connected by faint edges; a candidate tour is drawn | The goal is a short tour that visits every city once and returns. |
-| 3 | **One ant's choice** | Zoom to a focal city; probability fan over allowed next cities | An ant chooses probabilistically, biased by pheromone and distance. |
-| 4 | **The probability rule** | Formula overlay; probability fan updates as `α` and `β` change | `τ^α` rewards experience; `η^β` rewards short edges. |
-| 5 | **Leaving a trace** | Completed tours; pheromone deposits appear on used edges | Each ant deposits `Q/L_k` on every edge it used, so shorter tours deposit more per edge; the shared trail is stigmergy. |
-| 6 | **Forgetting** | Pheromone fades on unused edges; the map changes | Evaporation prevents stale paths from dominating forever. |
-| 7 | **Emergence** | Pull back; the best tour emerges; convergence chart appears | A short tour becomes a visible, reinforced path. |
-| 8 | **Tuning the colony** | Preset comparison: balanced, greedy, stagnant, forgetful | Parameters trade exploration against exploitation. |
-| 9 | **When it fails** | Local optimum example; dynamic city map | ACO is a heuristic, not a guarantee. |
-| 10 | **The lab** | Full sandbox | The reader can build, run, and share their own colony. |
+The story follows §1.3 exactly. Chapters 1–4 are guided and non-interactive;
+chapters 5–8 add the mechanism and may only be paused or replayed; chapters 9–12
+are formal; chapter 13 is the only free-play lab.
+
+| # | Chapter | Visual | Key idea | Mode |
+|---|---|---|---|---|
+| 1 | **Five cities, one round trip** | Five numbered cities; one tour draws itself and returns home | A tour visits every city once and returns to the start. Its length includes the return. | Guided, no controls |
+| 2 | **Try every tour** | All twelve distinct tours checked one by one; the shortest is marked | Brute force is exact but only because the instance is tiny. | Guided, no controls |
+| 3 | **Too many tours** | The map grows from five to thirty cities; tour count and time explode | `(n−1)!/2` growth makes exhaustive search impossible. | Guided, no controls |
+| 4 | **One ant, alone** | Back to five cities; one ant sees only unvisited cities and distances, chooses one, and leaves a faint trail | A local rule can build a tour without a map. | Guided, no controls |
+| 5 | **Leaving a trail** | A completed tour deposits pheromone; shorter tours leave stronger trails | Deposit is `Q/L_k`; the shared trail is the beginning of stigmergy. | Guided, pause/replay |
+| 6 | **Trails fade** | Unused trails fade; used trails are renewed | Evaporation stops old evidence from dominating forever. | Guided, pause/replay |
+| 7 | **A second ant** | Two ants; the second reads the first trail or explores | A trail changes the next ant's choice: positive feedback begins. | Guided, pause/replay |
+| 8 | **A few more ants** | Four ants build trails; the colony reaches the same 1.617 tour brute force found | Many local choices produce a route no ant planned. | Guided, pause/replay |
+| 9 | **The rule behind the choice** | Probability fan on the five-city map; transition formula | `p_ij ∝ τ_ij^α · η_ij^β`. `α` trusts experience; `β` trusts distance. | Formal, pseudocode |
+| 10 | **The rule behind the trail** | Deposit and evaporation overlays; update formula | Evaporate first, then deposit `Q/L_k` on the edges each ant used. | Formal, pseudocode |
+| 11 | **Tuning the colony** | Automatic preset comparison on the thirty-city map | Exploration and exploitation trade off; no preset is universally best. | Formal, no controls |
+| 12 | **When it fails** | Local optimum and thirty-city best tour | Ant System is a heuristic: good, but not guaranteed shortest. | Formal, no controls |
+| 13 | **The lab** | Place and move cities, choose ants and parameters, start, share | The reader can build, run, and share their own colony. | Free play |
+
+The first four chapters have no parameter controls, no metrics panel, and no
+pseudocode. The lesson caption carries the current step, count, and length so the
+sequence is understandable with the prose covered.
 
 ### 2.4 Visual layers
 
 - **City graph:** nodes and faint candidate edges.
-- **Pheromone trails:** edge width and opacity proportional to pheromone, on a readable scale.
+- **Lesson tour:** a closed tour drawn one leg at a time, with a home marker.
+- **Lesson enumeration:** one candidate tour at a time, with the shortest so far
+  kept in a distinct amber halo, dash, and square markers.
+- **Lesson growth:** city dots added in stages, with the count and search-time
+  table in the DOM. Do not draw an all-pairs edge hairball at thirty cities.
+- **Lesson ant:** one ant, the current city, the allowed unvisited cities, the
+  chosen leg, and a faint trail behind the ant.
+- **Pheromone trails:** edge width and opacity proportional to pheromone, on a
+  readable scale.
 - **Ants:** moving dots with short trails, interpolated along chosen edges.
-- **Best tour:** a distinct accent path with its length, plus a pattern or weight difference so it does not rely on color alone.
-- **Probability fan:** arcs or bars showing the focal ant's top N next-city probabilities (default N = 8) plus an explicit "other (Σ)" bucket, with a textual ranked alternative.
-- **Convergence chart:** best and mean tour length over iterations.
+- **Best tour:** a distinct accent path with its length, plus a pattern or weight
+  difference so it does not rely on color alone.
+- **Probability fan:** arcs showing the focal ant's next-city probabilities. Name
+  up to `min(8, candidates)` and add an explicit "other (Σ)" bucket only when
+  candidates are omitted; provide a textual ranked alternative.
 - **Annotations:** DOM labels anchored to cities and edges.
-- **HUD:** iteration, best length, mean length, normalized diversity/entropy, colony size.
+- **HUD:** iteration, best length, mean length, normalized diversity/entropy, and
+  colony size. Hidden during the guided opening; the lesson caption replaces it.
 
 ### 2.5 Parameters and presets
+
+The story has two deliberate parameter sets:
+
+| Context | Cities | Ants | Purpose |
+|---|---|---|---|
+| Guided lesson (chapters 1–10) | 5 | 1–4 | Small enough to follow every leg and every trail. |
+| Lab default (chapters 11–13) | 30 | 40 | Large enough to show the method at work. |
+
+The lab exposes the full parameter set:
 
 | Parameter | Range | Default |
 |---|---|---|
@@ -125,7 +197,9 @@ By the end, the reader should be able to:
 | Speed | 0.5×, 1×, 2×, 4× | 1× |
 | Seed | integer | 42 |
 
-`Q` is an internal constant in release 1; it is not a lab control and is not encoded separately in the URL. Structural parameter changes restart the run at iteration 0; see `docs/requirements.md` §2.6.1.
+`Q` is an internal constant in release 1; it is not a lab control and is not
+encoded separately in the URL. Structural parameter changes restart the run at
+iteration 0; see `docs/requirements.md` §2.6.1.
 
 | Preset | Intent | Values |
 |---|---|---|
@@ -136,11 +210,21 @@ By the end, the reader should be able to:
 
 ### 2.6 Metrics
 
+During the guided opening (chapters 1–8) the lesson caption states only what the
+current step needs: the leg number, the candidate count, the current tour length,
+the shortest length so far, or the colony size. The full metrics panel appears
+from chapter 9 onward, and the convergence chart appears in the lab.
+
+The metrics panel shows:
+
 - Best tour length.
 - Mean tour length.
 - Iteration number.
 - Normalized diversity/entropy of the pheromone distribution.
-- Optional: improvement since the previous iteration, and the number of distinct tours.
+- Colony size and city count.
+
+The lesson caption is the text alternative for the opening animation. It must
+carry the same numbers the canvas is showing and must not announce every frame.
 
 The diversity metric is normalized Shannon entropy over the per-edge pheromone mass:
 
@@ -152,6 +236,9 @@ H = −Σ_e p_e · ln(p_e) / ln(E)
 where `E` is the number of edges. `H` is in `[0, 1]`: uniform pheromone gives `1`, and all pheromone on one edge gives `0`. If the total pheromone is zero, `H` is `1` (maximally undifferentiated). The formula is unit-tested with known distributions.
 
 ### 2.7 Math and pseudocode
+
+This section is the formal layer. It must not appear before chapter 9; the prose
+and animation must already have shown every symbol in action.
 
 **Transition probability** from city `i` to an unvisited city `j`:
 
@@ -209,31 +296,48 @@ The story should use **Ant System** for transparency. It may mention Ant Colony 
 
 ### 2.9 Accessibility fallback
 
-- Article mode includes the full explanation, formulas, and a static best-tour figure generated at build time.
-- A text summary states the current best tour length and iteration.
-- Metrics are exposed in a polite live region at a low frequency.
-- Layer meaning is not encoded by color alone; the best tour uses a distinct pattern/weight.
-- The probability fan has a required textual alternative: a ranked list of next-city probabilities, including the "other" bucket.
-- Reduced motion replaces ant animation with discrete iteration steps.
+- Article mode includes the full explanation, formulas, and a static best-tour
+  figure generated at build time. The opening lesson is fully described in prose.
+- The lesson caption is a real DOM text alternative for the guided animation. It
+  states the current step, candidate count, tour length, or colony size at a low
+  frequency, never once per frame.
+- The full metrics panel is exposed in a polite live region from chapter 9 onward.
+- Layer meaning is not encoded by color alone; the best tour uses a distinct
+  pattern/weight, and the chosen ant leg uses weight as well as color.
+- The probability fan has a required textual alternative: a ranked list of
+  next-city probabilities, including the "other" bucket when it exists.
+- Reduced motion replaces every animated lesson step with a discrete keyframe in
+  the same order. Guided chapters without simulation controls keep the
+  keyframe stepper available.
+- The lab starts paused at iteration 0 so a keyboard or screen-reader user can
+  inspect the map before starting the run.
 
 ### 2.10 Acceptance criteria
 
-- [ ] All ten chapters exist.
-- [ ] Every chapter has a scene and a coherent visual state.
-- [ ] The probability fan shows normalized probabilities.
-- [ ] The best tour is distinct and its length is correct.
-- [ ] The convergence chart shows best and mean length.
-- [ ] All four presets apply and produce visibly different behavior.
-- [ ] City dragging, adding, removing, and reset work.
-- [ ] The lab includes all controls, seed, reset, and share.
-- [ ] Article mode is complete.
-- [ ] Reduced motion works.
-- [ ] Applications and limitations sections are present.
-- [ ] Key terms are defined in a glossary or inline.
-- [ ] At least one predict-then-reveal interaction exists.
-- [ ] At least three citations resolve.
-- [ ] The ACO invariants in `docs/requirements.md` pass.
-- [ ] The story passes accessibility, mobile, and performance checks.
+- [x] All thirteen chapters exist and match the teaching sequence.
+- [x] The first four chapters expose no parameter controls, metrics panel, or
+  pseudocode.
+- [x] The story opens with five cities and a closed tour that returns home.
+- [x] The story enumerates all twelve five-city tours and marks the 1.617 tour.
+- [x] The growth chapter shows the factorial and time wall from five to thirty
+  cities.
+- [x] The mechanism chapters return to five cities and build one ant →
+  pheromone → evaporation → two ants → four ants.
+- [x] The colony reaches the same 1.617 tour brute force found.
+- [x] Math and pseudocode first appear in chapter 9.
+- [x] The probability fan shows normalized probabilities on the five-city map.
+- [x] The best tour is distinct and its length is correct.
+- [x] The lab is the only chapter with parameter controls, starts paused, and can
+  place/move cities, change ants and parameters, start, reset, and share.
+- [x] All four presets apply and produce visibly different behavior.
+- [x] Article mode is complete.
+- [x] Reduced motion works.
+- [x] Applications and limitations sections are present.
+- [x] Key terms are defined in a glossary or inline.
+- [x] At least one predict-then-reveal interaction exists.
+- [x] At least three citations resolve.
+- [x] The ACO invariants in `docs/requirements.md` pass.
+- [x] The story passes accessibility, mobile, and performance checks.
 
 ### 2.11 References
 
@@ -515,6 +619,12 @@ Before a story is considered done:
 
 - [ ] The hook is clear in the first screen.
 - [ ] The learning objectives are concrete.
+- [ ] The opening two or three chapters are understandable with no prior
+  knowledge and have no parameter controls.
+- [ ] The smallest representative instance appears before the full-size one.
+- [ ] The obvious approach is shown succeeding, then shown breaking at scale.
+- [ ] Formal notation and pseudocode appear only after the mechanism is visible.
+- [ ] The lab is the last chapter and the only free-play surface.
 - [ ] Every chapter has one idea.
 - [ ] The visualization carries the argument, not just decoration.
 - [ ] At least one parameter has a surprising or instructive effect.
@@ -537,9 +647,14 @@ Before a story is considered done:
 
 ## 6. Content style
 
-- Write for a curious reader, not for a specialist.
+- Write for a curious reader, not for a specialist. Assume no prior knowledge.
 - Define a term before using it.
 - Prefer concrete examples over abstractions.
+- Start smaller than the finished system. Five cities before thirty; one ant
+  before a colony.
+- Earn the math: notation appears only after the reader has seen the thing it
+  describes.
+- Keep one running example until the mechanism is understood.
 - Use short paragraphs and generous whitespace.
 - Do not hide the argument behind the animation.
 - Do not overclaim: heuristics are not guarantees, and PRNGs are not all broken because RANDU was.

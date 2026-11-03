@@ -279,10 +279,7 @@ async function waitForRuntime(page: Page): Promise<void> {
 
 async function ensureRunning(page: Page): Promise<void> {
   await page.locator('[data-story-stage]').scrollIntoViewIfNeeded();
-  await page.waitForFunction(
-    () =>
-      document.querySelector<HTMLElement>('[data-story-stage]')?.dataset.pauseReason === 'running',
-  );
+  // The lab starts paused at iteration 0; the reader's play action starts it.
   const paused = await page.evaluate(
     () => document.querySelector<HTMLElement>('[data-story-controller]')?.dataset.paused === 'true',
   );

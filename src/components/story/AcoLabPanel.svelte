@@ -125,6 +125,7 @@
 
   let bestLength = $derived(metricValue('best-length'));
   let iteration = $derived(metricValue('iteration'));
+  let atStart = $derived(iteration === '0');
   let meanLength = $derived(metricValue('mean-length'));
   let entropy = $derived(metricValue('entropy'));
   let metricCities = $derived(metricValue('cities'));
@@ -158,23 +159,19 @@
   <header class="aco-lab__head">
     <h2 class="aco-lab__title" id="aco-lab-title">Colony lab</h2>
     <p class="aco-lab__note">
-      Change the instance, the rule, and the view. Structural changes restart the run at iteration
-      0 with the same seed. The stage Speed control (0.5×, 1×, 2×, 4×) remains the only speed
-      control.
+      Change the map, the colony, and the rule. Press <strong>Start simulation</strong> to run.
+      Turn on <strong>Edit map</strong> to place or move cities. Structural changes restart at
+      round 0 with the same seed.
     </p>
     <p class="aco-lab__note" data-share-scope data-testid="aco-lab-share-scope">
-      <strong>Share links</strong> copy the canonical URL for this chapter, seed, speed, and
-      structural parameters. They restart at step 0. <strong>Map edits are local and are not
-      included in share links</strong>; a share restores a seeded map with the same city count.
+      <strong>Share links</strong> record the chapter, seed, speed, and structural parameters, and
+      restart at step 0. <strong>Map edits are local and are not included</strong>; a share
+      restores a seeded map with the same city count.
     </p>
     <p class="aco-lab__note" data-compare-note data-testid="aco-lab-compare">
-      Side-by-side comparison of two parameter sets is a documented <em>should</em> requirement
-      deferred for release 1. Run one configuration at a time and use share links to compare runs.
-    </p>
-    <p class="aco-lab__note" data-quality-note>
-      The stage <strong>Details</strong> panel sets presentation quality (Auto, High, Medium, Low).
-      Quality changes DPR, rendered ants and trails, pheromone buckets, and edge detail without
-      changing the colony size, seed, or iteration state.
+      Side-by-side comparison of two parameter sets is deferred for release 1. Compare by running
+      one configuration at a time or opening two share links. The stage
+      <strong>Details</strong> panel sets presentation quality without changing the run.
     </p>
     {#if cityCount >= 100 && antCount >= 150}
       <p
@@ -213,7 +210,7 @@
       aria-pressed={paused}
       onclick={onTogglePaused}
     >
-      {paused ? 'Play' : 'Pause'}
+      {paused ? (atStart ? 'Start simulation' : 'Resume') : 'Pause'}
     </button>
     <button
       type="button"

@@ -39,12 +39,16 @@
   const params: AcoParams = ACO_DEFAULTS;
   const engine = new AcoEngine(params);
   const clock = new FixedStepClock({ maxSubsteps: 8 });
-  const baseScene = ACO_SCENES.emergence;
+  const baseScene = ACO_SCENES.colony;
 
   type LayerVisibility = Record<AcoCanvasLayerId, boolean>;
 
   const initialVisibility: LayerVisibility = {
     graph: true,
+    'lesson-growth': false,
+    'lesson-enumerate': false,
+    'lesson-tour': false,
+    'lesson-ant': false,
     pheromone: true,
     ants: true,
     'best-tour': true,

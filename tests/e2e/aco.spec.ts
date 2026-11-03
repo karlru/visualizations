@@ -61,7 +61,7 @@ async function waitForRuntime(page: Page): Promise<void> {
       canvas.width > 0 &&
       Number(stage.dataset.frames) > 0 &&
       window.__storyRuntimeDebug?.debugState().ready === true &&
-      window.__scrollDirector?.debugState().triggerCount === 10
+      window.__scrollDirector?.debugState().triggerCount === 13
     );
   });
 }
@@ -119,20 +119,16 @@ async function readRuntime(page: Page): Promise<RuntimeSnapshot> {
 }
 
 async function scrollToChapter(page: Page, id: string): Promise<void> {
-  const target = await page.evaluate((chapterId) => {
+  await page.evaluate((chapterId) => {
     const element = document.getElementById(chapterId);
     if (!element) throw new Error(`Missing chapter ${chapterId}`);
-    const top = element.getBoundingClientRect().top + window.scrollY - window.innerHeight / 2 + 40;
-    const clamped = Math.max(0, top);
     const html = document.documentElement;
     const previous = html.style.scrollBehavior;
     html.style.scrollBehavior = 'auto';
-    window.scrollTo(0, clamped);
+    element.scrollIntoView({ block: 'center', inline: 'nearest' });
     html.style.scrollBehavior = previous;
-    return clamped;
   }, id);
 
-  await page.waitForFunction((top) => Math.abs(window.scrollY - top) <= 2, target);
   await page.waitForFunction(
     (chapterId) =>
       document.querySelector<HTMLElement>('[data-story-controller]')?.dataset.activeChapter ===
@@ -161,7 +157,7 @@ test.describe('ACO reduced motion', () => {
     expect(initial.rootReduced).toBe('true');
     expect(initial.stageCount).toBe(1);
     expect(initial.canvasCount).toBe(1);
-    expect(initial.chapter).toBe('the-colony');
+    expect(initial.chapter).toBe('the-problem');
     // Entry settles on the chapter's final discrete keyframe.
     expect(initial.step).toBe(initial.stepCount - 1);
 
@@ -185,42 +181,47 @@ test.describe('ACO reduced motion', () => {
     expect(afterScroll.frames).toBe(initial.frames);
 
     // The discrete keyframe controls work, pause the clock, and reverse.
+    const finalStep = initial.step;
     await page.getByTestId('stage-step-back').click();
     await page.waitForFunction(
-      () =>
-        document.querySelector<HTMLElement>('[data-story-controller]')?.dataset.sceneStep === '1',
+      (step) =>
+        document.querySelector<HTMLElement>('[data-story-controller]')?.dataset.sceneStep ===
+        String(step),
+      finalStep - 1,
     );
     const oneBack = await readRuntime(page);
     expect(oneBack.paused).toBe(true);
-    expect(oneBack.step).toBe(1);
+    expect(oneBack.step).toBe(finalStep - 1);
     expect(oneBack.reveal).toBeLessThan(initial.reveal);
     expect(oneBack.simTime).toBeCloseTo(initial.simTime, 3);
 
     await page.getByTestId('stage-step-forward').click();
     await page.waitForFunction(
-      () =>
-        document.querySelector<HTMLElement>('[data-story-controller]')?.dataset.sceneStep === '2',
+      (step) =>
+        document.querySelector<HTMLElement>('[data-story-controller]')?.dataset.sceneStep ===
+        String(step),
+      finalStep,
     );
     const forward = await readRuntime(page);
-    expect(forward.step).toBe(2);
+    expect(forward.step).toBe(finalStep);
     expect(forward.reveal).toBeCloseTo(initial.reveal, 3);
-
-    // Replay remains paused under reduced motion.
-    await page.getByTestId('stage-replay').click();
-    const replayed = await readRuntime(page);
-    expect(replayed.paused).toBe(true);
-    expect(replayed.simSteps).toBe(0);
 
     // Chapter changes settle on their final keyframe without scrolling the
     // scene; the run restarts at step 0 and stays paused.
     await scrollToChapter(page, 'emergence');
     const emergence = await readRuntime(page);
     expect(emergence.chapter).toBe('emergence');
-    expect(emergence.scene).toBe('emergence');
+    expect(emergence.scene).toBe('colony');
     expect(emergence.paused).toBe(true);
     expect(emergence.step).toBe(emergence.stepCount - 1);
     expect(emergence.simSteps).toBe(0);
     expect(emergence.simTime).toBe(0);
+
+    // Replay remains paused under reduced motion.
+    await page.getByTestId('stage-replay').click();
+    const replayed = await readRuntime(page);
+    expect(replayed.paused).toBe(true);
+    expect(replayed.simSteps).toBe(0);
 
     // Article mode still carries the whole explanation and removes the stage.
     await page.getByTestId('article-mode-toggle').click();
@@ -231,7 +232,7 @@ test.describe('ACO reduced motion', () => {
     );
     await expect(page.locator('[data-story-stage]')).toHaveCount(0);
     await expect(page.locator('canvas')).toHaveCount(0);
-    await expect(page.locator('[data-story-chapter]')).toHaveCount(10);
+    await expect(page.locator('[data-story-chapter]')).toHaveCount(13);
     await expect(page.locator('.katex-display')).toHaveCount(3);
     await expect(page.locator('figure[data-figure="aco-best-tour"]')).toBeVisible();
     await expect(
@@ -253,7 +254,7 @@ test.describe('ACO route lifecycle', () => {
     const initial = await readRuntime(page);
     expect(initial.stageCount).toBe(1);
     expect(initial.canvasCount).toBe(1);
-    expect(initial.triggerCount).toBe(10);
+    expect(initial.triggerCount).toBe(13);
     expect(initial.stageMounts).toBe(1);
     expect(initial.stageLive).toBe(1);
     expect(initial.runtimeMounts).toBe(1);
@@ -277,9 +278,9 @@ test.describe('ACO route lifecycle', () => {
     }));
     expect(article.stages).toBe(0);
     expect(article.canvases).toBe(0);
-    expect(article.triggers).toBe(10);
+    expect(article.triggers).toBe(13);
     expect(article.mounts).toBe(1);
-    expect(article.chapters).toBe(10);
+    expect(article.chapters).toBe(13);
 
     // Returning to the stage remounts exactly one canvas; the chapter trigger
     // set is still one per chapter, not duplicated.
@@ -288,7 +289,7 @@ test.describe('ACO route lifecycle', () => {
     const restored = await readRuntime(page);
     expect(restored.stageCount).toBe(1);
     expect(restored.canvasCount).toBe(1);
-    expect(restored.triggerCount).toBe(10);
+    expect(restored.triggerCount).toBe(13);
     expect(restored.stageMounts).toBe(2);
     expect(restored.stageLive).toBe(1);
     expect(restored.runtimeMounts).toBe(1);
@@ -302,7 +303,7 @@ test.describe('ACO route lifecycle', () => {
     const returned = await readRuntime(page);
     expect(returned.stageCount).toBe(1);
     expect(returned.canvasCount).toBe(1);
-    expect(returned.triggerCount).toBe(10);
+    expect(returned.triggerCount).toBe(13);
     expect(returned.stageLive).toBe(1);
     expect(returned.runtimeMounts).toBe(1);
 

@@ -21,6 +21,13 @@
   } from '../../lib/quality';
 
   interface Props {
+    /**
+     * Authored stage controls. `none` is a guided, scroll-driven lesson (only
+     * the accessibility motion toggle and, under reduced motion, the keyframe
+     * stepper are present). `playback` is play/pause/replay plus the motion
+     * toggle. `full` is the release-1 control set.
+     */
+    readonly mode?: 'none' | 'playback' | 'full';
     readonly paused: boolean;
     readonly speed: number;
     /** Active renderer, used only for the human-readable details note. */
@@ -58,6 +65,7 @@
   }
 
   let {
+    mode = 'full',
     paused,
     speed,
     rendererId = 'canvas2d',
@@ -132,6 +140,7 @@
 <div
   class="stage-chrome"
   data-stage-chrome
+  data-mode={mode}
   data-paused={paused ? 'true' : 'false'}
   data-speed={speed}
   data-reduced-motion={reducedMotion ? 'true' : 'false'}
@@ -142,92 +151,98 @@
   data-quality-preference={qualityPreference}
   data-quality-reduced={qualityReduced ? 'true' : 'false'}
 >
-  <button
-    type="button"
-    class="stage-chrome__button"
-    data-testid="stage-play-pause"
-    aria-label={paused ? 'Play simulation' : 'Pause simulation'}
-    aria-pressed={paused}
-    aria-keyshortcuts="Space"
-    onclick={onTogglePaused}
-  >
-    {paused ? 'Play' : 'Pause'}
-  </button>
-
-  <button
-    type="button"
-    class="stage-chrome__button"
-    data-testid="stage-replay"
-    aria-label="Replay the current chapter simulation"
-    onclick={onReplay}
-  >
-    Replay
-  </button>
-
-  <fieldset class="stage-chrome__steps">
-    <legend class="visually-hidden">Scene keyframes</legend>
+  {#if mode !== 'none'}
     <button
       type="button"
-      class="stage-chrome__button stage-chrome__step"
-      data-testid="stage-step-back"
-      aria-label="Previous scene keyframe"
-      disabled={stepBackDisabled}
-      onclick={() => onStepScene?.(-1)}
+      class="stage-chrome__button"
+      data-testid="stage-play-pause"
+      aria-label={paused ? 'Play simulation' : 'Pause simulation'}
+      aria-pressed={paused}
+      aria-keyshortcuts="Space"
+      onclick={onTogglePaused}
     >
-      <span aria-hidden="true">‹</span>
+      {paused ? 'Play' : 'Pause'}
     </button>
-    <span class="stage-chrome__step-readout data" data-scene-step-readout aria-live="polite">
-      {sceneStep + 1} / {sceneStepCount}
-    </span>
+
     <button
       type="button"
-      class="stage-chrome__button stage-chrome__step"
-      data-testid="stage-step-forward"
-      aria-label="Next scene keyframe"
-      disabled={stepForwardDisabled}
-      onclick={() => onStepScene?.(1)}
+      class="stage-chrome__button"
+      data-testid="stage-replay"
+      aria-label="Replay the current chapter simulation"
+      onclick={onReplay}
     >
-      <span aria-hidden="true">›</span>
+      Replay
     </button>
-  </fieldset>
+  {/if}
 
-  <label class="stage-chrome__field">
-    <span class="stage-chrome__field-label">Speed</span>
-    <select
-      class="stage-chrome__select"
-      data-testid="stage-speed"
-      aria-label="Simulation speed"
-      value={String(speed)}
-      onchange={handleSpeed}
-    >
-      {#each SPEEDS as option (option)}
-        <option value={String(option)}>{formatSpeed(option)}</option>
-      {/each}
-    </select>
-  </label>
+  {#if mode !== 'none' || reducedMotion}
+    <fieldset class="stage-chrome__steps">
+      <legend class="visually-hidden">Scene keyframes</legend>
+      <button
+        type="button"
+        class="stage-chrome__button stage-chrome__step"
+        data-testid="stage-step-back"
+        aria-label="Previous scene keyframe"
+        disabled={stepBackDisabled}
+        onclick={() => onStepScene?.(-1)}
+      >
+        <span aria-hidden="true">‹</span>
+      </button>
+      <span class="stage-chrome__step-readout data" data-scene-step-readout aria-live="polite">
+        {sceneStep + 1} / {sceneStepCount}
+      </span>
+      <button
+        type="button"
+        class="stage-chrome__button stage-chrome__step"
+        data-testid="stage-step-forward"
+        aria-label="Next scene keyframe"
+        disabled={stepForwardDisabled}
+        onclick={() => onStepScene?.(1)}
+      >
+        <span aria-hidden="true">›</span>
+      </button>
+    </fieldset>
+  {/if}
 
-  <span
-    class="stage-chrome__quality"
-    data-testid="stage-quality"
-    data-quality-tier={qualityTier}
-    data-quality-preference={qualityPreference}
-    data-quality-reduced={qualityReduced ? 'true' : 'false'}
-    aria-live="polite"
-  >
-    Quality {qualityTierLabel(qualityTier)}
-  </span>
+  {#if mode === 'full'}
+    <label class="stage-chrome__field">
+      <span class="stage-chrome__field-label">Speed</span>
+      <select
+        class="stage-chrome__select"
+        data-testid="stage-speed"
+        aria-label="Simulation speed"
+        value={String(speed)}
+        onchange={handleSpeed}
+      >
+        {#each SPEEDS as option (option)}
+          <option value={String(option)}>{formatSpeed(option)}</option>
+        {/each}
+      </select>
+    </label>
 
-  {#if qualityReduced}
-    <p
-      class="stage-chrome__quality-notice"
-      data-testid="stage-quality-notice"
-      data-quality-reduced="true"
-      role="status"
+    <span
+      class="stage-chrome__quality"
+      data-testid="stage-quality"
+      data-quality-tier={qualityTier}
+      data-quality-preference={qualityPreference}
+      data-quality-reduced={qualityReduced ? 'true' : 'false'}
       aria-live="polite"
     >
-      Quality reduced to {qualityTierLabel(qualityTier)} for {workloadCities} cities × {workloadAnts}
-      ants. Presentation only: the colony size, seed, and iteration state are unchanged.
-    </p>
+      Quality {qualityTierLabel(qualityTier)}
+    </span>
+
+    {#if qualityReduced}
+      <p
+        class="stage-chrome__quality-notice"
+        data-testid="stage-quality-notice"
+        data-quality-reduced="true"
+        role="status"
+        aria-live="polite"
+      >
+        Quality reduced to {qualityTierLabel(qualityTier)} for {workloadCities} cities × {workloadAnts}
+        ants. Presentation only: the colony size, seed, and iteration state are unchanged.
+      </p>
+    {/if}
   {/if}
 
   <label class="stage-chrome__motion">
@@ -250,7 +265,7 @@
     </p>
   {/if}
 
-  {#if onShare}
+  {#if mode === 'full' && onShare}
     <button
       type="button"
       class="stage-chrome__button"
@@ -263,7 +278,7 @@
     </button>
   {/if}
 
-  {#if shareMessage}
+  {#if mode === 'full' && shareMessage}
     <p
       class="stage-chrome__share-status"
       class:stage-chrome__share-status--error={!shareOk}
@@ -276,7 +291,8 @@
     </p>
   {/if}
 
-  <details class="stage-chrome__details" data-testid="stage-details">
+  {#if mode === 'full'}
+    <details class="stage-chrome__details" data-testid="stage-details">
     <summary class="stage-chrome__summary">Details</summary>
     <div class="stage-chrome__panel">
       <dl class="stage-chrome__facts">
@@ -336,6 +352,7 @@
       </p>
     </div>
   </details>
+  {/if}
 </div>
 
 <style>

@@ -227,6 +227,16 @@
   padding-block: var(--space-2xl);
 }
 
+/*
+ * Guided sequences (a tour being enumerated, a trail being built, cities being
+ * added) need more scroll distance per step than a prose chapter. The extra
+ * range is opt-in so ordinary chapters keep their pacing.
+ */
+.story-controller[data-story-enhanced="true"][data-article-mode="false"]
+  .story-chapter[data-chapter-length="tall"] {
+  min-block-size: 155svh;
+}
+
 /* Article mode can be wider than the prose measure because there is no stage
    column competing for space; the prose itself keeps its measure. */
 .story-controller[data-article-mode="true"] .story-layout__chapters {

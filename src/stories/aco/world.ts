@@ -47,6 +47,49 @@ export function acoWorldPoint(city: Pick<City, 'x' | 'y'>): {
  */
 export const ACO_FOCAL_CITY_INDEX = 17;
 
+/**
+ * The fixed five-city teaching instance.
+ *
+ * It is the first five cities of the default seed-42 layout, so the opening
+ * chapters and the later thirty-city map share a provenance. The coordinates
+ * are frozen here for world-space label anchors and camera framing; a unit test
+ * regenerates the same layout from the pure TSP model and fails if it drifts.
+ */
+export const ACO_DEMO_SEED = 42;
+export const ACO_DEMO_CITY_COUNT = 5;
+
+export const ACO_DEMO_CITIES: readonly City[] = Object.freeze([
+  Object.freeze({ x: 0.6011037519201636, y: 0.44829055899754167 }),
+  Object.freeze({ x: 0.8524657934904099, y: 0.6697340414393693 }),
+  Object.freeze({ x: 0.17481389874592423, y: 0.5265925421845168 }),
+  Object.freeze({ x: 0.2732279943302274, y: 0.6247446539346129 }),
+  Object.freeze({ x: 0.8654746483080089, y: 0.4723170551005751 }),
+]);
+
+/** The five-city map in world space, in city-index order. */
+export const ACO_DEMO_WORLD = Object.freeze(ACO_DEMO_CITIES.map((city) => acoWorldPoint(city)));
+
+/**
+ * City the opening ant lesson starts in. City 0 sits near the centre of the
+ * five-city map, so the candidate fan reads clearly.
+ */
+export const ACO_DEMO_FOCAL_CITY_INDEX = 0;
+
+/** Focal city in world space; the five-city lesson camera pan. */
+export const ACO_DEMO_FOCAL_WORLD = Object.freeze(
+  acoWorldPoint(ACO_DEMO_CITIES[ACO_DEMO_FOCAL_CITY_INDEX] as City),
+);
+
+/**
+ * Choose the fan's focal city for the active problem size.
+ *
+ * The five-city lesson asks what an ant at the centre city would do next. The
+ * thirty-city story keeps the original mid-map city 17.
+ */
+export function acoFocalCityIndex(cityCount: number): number {
+  return cityCount <= ACO_DEMO_CITY_COUNT ? ACO_DEMO_FOCAL_CITY_INDEX : ACO_FOCAL_CITY_INDEX;
+}
+
 /** Normalized coordinates of {@link ACO_FOCAL_CITY_INDEX} for seed 42. */
 export const ACO_FOCAL_CITY: City = Object.freeze({
   x: 0.3194617456756532,

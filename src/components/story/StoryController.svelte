@@ -86,6 +86,7 @@
   import Slider from '../controls/Slider.svelte';
   import Toggle from '../controls/Toggle.svelte';
   import AcoLabPanel from './AcoLabPanel.svelte';
+  import AcoLessonOverlay from './AcoLessonOverlay.svelte';
   import ArticleModeToggle from './ArticleModeToggle.svelte';
   import ProgressRail from './ProgressRail.svelte';
   import StageChrome from './StageChrome.svelte';
@@ -314,6 +315,24 @@
   let labOpen = $state(false);
   /** The ACO lab panel appears at the end of the story after the lab is entered. */
   let labActive = $derived(showStage && story?.lab === 'aco' && labOpen);
+  /**
+   * Authored presentation for the active chapter. A story that omits it keeps
+   * the release-1 defaults: full chrome, metrics, and pseudocode.
+   */
+  let activePresentation = $derived(
+    activeChapterId === null
+      ? undefined
+      : runtimeChapters.get(activeChapterId)?.spec?.presentation,
+  );
+  let showMetrics = $derived(activePresentation?.metrics !== false);
+  let showPseudocode = $derived(activePresentation?.pseudocode !== false);
+  let chromeMode = $derived(activePresentation?.chrome ?? 'full');
+  /**
+   * The stage is a keyboard region only when it has simulation controls or the
+   * reduced-motion keyframe stepper. A guided, scroll-only lesson has no
+   * simulation controls to operate.
+   */
+  let stageInteractive = $derived(chromeMode !== 'none' || reducedMotion);
   /** Effective layer visibility after the lab's presentation overrides. */
   let layerVisibility = $derived.by((): Record<string, boolean> => {
     const result: Record<string, boolean> = {};
@@ -330,6 +349,15 @@
   });
   let activeSceneStepCount = $derived(
     sceneStepCountFor(activeChapterId === null ? undefined : runtimeChapters.get(activeChapterId)),
+  );
+  /**
+   * The progress the lesson caption should show. Reduced motion replaces scroll
+   * progress with the discrete keyframe so the caption and canvas agree.
+   */
+  let activeDisplayProgress = $derived(
+    reducedMotion
+      ? keyframeProgress(sceneStep, activeSceneStepCount)
+      : activeProgress,
   );
   /** Highlighted pseudocode panel, mounted only in the enhanced stage layout. */
   let pseudocodePanel = $state<HTMLElement | null>(null);
@@ -600,11 +628,15 @@
 
   function resolveParams(spec: ChapterSpec<StoryParamBag> | undefined): StoryParamBag {
     const overrides = spec?.sceneOverrides?.params;
-    // Parameter changes happen on chapter entry only, never on progress. Reader
-    // control overrides sit on top so a slider or toggle does not get wiped out
-    // when the next chapter applies its own typed defaults.
     const defaults = story?.defaults ?? EMPTY_PARAMS;
     const base = overrides === undefined ? { ...defaults } : { ...defaults, ...overrides };
+    // A scripted teaching chapter owns its run identity. Reader lab choices are
+    // re-applied automatically when the reader returns to an unlocked chapter.
+    if (spec?.presentation?.lockParams === true) {
+      return base;
+    }
+    // Reader control overrides sit on top so a slider or toggle does not get
+    // wiped out when the next chapter applies its own typed defaults.
     return { ...base, ...readerParams };
   }
 
@@ -911,6 +943,9 @@
         simulatedSeconds = 0;
         stepCount = 0;
         frameCount = 0;
+        // The lab is a playground: it starts at iteration 0 until the reader
+        // presses Start. Guided chapters resume so their mechanism is visible.
+        setPaused(chapter.id === 'the-lab' || reducedMotion);
         // Enter the chapter on its settled keyframe. Reduced-motion readers can
         // then step backwards through the discrete states, never scrub.
         sceneStep = sceneStepCountFor(chapter) - 1;
@@ -1756,7 +1791,7 @@
     {#if showStage}
       <div
         class="story-layout__stage"
-        class:story-layout__stage--with-pseudocode={pseudocodeHtml !== undefined}
+        class:story-layout__stage--with-pseudocode={showPseudocode && pseudocodeHtml !== undefined}
       >
         <StoryStage
           {createRenderer}
@@ -1770,14 +1805,23 @@
           testId="story-stage"
           ariaLabel={stageLabel}
           description={stageDescription}
-          interactive
+          interactive={stageInteractive}
           roledescription="interactive simulation stage"
           describedBy="story-shortcuts"
           ariaKeyshortcuts="Space ArrowLeft ArrowRight ArrowUp ArrowDown Escape"
           onStageKeydown={handleStageKeydown}
           onReady={handleStageReady}
         >
+          {#if story?.lab === 'aco' && !labActive}
+            <AcoLessonOverlay
+              chapterId={activeChapterId}
+              progress={activeDisplayProgress}
+              metrics={metricItems}
+              reducedMotion={reducedMotion}
+            />
+          {/if}
           <StageChrome
+            mode={chromeMode}
             {paused}
             {speed}
             rendererId={story?.rendererId ?? 'canvas2d'}
@@ -1826,7 +1870,7 @@
           The listing itself is build-time HTML from the page; this island only
           moves the active line on chapter entry.
         -->
-        {#if pseudocodeHtml}
+        {#if pseudocodeHtml && showPseudocode}
           <section class="story-pseudocode" aria-labelledby="story-pseudocode-title" data-pseudocode-panel>
             <div class="story-pseudocode__head">
               <h2 class="story-controls__title" id="story-pseudocode-title">The algorithm</h2>
@@ -1913,9 +1957,11 @@
         </section>
       {/if}
 
-      {#if showStage}
+      {#if showStage && showMetrics}
         <Metrics id="story-metrics" title="Live metrics" items={metricItems} />
+      {/if}
 
+      {#if showStage && chromeMode !== 'none'}
         <details class="story-controls__shortcuts" id="story-shortcuts" data-stage-shortcuts>
           <summary class="story-controls__summary">Keyboard shortcuts</summary>
           <ul class="story-controls__keys">

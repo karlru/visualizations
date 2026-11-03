@@ -28,11 +28,17 @@ interface Props {
   eyebrow?: string;
   /** Optional presentation overrides for this chapter only. */
   sceneOverrides?: ChapterSceneOverrides;
+  /**
+   * Extra scroll range in the enhanced stage layout. Guided sequences use a
+   * taller chapter so each deterministic step gets readable screen time.
+   */
+  length?: 'normal' | 'tall';
   /** Heading level. Chapters are h2 under the story's h1. */
   level?: 2 | 3;
 }
 
-const { id, title, scene, eyebrow, sceneOverrides, level = 2 }: Props = Astro.props;
+const { id, title, scene, eyebrow, sceneOverrides, length = 'normal', level = 2 }: Props =
+  Astro.props;
 const overridesJson = serializeChapterSceneOverrides(sceneOverrides);
 const headingId = `${id}-title`;
 ---
@@ -43,6 +49,7 @@ const headingId = `${id}-title`;
   data-story-chapter
   data-scene={scene}
   data-chapter-title={title}
+  data-chapter-length={length}
   data-scene-overrides={overridesJson}
   aria-labelledby={headingId}
 >

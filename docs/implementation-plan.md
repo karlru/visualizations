@@ -1245,6 +1245,70 @@ Verified 2026-10-31 with Node 22.23.4 and `pnpm lint` (0 errors; the two existin
 
 **Fixes found by this gate.** Repeated paused redraws at fractional DPR were leaving a growing one-device-row fringe at the canvas edge because `Canvas2DRenderer` filled the CSS-sized rectangle without clearing the full backing store; it now clears the device-pixel buffer before each frame. `StoryStage` now repaints once whenever the stage re-enters view (or its pause state changes) even while the reader clock is paused, so scene composition that advanced offscreen is never presented as a stale frame. Caveats: visual baselines are Chromium/Linux only (the cross-browser matrix is Step 7.3), and a real mid-tier mobile-device and Safari pass remains part of the Phase 7.2 performance/quality gate.
 
+### (DONE) Step 3.8 — Rewrite the ACO story as a guided lesson
+
+**Goal:** The ACO story assumes no prior knowledge, builds from a five-city
+example to the colony step by step, and keeps all parameter play in the final
+lab.
+
+**Tasks**
+
+1. (DONE) Add the teaching arc and progressive-disclosure rules to
+   `docs/stories.md`, `docs/requirements.md`, `README.md`, and this plan's story
+   checklist.
+2. (DONE) Rewrite the ACO outline, metadata, chapter table, and acceptance criteria in
+   `docs/stories.md` §2.
+3. (DONE) Finalize the chapter presentation contract: `chrome`, `metrics`,
+   `pseudocode`, and `lockParams`; use the chapter `length` prop for guided
+   scroll range.
+4. (DONE) Fix the lesson data and layers: constant initialization order, home as the
+   final allowed city, engine-first-tour continuity, dynamic focal city, and a
+   readable growth sequence.
+5. (DONE) Rewrite the ACO MDX as thirteen chapters: five-city TSP, enumeration,
+   factorial wall, one ant, deposit, evaporation, second ant, a few more ants,
+   transition rule, update rule, tuning, limits, and lab.
+6. (DONE) Make chapters 1–4 non-interactive; allow pause/replay only in chapters 5–8;
+   keep parameter controls out of every chapter except the lab.
+7. (DONE) Simplify the lab copy, start it paused at iteration 0, and add an explicit
+   start action.
+8. (DONE) Update unit, E2E, accessibility, and visual tests; regenerate the ACO
+   baselines.
+9. (DONE) Run the full verification gate and update this step with the measured
+   results.
+
+**Files**
+
+`docs/stories.md`, `docs/requirements.md`, `README.md`,
+`docs/implementation-plan.md`, `docs/runtime-acceptance.md`,
+`src/stories/registry.ts`, `src/stories/aco/{config,scenes,lesson,world,annotations,module}.ts`,
+`src/render/canvas2d/layers/{index,lesson,probability-fan}.ts`,
+`src/components/story/{AcoLessonOverlay,StoryController,StageChrome,AcoLabPanel,Chapter}.astro`,
+`src/content/stories/ant-colony-optimization/index.mdx`,
+`tests/unit/aco-*.test.ts`, `tests/unit/{pseudocode,story-loader}.test.ts`,
+`tests/e2e/aco*.spec.ts`, `tests/e2e/{a11y,visual,seo}.spec.ts`.
+
+**Acceptance criteria**
+
+- [x] The first four chapters expose no parameter controls, metrics panel, or
+  pseudocode.
+- [x] The story opens with five cities and a closed tour that returns home.
+- [x] All twelve five-city tours are enumerated and the 1.617 shortest tour is
+  marked.
+- [x] The factorial wall moves from five to thirty cities with the correct
+  tour counts and search times.
+- [x] The mechanism chapters return to five cities and build one ant →
+  pheromone → evaporation → two ants → four ants.
+- [x] The colony reaches the same 1.617 tour brute force found.
+- [x] Math and pseudocode first appear in chapter 9.
+- [x] The lab is the only chapter with parameter controls, starts paused, and
+  supports place/move cities, ants, parameters, start, reset, and share.
+- [x] Article mode and no-JS show all thirteen chapters and the static figure.
+- [x] Reduced motion steps through the guided lesson as ordered keyframes.
+- [x] Unit tests, E2E, axe, visual baselines, and bundle budgets pass.
+- [x] RANDU content and configuration are unchanged.
+
+**Verified 2026-11-03** with `pnpm lint` (0 errors; 3 formatter/lint warnings resolved to the two existing `execCommand` hints), `pnpm test` (**416 passing, 1 existing todo**; 8 new lesson-data cases in `tests/unit/aco-lesson.test.ts`), `pnpm build`, `pnpm check:links` (87 internal references across 9 HTML files), `pnpm check:citations` (7 ok, 1 existing mitpress 403 warning, 0 failed; ACO 3/4, floor met), `pnpm check:bundle` (documented stub), `CI=1 pnpm test:e2e` (**151 passing**), `pnpm test:visual` (**5 passing**), and `pnpm exec playwright test tests/e2e/aco-performance.spec.ts` (3 passing; desktop p95 frame work 0.6 ms, mobile 2.4 ms, worst-case 28.3 ms, no long task over 200 ms). The working tree keeps the ACO WIP as the base. The guided opening is chapters 1–4 (`chrome: none`), chapters 5–8 allow pause/replay only, chapters 9–12 are formal, and the lab is the only full-control surface. `ACO_LESSON_CHAPTER_IDS` drives the lesson caption; `activeDisplayProgress` keeps the caption aligned with the reduced-motion keyframe. The 5-city fan uses `acoFocalCityIndex(cityCount)` (city 1) while the 30-city map keeps city 18. The lesson data was repaired for the import-order TDZ, the final home candidate, and the engine-first-tour continuity. The ACO visual baselines are now `aco-five-cities-1440`, `aco-tuning-1440`, `aco-lab-1440`, and `aco-lab-390`; the old colony/emergence baselines were removed. No RANDU file or RANDU content was changed.
+
 ## 8. Phase 4 — 3D foundation and RANDU math
 
 ### Step 4.1 — Renderer adapter integration
@@ -2143,6 +2207,12 @@ jobs:
 A story is done only when:
 
 - [ ] All chapters from `docs/stories.md` exist.
+- [ ] The opening is understandable with no prior knowledge and has no
+  parameter controls.
+- [ ] The smallest representative instance appears before the full-size one.
+- [ ] The obvious approach is shown succeeding, then failing at scale.
+- [ ] Formal notation and pseudocode appear only after the mechanism.
+- [ ] The lab is the last chapter and the only free-play surface.
 - [ ] The engine has unit-tested invariants.
 - [ ] The renderer has all required layers.
 - [ ] Parameters, presets, seed, reset, and share work; share restores the starting state and discloses excluded local edits.

@@ -107,6 +107,9 @@ async function advanceFixedSteps(page: Page, steps: number): Promise<void> {
         requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
       }),
   );
+  // Two frames let Svelte flush; the short wall-clock settle covers a busy
+  // worker where the canvas paint lands just after the RAF pair.
+  await page.waitForTimeout(150);
 }
 
 /** Wait until chapter entry events have stopped (fonts and sticky layout settle). */
@@ -141,32 +144,32 @@ test.describe('ACO story visual baselines', () => {
     reducedMotion: 'reduce',
   });
 
-  test('colony overview at a fixed scroll position', async ({ page }) => {
+  test('guided five-city opening at a fixed keyframe', async ({ page }) => {
     await page.goto(`${STORY}?seed=42&lenis=off`);
     await waitForRuntime(page);
-    await scrollToChapter(page, 'the-colony');
+    await scrollToChapter(page, 'the-problem');
 
     await expect(page.locator('[data-story-controller]')).toHaveAttribute(
       'data-active-scene',
-      'colony-overview',
+      'five-cities',
     );
-    await expect(page.locator('[data-metric="iteration"]')).toHaveText('0');
-    await expect(page).toHaveScreenshot('aco-colony-1440.png');
+    await expect(page.locator('[data-lesson-overlay]')).toBeVisible();
+    await expect(page).toHaveScreenshot('aco-five-cities-1440.png');
   });
 
-  test('emergence after 50 frozen iterations', async ({ page }) => {
+  test('tuning on the thirty-city map after 50 frozen iterations', async ({ page }) => {
     await page.goto(`${STORY}?seed=42&lenis=off`);
     await waitForRuntime(page);
-    await scrollToChapter(page, 'emergence');
+    await scrollToChapter(page, 'tuning-the-colony');
     await advanceFixedSteps(page, 3_000);
 
     await expect(page.locator('[data-story-controller]')).toHaveAttribute(
       'data-active-scene',
-      'emergence',
+      'tuning',
     );
     await expect(page.locator('[data-metric="iteration"]')).toHaveText('50');
     await expect(page.locator('[data-metric="best-length"]')).toHaveText('4.907');
-    await expect(page).toHaveScreenshot('aco-emergence-1440.png');
+    await expect(page).toHaveScreenshot('aco-tuning-1440.png');
   });
 
   test('lab with frozen metrics, chart, and controls', async ({ page }) => {
@@ -209,10 +212,20 @@ test.describe('ACO mobile visual baseline', () => {
     reducedMotion: 'reduce',
   });
 
-  test('the frozen emergence stage at 390 px', async ({ page }) => {
-    await page.goto(`${STORY}?seed=42&lenis=off`);
+  test('the frozen lab stage at 390 px', async ({ page }) => {
+    await page.goto(`${STORY}?seed=42&lenis=off#the-lab`);
     await waitForRuntime(page);
-    await scrollToChapter(page, 'emergence');
+
+    // The lab is the one mobile chapter whose stage stays pinned, so its stage
+    // is a stable element screenshot instead of a page-coordinate clip.
+    await scrollToChapter(page, 'the-lab');
+    await page.waitForFunction(
+      () =>
+        document.querySelector<HTMLElement>('[data-story-controller]')?.dataset.labActive ===
+        'true',
+    );
+    await scrollToTop(page, '[data-aco-lab]', 96);
+    await waitForEntrySettle(page);
     await advanceFixedSteps(page, 3_000);
 
     await expect(page.locator('[data-metric="iteration"]')).toHaveText('50');
@@ -221,23 +234,6 @@ test.describe('ACO mobile visual baseline', () => {
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
     );
     expect(overflow).toBeLessThanOrEqual(0);
-
-    // On a phone the narrative stage is in normal flow above the chapters, so
-    // an element screenshot would scroll the page back to the colony and change
-    // the active chapter. Capture the stage's page-coordinate clip from one
-    // full-page screenshot instead; the page never scrolls and the frozen
-    // emergence frame stays active.
-    const clip = await page.evaluate(() => {
-      const stage = document.querySelector<HTMLElement>('[data-story-stage]');
-      if (!stage) throw new Error('Missing story stage');
-      const rect = stage.getBoundingClientRect();
-      return {
-        x: rect.left + window.scrollX,
-        y: rect.top + window.scrollY,
-        width: rect.width,
-        height: rect.height,
-      };
-    });
-    await expect(page).toHaveScreenshot('aco-emergence-390.png', { fullPage: true, clip });
+    await expect(page.locator('[data-story-stage]')).toHaveScreenshot('aco-lab-390.png');
   });
 });

@@ -3,12 +3,12 @@ import { describe, expect, it } from 'vitest';
 import { ACO_CHAPTERS } from '../../src/stories/aco/config';
 
 /**
- * Content contract for `docs/requirements.md` FR-CONTENT-01…12 and
- * `docs/stories.md` §2.3, §2.8–2.11.
+ * Content contract for the guided ACO story.
  *
  * The MDX is parsed as source because the chapter attributes are the contract
- * shared with `ACO_CHAPTERS`: a renamed id, title, or scene must fail here
- * before it silently detaches the prose from its scene.
+ * shared with `ACO_CHAPTERS`: a renamed id, title, or scene must fail here before
+ * it silently detaches the prose from its scene. The math/pseudocode checks
+ * enforce the teaching arc in `docs/stories.md` §1.3.
  */
 const mdx = readFileSync(
   new URL('../../src/content/stories/ant-colony-optimization/index.mdx', import.meta.url),
@@ -78,17 +78,17 @@ function section(id: string): string {
 const chapters = parseChapters(mdx);
 
 describe('ACO story prose contract', () => {
-  it('binds the ten MDX chapters to ACO_CHAPTERS id, title, and scene in order', () => {
+  it('binds the thirteen MDX chapters to ACO_CHAPTERS in order', () => {
     expect(chapters.map(({ id, title, scene }) => ({ id, title, scene }))).toEqual(
       ACO_CHAPTERS.map(({ id, title, scene }) => ({ id, title, scene })),
     );
+    expect(chapters).toHaveLength(13);
   });
 
   it('has complete prose in every chapter with no placeholder text', () => {
     expect(mdx).not.toMatch(/placeholder/i);
     expect(mdx).not.toMatch(/\bTODO\b/);
 
-    expect(chapters).toHaveLength(10);
     for (const chapter of chapters) {
       const text = plainText(chapter.body);
       expect(wordCount(chapter.body), `${chapter.id} is too short`).toBeGreaterThanOrEqual(80);
@@ -98,11 +98,12 @@ describe('ACO story prose contract', () => {
 
     const total = chapters.reduce((sum, chapter) => sum + wordCount(chapter.body), 0);
     expect(total).toBeGreaterThanOrEqual(1_800);
-    expect(total).toBeLessThanOrEqual(2_800);
+    expect(total).toBeLessThanOrEqual(3_200);
   });
 
-  it('keeps the documented metadata and four references in frontmatter', () => {
-    expect(frontmatter).toMatch(/^difficulty: "intermediate"$/m);
+  it('uses introductory metadata with no assumed knowledge', () => {
+    expect(frontmatter).toMatch(/^difficulty: "introductory"$/m);
+    expect(frontmatter).toMatch(/^difficultyNote: "No prior knowledge assumed/m);
     expect(frontmatter).toMatch(/^visualMode: "2d"$/m);
     expect(frontmatter).toMatch(/^learningObjectives:$/m);
     expect(frontmatter).toMatch(/^prerequisites:$/m);
@@ -118,7 +119,7 @@ describe('ACO story prose contract', () => {
       frontmatter.indexOf('prerequisites:'),
       frontmatter.indexOf('references:'),
     );
-    expect(prerequisitesBlock.match(/^ {2}- "/gm)).toHaveLength(3);
+    expect(prerequisitesBlock).toMatch(/None — every term is defined in the story/);
 
     const referenceTitles = frontmatter
       .slice(frontmatter.indexOf('references:'))
@@ -126,66 +127,80 @@ describe('ACO story prose contract', () => {
     expect(referenceTitles).toHaveLength(4);
   });
 
-  it('covers the required narrative beats chapter by chapter', () => {
-    // 01 — the colony: no leader, simple agents, stigmergy defined.
-    expect(chapterBody('the-colony')).toMatch(/no control room|no leader/i);
-    expect(chapterBody('the-colony')).toMatch(/stigmergy/i);
-
-    // 02 — the problem: TSP, tour/cycle, return edge, the search space.
+  it('covers the teaching beats chapter by chapter', () => {
+    // 01 — five cities, TSP, closed tour, return home, distance sum.
     expect(chapterBody('the-problem')).toMatch(/traveling salesman problem/i);
-    expect(chapterBody('the-problem')).toMatch(/cycle/i);
-    expect(chapterBody('the-problem')).toMatch(/return edge/i);
-    expect(chapterBody('the-problem')).toMatch(/29! orders/);
-    expect(chapterBody('the-problem')).not.toMatch(/29 orders/);
-    expect(chapterBody('the-problem')).toMatch(/29!\/2/);
+    expect(chapterBody('the-problem')).toMatch(/tour/i);
+    expect(chapterBody('the-problem')).toMatch(/closed cycle/i);
+    expect(chapterBody('the-problem')).toMatch(/return/i);
+    expect(chapterBody('the-problem')).toMatch(/five cities/i);
 
-    // 03 — one ant's choice: allowed set, focal city, top N and other (Σ),
-    // normalized probabilities.
-    expect(chapterBody('one-ants-choice')).toMatch(/unvisited/i);
-    expect(chapterBody('one-ants-choice')).toMatch(/allowed set/i);
-    expect(chapterBody('one-ants-choice')).toMatch(/Other 21 cities \(Σ\)/);
-    expect(chapterBody('one-ants-choice')).toMatch(/normalized/i);
+    // 02 — twelve tours, brute force, shortest 1.617.
+    expect(chapterBody('try-every-tour')).toMatch(/12 distinct tours|twelve distinct tours/i);
+    expect(chapterBody('try-every-tour')).toMatch(/brute force/i);
+    expect(chapterBody('try-every-tour')).toMatch(/1\.617/);
 
-    // 04 — the probability rule: τ^α and η^β, extremes, one prediction.
-    expect(chapterBody('the-probability-rule')).toMatch(/(\\tau|τ)/);
-    expect(chapterBody('the-probability-rule')).toMatch(/(\\eta|η)/);
-    expect(chapterBody('the-probability-rule')).toMatch(/(\\alpha = 0|α = 0)/);
-    expect(chapterBody('the-probability-rule')).toMatch(/(\\beta = 0|β = 0)/);
-    expect(chapterBody('the-probability-rule')).toMatch(/<Predict\b/);
-    expect(chapterBody('the-probability-rule')).toMatch(/<Math\b/);
-    expect(chapterBody('the-probability-rule')).toMatch(/<Pseudocode\b/);
+    // 03 — factorial growth, time wall, heuristic.
+    expect(chapterBody('too-many-tours')).toMatch(/factorial/i);
+    expect(chapterBody('too-many-tours')).toMatch(/4\.4 × 10³⁰|4\.4e30/);
+    expect(chapterBody('too-many-tours')).toMatch(/heuristic/i);
+    expect(chapterBody('too-many-tours')).toMatch(/30/);
 
-    // 05 — leaving a trace: Q/L, shorter tours, positive feedback.
+    // 04 — one ant, allowed set, randomness, pheromone, 1.737.
+    expect(chapterBody('one-ants-choice')).toMatch(/allowed/i);
+    expect(chapterBody('one-ants-choice')).toMatch(/pheromone/i);
+    expect(chapterBody('one-ants-choice')).toMatch(/1\.737/);
+    expect(chapterBody('one-ants-choice')).toMatch(/local/i);
+
+    // 05 — deposit Q/L, shorter tour, positive feedback, stigmergy.
     expect(chapterBody('leaving-a-trace')).toMatch(/Q\/L/);
     expect(chapterBody('leaving-a-trace')).toMatch(/positive feedback/i);
-    expect(chapterBody('leaving-a-trace')).toMatch(/shorter route|shorter tour/i);
-    expect(chapterBody('leaving-a-trace')).toMatch(/<Math\b/);
+    expect(chapterBody('leaving-a-trace')).toMatch(/stigmergy/i);
+    expect(chapterBody('leaving-a-trace')).toMatch(/shorter tour/i);
 
-    // 06 — forgetting: (1 − ρ), stale paths, ρ = 1 boundary.
-    expect(chapterBody('forgetting')).toMatch(/(\(1 - \\rho\)|\(1 − ρ\))/);
-    expect(chapterBody('forgetting')).toMatch(/(\\rho = 1|ρ = 1)/);
-    expect(chapterBody('forgetting')).toMatch(/zero/i);
-    expect(chapterBody('forgetting')).toMatch(/<Math\b/);
+    // 06 — evaporation, (1 − ρ), why forgetting matters.
+    expect(chapterBody('forgetting')).toMatch(/(\(1-\\rho\)|\(1 - \\rho\)|\(1 − ρ\))/);
+    expect(chapterBody('forgetting')).toMatch(/fade|evaporat/i);
+    expect(chapterBody('forgetting')).toMatch(/older|old evidence|forget/i);
 
-    // 07 — emergence: record vs mean, entropy, the static figure.
-    expect(chapterBody('emergence')).toMatch(/never rises/i);
-    expect(chapterBody('emergence')).toMatch(/mean/i);
-    expect(chapterBody('emergence')).toMatch(/entropy/i);
-    expect(chapterBody('emergence')).toMatch(/4\.91/);
-    expect(chapterBody('emergence')).toMatch(/6\.12/);
-    expect(chapterBody('emergence')).not.toMatch(/6\.36/);
-    expect(chapterBody('emergence')).toMatch(/4\.91 record is shorter/i);
-    expect(chapterBody('emergence')).toMatch(/<Figure\b/);
+    // 07 — second ant, shared trail, feedback loop.
+    expect(chapterBody('two-ants')).toMatch(/second ant/i);
+    expect(chapterBody('two-ants')).toMatch(/trail/i);
+    expect(chapterBody('two-ants')).toMatch(/two rounds|two/i);
 
-    // 08 — tuning: all four presets with their documented values.
+    // 08 — four ants, 1.617, emergence, record vs mean.
+    expect(chapterBody('emergence')).toMatch(/four/i);
+    expect(chapterBody('emergence')).toMatch(/1\.617/);
+    expect(chapterBody('emergence')).toMatch(/emergence/i);
+    expect(chapterBody('emergence')).toMatch(/best length/i);
+    expect(chapterBody('emergence')).toMatch(/mean length/i);
+
+    // 09 — transition rule, tau/eta, alpha/beta, pseudocode.
+    expect(chapterBody('the-probability-rule')).toMatch(/\\tau|τ/);
+    expect(chapterBody('the-probability-rule')).toMatch(/\\eta|η/);
+    expect(chapterBody('the-probability-rule')).toMatch(/\\alpha|α/);
+    expect(chapterBody('the-probability-rule')).toMatch(/\\beta|β/);
+    expect(chapterBody('the-probability-rule')).toMatch(/<Math\b/);
+    expect(chapterBody('the-probability-rule')).toMatch(/<Pseudocode\b/);
+    expect(chapterBody('the-probability-rule')).toMatch(/<Predict\b/);
+
+    // 10 — deposit and update rules, evaporation order.
+    expect(chapterBody('the-update-rule')).toMatch(/Q\/L/);
+    expect(chapterBody('the-update-rule')).toMatch(/evaporat/i);
+    expect(chapterBody('the-update-rule')).toMatch(/<Math\b/);
+
+    // 11 — presets, exploration/exploitation, the thirty-city figure.
     expect(chapterBody('tuning-the-colony')).toMatch(/α = 1, β = 2, ρ = 0\.5/);
     expect(chapterBody('tuning-the-colony')).toMatch(/α = 0\.5, β = 8, ρ = 0\.5/);
     expect(chapterBody('tuning-the-colony')).toMatch(/α = 5, β = 1, ρ = 0\.1/);
     expect(chapterBody('tuning-the-colony')).toMatch(/α = 1, β = 2, ρ = 0\.95/);
     expect(chapterBody('tuning-the-colony')).toMatch(/exploration/i);
     expect(chapterBody('tuning-the-colony')).toMatch(/exploitation/i);
+    expect(chapterBody('tuning-the-colony')).toMatch(/4\.91/);
+    expect(chapterBody('tuning-the-colony')).toMatch(/<Figure\b/);
+    expect(chapterBody('tuning-the-colony')).toMatch(/<Predict\b/);
 
-    // 09 — when it fails: explicit limitations and applications sections.
+    // 12 — limitations and applications.
     expect(chapterBody('when-it-fails')).toMatch(/<h3>Limitations<\/h3>/);
     expect(chapterBody('when-it-fails')).toMatch(/<h3>Applications<\/h3>/);
     expect(chapterBody('when-it-fails')).toMatch(/heuristic/i);
@@ -194,35 +209,43 @@ describe('ACO story prose contract', () => {
     expect(chapterBody('when-it-fails')).toMatch(/vehicle routing/i);
     expect(chapterBody('when-it-fails')).toMatch(/network design/i);
     expect(chapterBody('when-it-fails')).toMatch(/scheduling/i);
-    expect(chapterBody('when-it-fails')).toMatch(/dynamic/i);
 
-    // 10 — the lab: every control is named, and local map edits are disclosed.
-    expect(chapterBody('the-lab')).toMatch(/Cities \(2–150\)/);
-    expect(chapterBody('the-lab')).toMatch(/ants \(1–200\)/);
-    expect(chapterBody('the-lab')).toMatch(/α \(0–5\).*β \(0–10\).*ρ \(0–1\)/s);
-    expect(chapterBody('the-lab')).toMatch(/0\.5×, 1×, 2×, 4×/);
+    // 13 — the lab, start action, map edits, share scope.
+    expect(chapterBody('the-lab')).toMatch(/Start simulation/i);
+    expect(chapterBody('the-lab')).toMatch(/place and move cities/i);
+    expect(chapterBody('the-lab')).toMatch(/ants/i);
     expect(chapterBody('the-lab')).toMatch(/seed/i);
     expect(chapterBody('the-lab')).toMatch(/share link/i);
     expect(chapterBody('the-lab')).toMatch(/not encoded in a share link/i);
-    expect(chapterBody('the-lab')).toMatch(/playback, replay, speed, and share/);
-    expect(chapterBody('the-lab')).toMatch(
-      /share link records the seed.*structural parameters.*speed.*chapter/is,
-    );
-    expect(chapterBody('the-lab')).toMatch(/parameter panel, presets, the city editor/i);
-    expect(chapterBody('the-lab')).toMatch(/step controls/i);
-    expect(chapterBody('the-lab')).toMatch(/layer toggles/i);
-    expect(chapterBody('the-lab')).toMatch(/camera buttons/i);
-    expect(chapterBody('the-lab')).not.toMatch(/not part of this chapter yet/i);
+    expect(chapterBody('the-lab')).toMatch(/pause, step, restart, and share/i);
   });
 
-  it('includes two native predictions, four callouts, and one static figure', () => {
+  it('keeps math and pseudocode out of the guided opening', () => {
+    for (const id of [
+      'the-problem',
+      'try-every-tour',
+      'too-many-tours',
+      'one-ants-choice',
+      'leaving-a-trace',
+      'forgetting',
+      'two-ants',
+      'emergence',
+    ]) {
+      expect(chapterBody(id), `${id} must stay concrete`).not.toMatch(/<Math\b/);
+      expect(chapterBody(id), `${id} must stay concrete`).not.toMatch(/<Pseudocode\b/);
+    }
+
+    expect(mdx.indexOf('<Math')).toBeGreaterThan(mdx.indexOf('id="the-probability-rule"'));
+    expect(mdx.indexOf('<Pseudocode')).toBeGreaterThan(mdx.indexOf('id="the-probability-rule"'));
+  });
+
+  it('includes two native predictions, at least four callouts, and one static figure', () => {
     expect(mdx.match(/<Predict\b/g)).toHaveLength(2);
     expect((mdx.match(/<Callout\b/g) ?? []).length).toBeGreaterThanOrEqual(4);
     expect(mdx.match(/<Figure\b/g)).toHaveLength(1);
     expect(mdx).toContain('aco-best-tour.svg?raw');
     expect(mdx).toContain('name="aco-best-tour"');
 
-    // The figure's caption must carry the argument, not rely on colour alone.
     const figure = mdx.slice(mdx.indexOf('<Figure'));
     for (const phrase of ['halo', 'dashed', 'square', '4.91', 'server-rendered']) {
       expect(figure.slice(0, figure.indexOf('/>')).toLowerCase()).toContain(phrase.toLowerCase());
@@ -238,6 +261,8 @@ describe('ACO story prose contract', () => {
 
     for (const term of [
       'Ant (agent)',
+      'Brute force',
+      'Candidate tour',
       'Pheromone',
       'Stigmergy',
       'Tour',
@@ -245,6 +270,8 @@ describe('ACO story prose contract', () => {
       'Heuristic',
       'Exploration and exploitation',
       'Evaporation',
+      'Positive feedback',
+      'Local optimum',
       'Diversity',
     ]) {
       expect(glossary, `glossary is missing ${term}`).toContain(term);
@@ -265,17 +292,14 @@ describe('ACO story prose contract', () => {
       expect(tag).toContain('rel="noopener noreferrer"');
     }
 
-    // No external link anywhere in the document may omit the rel values.
     for (const [tag] of mdx.matchAll(/<a\b[^>]*href="https?:\/\/[^"]+"[^>]*>/g)) {
       expect(tag).toContain('rel="noopener noreferrer"');
     }
   });
 
   it('keeps the article self-contained instead of promising absent panels', () => {
-    // The page has no live convergence chart or fan summary yet; the prose
-    // refers to the metrics panel and the ranked text instead.
-    expect(chapterBody('emergence')).toMatch(/metrics panel/i);
-    expect(chapterBody('one-ants-choice')).toMatch(/textual version of the same fan/i);
+    expect(chapterBody('emergence')).toMatch(/record/i);
+    expect(chapterBody('emergence')).toMatch(/mean/i);
     expect(mdx).not.toMatch(/convergence chart/i);
     expect(mdx).not.toMatch(/fan summary/i);
   });

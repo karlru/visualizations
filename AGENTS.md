@@ -35,6 +35,7 @@ Docs are the source of truth. If implementation reveals a wrong contract, fix th
 
 - One agent session works on **at most one step**.
 - Work through phases in order; later steps assume earlier contracts. Do not start story content before engine and renderer contracts are stable.
+- Story content follows the teaching arc in `docs/stories.md` §1.3: assume no prior knowledge, start with the smallest representative instance, show the obvious method and why it breaks, then the mechanism, then formal notation, then the lab. The opening chapters are guided and non-interactive.
 - Read the full step before editing: **Goal**, **Tasks**, **Files**, **Acceptance criteria**. Acceptance criteria are the test contract.
 
 ### Marking progress

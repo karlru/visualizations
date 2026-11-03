@@ -23,21 +23,28 @@ import {
 import {
   ACO_BEST_TOUR_CENTROID,
   ACO_BEST_TOUR_LENGTH,
+  ACO_DEMO_CITIES,
+  ACO_DEMO_FOCAL_CITY_INDEX,
+  ACO_DEMO_FOCAL_WORLD,
   ACO_FOCAL_CITY,
   ACO_FOCAL_CITY_INDEX,
   ACO_FOCAL_WORLD,
+  acoFocalCityIndex,
   acoWorldPoint,
 } from '../../src/stories/aco/world';
 
 /** The chapter ↔ scene contract that prose and E2E tests must be able to rely on. */
 const EXPECTED_CHAPTERS = [
-  ['the-colony', 'The colony', 'colony-overview'],
-  ['the-problem', 'The problem', 'tour-problem'],
-  ['one-ants-choice', "One ant's choice", 'focal-choice'],
-  ['the-probability-rule', 'The probability rule', 'probability-rule'],
-  ['leaving-a-trace', 'Leaving a trace', 'deposit'],
-  ['forgetting', 'Forgetting', 'evaporation'],
-  ['emergence', 'Emergence', 'emergence'],
+  ['the-problem', 'Five cities, one round trip', 'five-cities'],
+  ['try-every-tour', 'Try every tour', 'enumerate-tours'],
+  ['too-many-tours', 'Too many tours', 'factorial-wall'],
+  ['one-ants-choice', 'One ant, alone', 'one-ant'],
+  ['leaving-a-trace', 'Leaving a trail', 'deposit'],
+  ['forgetting', 'Trails fade', 'evaporation'],
+  ['two-ants', 'A second ant', 'two-ants'],
+  ['emergence', 'A few more ants', 'colony'],
+  ['the-probability-rule', 'The rule behind the choice', 'probability-rule'],
+  ['the-update-rule', 'The rule behind the trail', 'update-rule'],
   ['tuning-the-colony', 'Tuning the colony', 'tuning'],
   ['when-it-fails', 'When it fails', 'limits'],
   ['the-lab', 'The lab', 'lab'],
@@ -66,14 +73,26 @@ function findPreset(id: string) {
   return preset;
 }
 
+function expectCameraClose(
+  actual: AcoSceneDefinition['camera'],
+  expected: AcoSceneDefinition['camera'],
+): void {
+  expect(actual.kind).toBe(expected.kind);
+  if (actual.kind !== '2d' || expected.kind !== '2d') return;
+  expect(actual.panX).toBeCloseTo(expected.panX, 12);
+  expect(actual.panY).toBeCloseTo(expected.panY, 12);
+  expect(actual.zoom).toBeCloseTo(expected.zoom, 12);
+  expect(actual.rotation ?? 0).toBeCloseTo(expected.rotation ?? 0, 12);
+}
+
 describe('ACO chapter and scene map', () => {
-  it('declares exactly ten chapters and ten scenes with unique ids', () => {
-    expect(ACO_CHAPTERS).toHaveLength(10);
-    expect(ACO_SCENE_IDS).toHaveLength(10);
+  it('declares exactly thirteen chapters and thirteen scenes with unique ids', () => {
+    expect(ACO_CHAPTERS).toHaveLength(13);
+    expect(ACO_SCENE_IDS).toHaveLength(13);
     expect(ACO_SCENE_IDS).toHaveLength(Object.keys(ACO_SCENES).length);
 
-    expect(new Set(ACO_CHAPTERS.map((chapter) => chapter.id)).size).toBe(10);
-    expect(new Set(ACO_SCENE_IDS).size).toBe(10);
+    expect(new Set(ACO_CHAPTERS.map((chapter) => chapter.id)).size).toBe(13);
+    expect(new Set(ACO_SCENE_IDS).size).toBe(13);
   });
 
   it('matches the documented chapter, title, and scene table in order', () => {
@@ -95,14 +114,44 @@ describe('ACO chapter and scene map', () => {
     }
   });
 
-  it('gives every chapter a pseudocode line and two to four reduced-motion steps', () => {
+  it('hides controls, metrics, and pseudocode during the guided opening', () => {
+    for (const chapter of ACO_CHAPTERS.slice(0, 4)) {
+      expect(chapter.presentation?.chrome, chapter.id).toBe('none');
+      expect(chapter.presentation?.metrics, chapter.id).toBe(false);
+      expect(chapter.presentation?.pseudocode, chapter.id).toBe(false);
+      expect(chapter.presentation?.lockParams, chapter.id).toBe(true);
+      expect(chapter.pseudocodeLine, chapter.id).toBeUndefined();
+    }
+
+    for (const chapter of ACO_CHAPTERS.slice(4, 8)) {
+      expect(chapter.presentation?.chrome, chapter.id).toBe('playback');
+      expect(chapter.presentation?.metrics, chapter.id).toBe(false);
+      expect(chapter.presentation?.pseudocode, chapter.id).toBe(false);
+      expect(chapter.presentation?.lockParams, chapter.id).toBe(true);
+    }
+
+    for (const chapter of ACO_CHAPTERS.slice(8, 10)) {
+      expect(chapter.presentation?.chrome, chapter.id).toBe('playback');
+      expect(chapter.presentation?.pseudocode, chapter.id).toBe(true);
+      expect(chapter.pseudocodeLine, chapter.id).toBeTypeOf('number');
+    }
+
+    for (const chapter of ACO_CHAPTERS.slice(10, 12)) {
+      expect(chapter.presentation?.chrome, chapter.id).toBe('playback');
+      expect(chapter.presentation?.metrics, chapter.id).toBe(true);
+      expect(chapter.presentation?.pseudocode, chapter.id).toBe(false);
+    }
+
+    const lab = ACO_CHAPTERS.at(-1);
+    expect(lab?.id).toBe('the-lab');
+    expect(lab?.presentation?.chrome).toBe('full');
+    expect(lab?.presentation?.lockParams).toBe(false);
+  });
+
+  it('gives every guided chapter a reduced-motion step count', () => {
     for (const chapter of ACO_CHAPTERS) {
-      expect(chapter.pseudocodeLine).toBeTypeOf('number');
-      expect(Number.isInteger(chapter.pseudocodeLine)).toBe(true);
-      expect(chapter.pseudocodeLine).toBeGreaterThanOrEqual(0);
-      expect(chapter.pseudocodeLine).toBeLessThanOrEqual(9);
       expect(chapter.reducedMotionSteps).toBeGreaterThanOrEqual(2);
-      expect(chapter.reducedMotionSteps).toBeLessThanOrEqual(4);
+      expect(chapter.reducedMotionSteps).toBeLessThanOrEqual(13);
       expect(chapter.tourAct).toBeUndefined();
     }
   });
@@ -126,17 +175,24 @@ describe('ACO scenes', () => {
         expect(layer.opacity).toBeGreaterThanOrEqual(0);
         expect(layer.opacity).toBeLessThanOrEqual(1);
       }
-      expect(scene.layers.find((layer) => layer.id === 'graph')?.visible).toBe(true);
+      // The factorial wall deliberately replaces the city graph with the
+      // growth diagram; every other scene keeps the graph visible.
+      if (sceneId !== 'factorial-wall') {
+        expect(scene.layers.find((layer) => layer.id === 'graph')?.visible).toBe(true);
+      }
 
       expect(scene.labels.length).toBeGreaterThan(0);
       expect(new Set(scene.labels.map((label) => label.id)).size).toBe(scene.labels.length);
-      expect(typeof scene.convergenceChart).toBe('boolean');
     }
   });
 
-  it('uses only the canonical canvas layer ids and keeps the chart out of them', () => {
+  it('uses only the canonical canvas layer ids', () => {
     expect(ACO_CANVAS_LAYER_IDS).toEqual([
       'graph',
+      'lesson-growth',
+      'lesson-enumerate',
+      'lesson-tour',
+      'lesson-ant',
       'pheromone',
       'ants',
       'best-tour',
@@ -162,53 +218,32 @@ describe('ACO scenes', () => {
 
     expect([...used].sort()).toEqual(Object.keys(ACO_ANNOTATIONS).sort());
   });
-
-  it('shows the DOM convergence chart only where the narrative calls for it', () => {
-    expect(sceneOf('emergence').convergenceChart).toBe(true);
-    expect(sceneOf('colony-overview').convergenceChart).toBe(false);
-    expect(sceneOf('lab').convergenceChart).toBe(true);
-  });
 });
 
 describe('ACO camera moves', () => {
-  it('frames a real city of the default seed-42/30-city layout', () => {
+  it('frames the five-city teaching map and the thirty-city focal city', () => {
+    const demoCamera = cameraOf(sceneOf('five-cities'));
+    expect(demoCamera.panX).toBeCloseTo(0.15, 12);
+    expect(demoCamera.panY).toBeCloseTo(0.3, 12);
+    expect(demoCamera.zoom).toBe(150);
+
+    const fanCamera = cameraOf(sceneOf('probability-rule'));
+    expect(fanCamera.panX).toBeCloseTo(ACO_DEMO_FOCAL_WORLD.x, 12);
+    expect(fanCamera.panY).toBeCloseTo(ACO_DEMO_FOCAL_WORLD.y, 12);
+    expect(acoFocalCityIndex(5)).toBe(ACO_DEMO_FOCAL_CITY_INDEX);
+
     const instance = createTspInstance(42, 30);
     const actualFocalCity = instance.cities[ACO_FOCAL_CITY_INDEX];
     expect(actualFocalCity).toEqual(ACO_FOCAL_CITY);
-
     const focalWorld = acoWorldPoint(actualFocalCity);
     expect(focalWorld.x).toBeCloseTo(ACO_FOCAL_WORLD.x, 12);
     expect(focalWorld.y).toBeCloseTo(ACO_FOCAL_WORLD.y, 12);
-
-    const camera = cameraOf(sceneOf('focal-choice'));
-    const distanceToNearestCity = Math.min(
-      ...instance.cities.map((city) => {
-        const point = acoWorldPoint(city);
-        return Math.hypot(point.x - camera.panX, point.y - camera.panY);
-      }),
-    );
-    expect(distanceToNearestCity).toBeLessThan(1e-9);
-
-    const focalLabel = sceneOf('focal-choice').labels.find((label) => label.id === 'focal-city');
-    expect(focalLabel?.anchor).toEqual({
-      space: 'world2d',
-      x: camera.panX,
-      y: camera.panY,
-    });
+    expect(acoFocalCityIndex(30)).toBe(ACO_FOCAL_CITY_INDEX);
   });
 
-  it('includes overview, focal zoom, best-tour follow, and convergence pull-back poses', () => {
-    const overview = cameraOf(sceneOf('colony-overview'));
-    const focal = cameraOf(sceneOf('focal-choice'));
-    const deposit = cameraOf(sceneOf('deposit'));
-    const emergence = cameraOf(sceneOf('emergence'));
-
-    // Overview is wider than the focal city; convergence pulls back again.
-    expect(focal.zoom).toBeGreaterThan(overview.zoom);
-    expect(emergence.zoom).toBeLessThan(deposit.zoom);
-    // The best-tour chapters follow the tour centroid, not the origin.
-    expect(deposit.panX).toBeCloseTo(acoWorldPoint(ACO_BEST_TOUR_CENTROID).x, 12);
-    expect(deposit.panY).toBeCloseTo(acoWorldPoint(ACO_BEST_TOUR_CENTROID).y, 12);
+  it('keeps the five-city demo map aligned with the seed-42 layout', () => {
+    const instance = createTspInstance(42, 30);
+    expect(ACO_DEMO_CITIES).toEqual(instance.cities.slice(0, 5));
   });
 
   it('keeps the stored best-tour anchors in sync with the pure engine', () => {
@@ -345,14 +380,14 @@ describe('ACO URL schema', () => {
   });
 
   it('omits defaults and emits only non-default values in declaration order', () => {
-    const defaultsOnly = serializeUrlState(ACO_URL_PARAMS, ACO_DEFAULTS, 'the-colony', {
+    const defaultsOnly = serializeUrlState(ACO_URL_PARAMS, ACO_DEFAULTS, 'the-problem', {
       defaults: ACO_DEFAULTS,
       chapterIds: ACO_CHAPTER_IDS,
     });
     expect(defaultsOnly).toEqual({
       query: '',
-      fragment: '#the-colony',
-      relative: '#the-colony',
+      fragment: '#the-problem',
+      relative: '#the-problem',
     });
 
     const custom: AcoParams = {
@@ -488,17 +523,16 @@ describe('ACO determinism and scene settling', () => {
       const scene = sceneOf(chapter.scene);
       const settled = composeSceneState(scene, chapter.sceneOverrides, 1);
 
-      expect(settled.camera).toEqual(scene.camera);
+      expectCameraClose(settled.camera, scene.camera);
       expect(settled.labels).toEqual(scene.labels);
-      expect(settled.revealProgress).toBe(scene.revealProgress ?? 1);
-      expect(settled.layers.map((layer) => layer.opacity)).toEqual(
-        scene.layers.map((layer) => layer.opacity),
-      );
+      expect(settled.revealProgress).toBeCloseTo(scene.revealProgress ?? 1, 12);
       expect(settled.layers.map((layer) => layer.id)).toEqual(ACO_CANVAS_LAYER_IDS);
-      for (const layer of settled.layers) {
+      settled.layers.forEach((layer, index) => {
+        const expected = scene.layers[index];
+        expect(layer.opacity).toBeCloseTo(expected?.opacity ?? 0, 12);
         expect(layer.opacity).toBeGreaterThanOrEqual(0);
         expect(layer.opacity).toBeLessThanOrEqual(1);
-      }
+      });
 
       for (const progress of [0, 0.5, 1]) {
         const state = composeSceneState(scene, chapter.sceneOverrides, progress);

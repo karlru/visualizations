@@ -23,9 +23,9 @@ test('the catalogue renders both collection entries with their metadata', async 
   await page.goto('/stories');
 
   const aco = page.getByRole('listitem').filter({ hasText: 'The Colony That Finds a Short Route' });
-  await expect(aco).toContainText('A colony has no leader and no map.');
+  await expect(aco).toContainText('Five cities, twelve possible round trips');
   await expect(aco).toContainText('Optimization');
-  await expect(aco).toContainText('intermediate');
+  await expect(aco).toContainText('introductory');
   await expect(aco).toContainText('2d');
 
   const randu = page

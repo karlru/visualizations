@@ -43,9 +43,16 @@ describe('ACO pseudocode contract', () => {
     expect(ACO_PSEUDOCODE_LINE_COUNT).toBe(10);
   });
 
-  it('binds every chapter to an addressable line', () => {
+  it('binds only the formal chapters to an addressable line', () => {
+    const withLine = ACO_CHAPTERS.filter((chapter) => chapter.pseudocodeLine !== undefined);
+    expect(withLine.map((chapter) => chapter.id)).toEqual([
+      'the-probability-rule',
+      'the-update-rule',
+      'the-lab',
+    ]);
+
     for (const chapter of ACO_CHAPTERS) {
-      expect(chapter.pseudocodeLine, chapter.id).toBeTypeOf('number');
+      if (chapter.pseudocodeLine === undefined) continue;
       expect(Number.isInteger(chapter.pseudocodeLine), chapter.id).toBe(true);
       expect(chapter.pseudocodeLine, chapter.id).toBeGreaterThanOrEqual(0);
       expect(chapter.pseudocodeLine, chapter.id).toBeLessThan(ACO_PSEUDOCODE_LINE_COUNT);

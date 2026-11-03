@@ -91,6 +91,18 @@ async function scrollToLab(page: Page): Promise<void> {
   await page.waitForFunction((top) => Math.abs(window.scrollY - top) <= 2, target);
 }
 
+async function scrollToChapter(page: Page, id: string): Promise<void> {
+  await page.evaluate((chapterId) => {
+    const element = document.getElementById(chapterId);
+    if (!element) throw new Error(`Missing chapter ${chapterId}`);
+    const html = document.documentElement;
+    const previous = html.style.scrollBehavior;
+    html.style.scrollBehavior = 'auto';
+    element.scrollIntoView({ block: 'center', inline: 'nearest' });
+    html.style.scrollBehavior = previous;
+  }, id);
+}
+
 async function readLayout(page: Page): Promise<LayoutSnapshot> {
   return page.evaluate(() => {
     const stage = document.querySelector<HTMLElement>('[data-story-stage]');
@@ -153,13 +165,10 @@ test.describe('ACO responsive matrix', () => {
         expect(layout.stageBottom).toBeLessThanOrEqual(layout.chapterTop + 0.5);
       }
 
-      const chrome = page.getByTestId('stage-details');
-      await expect(chrome).toBeVisible();
-      const chromeBox = await chrome.boundingBox();
-      if (chromeBox === null) throw new Error('Missing stage details control box');
-      expect(chromeBox.x).toBeGreaterThanOrEqual(0);
-      expect(chromeBox.x + chromeBox.width).toBeLessThanOrEqual(viewport.width + 0.5);
-      expect(chromeBox.height).toBeGreaterThanOrEqual(44);
+      // The guided opening exposes the motion preference but no simulation
+      // controls; the full chrome is checked in the lab test below.
+      const motion = page.getByTestId('motion-toggle');
+      await expect(motion).toBeVisible();
       expect(errors).toEqual([]);
     });
   }
@@ -167,9 +176,12 @@ test.describe('ACO responsive matrix', () => {
   test('keeps the stage, chrome, pseudocode, and formulas usable at 360 px', async ({ page }) => {
     const errors = watchErrors(page);
     await page.setViewportSize({ width: 360, height: 800 });
-    await page.goto(STORY);
+    await page.goto(LAB);
     await waitForRuntime(page);
+    await waitForLab(page);
+    await scrollToLab(page);
 
+    // The lab has the full chrome; the guided opening intentionally has none.
     // Stage chrome controls meet the 44 px touch target and stay on screen.
     for (const testId of ['stage-play-pause', 'stage-replay', 'stage-details']) {
       const control = page.getByTestId(testId);
@@ -187,7 +199,14 @@ test.describe('ACO responsive matrix', () => {
     await expect(page.getByTestId('stage-quality-select')).toBeVisible();
     await page.getByTestId('stage-details').click();
 
-    // Pseudocode and formulas stay inside their own containers.
+    // The stage pseudocode panel is hidden in the lab, so check it on the
+    // formal chapter that introduces the rule.
+    await scrollToChapter(page, 'the-probability-rule');
+    await page.waitForFunction(
+      () =>
+        document.querySelector<HTMLElement>('[data-story-controller]')?.dataset.activeChapter ===
+        'the-probability-rule',
+    );
     await expect(page.locator('[data-pseudocode-panel]')).toBeVisible();
     await expect(page.locator('.katex-display')).toHaveCount(3);
     const surfaces = await page.evaluate(() => {
@@ -266,11 +285,7 @@ test.describe('ACO quality tiers', () => {
     await waitForRuntime(page);
     await waitForLab(page);
     await scrollToLab(page);
-    await page.waitForFunction(
-      () =>
-        document.querySelector<HTMLElement>('[data-story-stage]')?.dataset.pauseReason ===
-        'running',
-    );
+    // The lab starts paused at iteration 0; start it explicitly.
     const startedPaused = await page.evaluate(
       () =>
         document.querySelector<HTMLElement>('[data-story-controller]')?.dataset.paused === 'true',

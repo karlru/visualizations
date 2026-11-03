@@ -36,19 +36,15 @@ async function waitForLab(page: Page): Promise<void> {
 }
 
 async function scrollToLab(page: Page): Promise<void> {
-  const target = await page.evaluate(() => {
+  await page.evaluate(() => {
     const element = document.getElementById('the-lab');
     if (!element) throw new Error('Missing the-lab chapter');
-    const top = element.getBoundingClientRect().top + window.scrollY - window.innerHeight / 2 + 40;
-    const clamped = Math.max(0, top);
     const html = document.documentElement;
     const previous = html.style.scrollBehavior;
     html.style.scrollBehavior = 'auto';
-    window.scrollTo(0, clamped);
+    element.scrollIntoView({ block: 'center', inline: 'nearest' });
     html.style.scrollBehavior = previous;
-    return clamped;
   });
-  await page.waitForFunction((top) => Math.abs(window.scrollY - top) <= 2, target);
 }
 
 async function enableMapEdit(page: Page): Promise<void> {
@@ -62,10 +58,10 @@ async function enableMapEdit(page: Page): Promise<void> {
 
 async function waitForPauseReason(page: Page): Promise<void> {
   await scrollToLab(page);
-  await page.waitForFunction(
-    () =>
-      document.querySelector<HTMLElement>('[data-story-stage]')?.dataset.pauseReason === 'running',
-  );
+  await page.waitForFunction(() => {
+    const reason = document.querySelector<HTMLElement>('[data-story-stage]')?.dataset.pauseReason;
+    return reason === 'reader' || reason === 'running';
+  });
 }
 
 interface LabState {
@@ -146,13 +142,17 @@ async function dragFirstCity(page: Page, dx = 36, dy = -24): Promise<void> {
   await enableMapEdit(page);
   await scrollToLab(page);
   const handle = page.locator('[data-city-handle]').first();
+  await handle.scrollIntoViewIfNeeded();
+  await expect(handle).toBeVisible();
   const box = await handle.boundingBox();
   if (box === null) throw new Error('Missing city handle box');
   const startX = box.x + box.width / 2;
   const startY = box.y + box.height / 2;
   await page.mouse.move(startX, startY);
   await page.mouse.down();
+  await page.waitForTimeout(50);
   await page.mouse.move(startX + dx, startY + dy, { steps: 6 });
+  await page.waitForTimeout(50);
   await page.mouse.up();
 }
 
@@ -303,6 +303,13 @@ test.describe('ACO lab', () => {
     await waitForLab(page);
     await waitForPauseReason(page);
 
+    // The lab starts paused at iteration 0. Start it, then pause for a stable
+    // comparison.
+    await page.getByTestId('aco-lab-play').click();
+    await page.waitForFunction(
+      () =>
+        document.querySelector<HTMLElement>('[data-story-controller]')?.dataset.paused === 'false',
+    );
     await page.getByTestId('aco-lab-play').click();
     await page.waitForFunction(
       () =>
@@ -345,6 +352,13 @@ test.describe('ACO lab', () => {
     await page.goto(LAB);
     await waitForLab(page);
     await waitForPauseReason(page);
+    // Start from the paused lab, run briefly, then pause for a stable frame.
+    await page.getByTestId('aco-lab-play').click();
+    await page.waitForFunction(
+      () =>
+        document.querySelector<HTMLElement>('[data-story-controller]')?.dataset.paused === 'false',
+    );
+    await page.waitForTimeout(250);
     await page.getByTestId('aco-lab-play').click();
     await page.waitForFunction(
       () =>
@@ -433,7 +447,9 @@ test.describe('ACO lab', () => {
     await waitForLab(page);
     await waitForPauseReason(page);
 
-    // Run long enough to have a best tour, then pause for a stable comparison.
+    // The lab starts paused. Run long enough to have a best tour, then pause for
+    // a stable comparison.
+    await page.getByTestId('aco-lab-play').click();
     await page.waitForFunction(
       () => Number(document.querySelector('[data-metric="iteration"]')?.textContent ?? '0') > 0,
     );
@@ -674,6 +690,9 @@ test.describe('ACO lab on a coarse pointer', () => {
     ).toBe('none');
 
     const handle = page.locator('[data-city-handle]').first();
+    await handle.scrollIntoViewIfNeeded();
+    await expect(handle).toBeVisible();
+    await page.waitForTimeout(100);
     const box = await handle.boundingBox();
     if (box === null) throw new Error('Missing city handle box');
     const startX = box.x + box.width / 2;

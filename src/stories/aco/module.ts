@@ -28,7 +28,7 @@ import {
   worldToCities,
 } from './map';
 import { buildProbabilityFan, DEFAULT_FAN_CANDIDATES } from './probability-fan';
-import { ACO_FOCAL_CITY_INDEX } from './world';
+import { acoFocalCityIndex } from './world';
 
 function formatLength(value: number | null): string {
   return value === null || !Number.isFinite(value) ? '—' : value.toFixed(3);
@@ -64,10 +64,9 @@ export const acoStoryHooks: StoryModuleHooks<AcoParams, AcoSnapshot, AcoMetrics>
 
   createRenderer: () =>
     new Canvas2DRenderer<AcoParams, AcoSnapshot>({
-      layers: createAcoLayers({
-        focalCity: ACO_FOCAL_CITY_INDEX,
-        topN: DEFAULT_FAN_CANDIDATES,
-      }),
+      // The focal city follows the instance size: city 1 on the five-city
+      // teaching map, city 18 on the thirty-city story map.
+      layers: createAcoLayers({ topN: DEFAULT_FAN_CANDIDATES }),
       dprCap: 2,
     }),
 
@@ -90,7 +89,7 @@ export const acoStoryHooks: StoryModuleHooks<AcoParams, AcoSnapshot, AcoMetrics>
 
   auxiliary: ({ metrics, snapshot }): StoryAuxiliaryView => {
     const cityCount = snapshot.cityCount;
-    const focalCity = Math.min(ACO_FOCAL_CITY_INDEX, Math.max(0, cityCount - 1));
+    const focalCity = acoFocalCityIndex(cityCount);
     // A one-city instance has no next city to rank; the UI never creates one,
     // but the engine supports it for edge-case tests.
     const fan =
