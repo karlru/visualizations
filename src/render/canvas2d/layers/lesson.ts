@@ -21,7 +21,6 @@ import {
   bestTourIndexUpTo,
   enumerationFraction,
   enumerationStep,
-  growthStageFraction,
   growthStageIndex,
   lessonProgress,
   oneAntStepIndex,
@@ -34,7 +33,6 @@ import {
   drawLine,
   drawPoints,
   drawPolyline,
-  drawSegments,
   type FillStyle,
   fillCircle,
   type PointStyle,
@@ -284,29 +282,14 @@ export function createLessonEnumerateLayer(): Canvas2DLayer<AcoParams, AcoSnapsh
 interface GrowthGeometry {
   readonly cityCount: number;
   readonly points: MutablePoint[];
-  readonly edgeCoords: Float64Array;
-  readonly edgeCount: number;
 }
 
+/**
+ * Only the city dots are drawn. An all-pairs edge cloud at thirty cities is a
+ * hairball that obscures the one thing this chapter measures: the count.
+ */
 function buildGrowthGeometry(cities: readonly City[]): GrowthGeometry {
-  const points = buildCityPoints(cities);
-  const edgeCount = (cities.length * (cities.length - 1)) / 2;
-  const edgeCoords = new Float64Array(edgeCount * 4);
-  let offset = 0;
-  for (let from = 0; from < points.length; from += 1) {
-    const start = points[from];
-    if (start === undefined) continue;
-    for (let to = from + 1; to < points.length; to += 1) {
-      const end = points[to];
-      if (end === undefined) continue;
-      edgeCoords[offset] = start.x;
-      edgeCoords[offset + 1] = start.y;
-      edgeCoords[offset + 2] = end.x;
-      edgeCoords[offset + 3] = end.y;
-      offset += 4;
-    }
-  }
-  return { cityCount: cities.length, points, edgeCoords, edgeCount };
+  return { cityCount: cities.length, points: buildCityPoints(cities) };
 }
 
 const GROWTH_GEOMETRY: readonly GrowthGeometry[] = ACO_LESSON_GROWTH_STAGES.map((stage) =>
@@ -314,7 +297,6 @@ const GROWTH_GEOMETRY: readonly GrowthGeometry[] = ACO_LESSON_GROWTH_STAGES.map(
 );
 
 export function createLessonGrowthLayer(): Canvas2DLayer<AcoParams, AcoSnapshot> {
-  const edgeStyle: StrokeStyle = { color: '', width: 0.8, alpha: 0.18, cap: 'butt' };
   const cityStyle: PointStyle = { radius: 3.2, fill: '', stroke: '', strokeWidth: 1.2 };
 
   return {
@@ -323,7 +305,6 @@ export function createLessonGrowthLayer(): Canvas2DLayer<AcoParams, AcoSnapshot>
       if (!layerVisible(frame.layer)) return;
       const progress = lessonProgress(frame.revealProgress);
       const index = growthStageIndex(progress);
-      const fraction = growthStageFraction(progress);
       const current = GROWTH_GEOMETRY[index];
       const previous = index > 0 ? GROWTH_GEOMETRY[index - 1] : undefined;
       if (current === undefined) return;
@@ -334,21 +315,12 @@ export function createLessonGrowthLayer(): Canvas2DLayer<AcoParams, AcoSnapshot>
       // Previous stage stays faint under the new one, so growth reads as nodes
       // being added rather than a hard cut.
       if (previous !== undefined) {
-        edgeStyle.color = frame.theme.stageMuted;
-        edgeStyle.width = pixelsToWorld(0.6, zoom);
-        edgeStyle.alpha = 0.1 + 0.08 * (1 - fraction);
-        drawSegments(frame.ctx, previous.edgeCoords, previous.edgeCount, edgeStyle, 0, 2);
         cityStyle.radius = pixelsToWorld(2.4, zoom);
         cityStyle.fill = frame.theme.stageMuted;
         cityStyle.stroke = frame.theme.stage;
         cityStyle.strokeWidth = pixelsToWorld(1, zoom);
         drawPoints(frame.ctx, previous.points, cityStyle, previous.cityCount);
       }
-
-      edgeStyle.color = frame.theme.cool;
-      edgeStyle.width = pixelsToWorld(0.8 + highlight * 0.3, zoom);
-      edgeStyle.alpha = 0.12 + 0.16 * fraction;
-      drawSegments(frame.ctx, current.edgeCoords, current.edgeCount, edgeStyle, 0, 2);
 
       cityStyle.radius = pixelsToWorld(3.2 + highlight * 0.6, zoom);
       cityStyle.fill = frame.theme.stageInk;

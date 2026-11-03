@@ -939,6 +939,16 @@
         runtime?.setParams(params);
         runtime?.reset();
         clock?.reset();
+        // Reduced motion has no autoplay, so settle the static keyframe on the
+        // chapter's authored iteration count; otherwise the trail chapters would
+        // open at iteration 0 with no pheromone to explain.
+        if (reducedMotion) {
+          const settleIterations =
+            chapter.spec?.presentation?.reducedMotionIterations ?? 0;
+          for (let index = 0; index < settleIterations; index += 1) {
+            runtime?.step(1);
+          }
+        }
         syncStageSpeedFromParams();
         simulatedSeconds = 0;
         stepCount = 0;

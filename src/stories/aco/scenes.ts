@@ -91,7 +91,7 @@ const DEMO_CAMERA = Object.freeze({
   kind: '2d' as const,
   panX: 0.15,
   panY: 0.3,
-  zoom: 150,
+  zoom: 115,
   rotation: -0.18,
 });
 
@@ -107,7 +107,7 @@ function demoLabels(extra: readonly string[] = []): readonly SceneLabel[] {
 export const ACO_SCENES: Readonly<Record<AcoSceneId, AcoSceneDefinition>> = {
   'five-cities': {
     id: 'five-cities',
-    camera: demoCamera(150),
+    camera: demoCamera(115),
     layers: acoLayers({ graph: 1, 'lesson-tour': 1 }),
     highlights: [{ id: 'demo-tour', layerId: 'lesson-tour', intensity: 0.8 }],
     revealProgress: 1,
@@ -115,7 +115,7 @@ export const ACO_SCENES: Readonly<Record<AcoSceneId, AcoSceneDefinition>> = {
   },
   'enumerate-tours': {
     id: 'enumerate-tours',
-    camera: demoCamera(150),
+    camera: demoCamera(115),
     layers: acoLayers({ graph: 1, 'lesson-enumerate': 1 }),
     highlights: [{ id: 'demo-optimum', layerId: 'lesson-enumerate', intensity: 0.8 }],
     revealProgress: 1,
@@ -123,7 +123,7 @@ export const ACO_SCENES: Readonly<Record<AcoSceneId, AcoSceneDefinition>> = {
   },
   'factorial-wall': {
     id: 'factorial-wall',
-    camera: demoCamera(150),
+    camera: { kind: '2d', panX: 0, panY: 0, zoom: 100, rotation: 0 },
     layers: acoLayers({ 'lesson-growth': 1 }),
     highlights: [{ id: 'demo-growth', layerId: 'lesson-growth', intensity: 0.7 }],
     revealProgress: 1,
@@ -131,15 +131,15 @@ export const ACO_SCENES: Readonly<Record<AcoSceneId, AcoSceneDefinition>> = {
   },
   'one-ant': {
     id: 'one-ant',
-    camera: demoCamera(165),
+    camera: demoCamera(115),
     layers: acoLayers({ graph: 1, 'lesson-ant': 1 }),
     highlights: [{ id: 'demo-one-ant', layerId: 'lesson-ant', intensity: 0.8 }],
     revealProgress: 1,
-    labels: demoLabels(['demo-one-ant', 'demo-allowed', 'demo-ant-trail']),
+    labels: demoLabels(['demo-one-ant', 'demo-allowed']),
   },
   deposit: {
     id: 'deposit',
-    camera: demoCamera(175),
+    camera: demoCamera(115),
     layers: acoLayers({ graph: 1, pheromone: 0.9, ants: 1, 'best-tour': 0.6 }),
     highlights: [{ id: 'demo-trail', layerId: 'pheromone', intensity: 1 }],
     revealProgress: 1,
@@ -147,7 +147,7 @@ export const ACO_SCENES: Readonly<Record<AcoSceneId, AcoSceneDefinition>> = {
   },
   evaporation: {
     id: 'evaporation',
-    camera: demoCamera(165),
+    camera: demoCamera(115),
     layers: acoLayers({ graph: 1, pheromone: 1, ants: 0.6, 'best-tour': 0.4 }),
     highlights: [{ id: 'demo-fade', layerId: 'pheromone', intensity: 0.8 }],
     revealProgress: 1,
@@ -155,7 +155,7 @@ export const ACO_SCENES: Readonly<Record<AcoSceneId, AcoSceneDefinition>> = {
   },
   'two-ants': {
     id: 'two-ants',
-    camera: demoCamera(160),
+    camera: demoCamera(115),
     layers: acoLayers({ graph: 1, pheromone: 0.85, ants: 1, 'best-tour': 0.7 }),
     highlights: [{ id: 'demo-second-ant', layerId: 'ants', intensity: 0.8 }],
     revealProgress: 1,
@@ -163,7 +163,7 @@ export const ACO_SCENES: Readonly<Record<AcoSceneId, AcoSceneDefinition>> = {
   },
   colony: {
     id: 'colony',
-    camera: demoCamera(155),
+    camera: demoCamera(115),
     layers: acoLayers({ graph: 1, pheromone: 1, ants: 0.9, 'best-tour': 1 }),
     highlights: [{ id: 'demo-match', layerId: 'best-tour', intensity: 1 }],
     revealProgress: 1,
@@ -171,7 +171,7 @@ export const ACO_SCENES: Readonly<Record<AcoSceneId, AcoSceneDefinition>> = {
   },
   'probability-rule': {
     id: 'probability-rule',
-    camera: demoCamera(150, ACO_DEMO_FOCAL_WORLD.x, ACO_DEMO_FOCAL_WORLD.y),
+    camera: demoCamera(115, ACO_DEMO_FOCAL_WORLD.x, ACO_DEMO_FOCAL_WORLD.y),
     layers: acoLayers({
       graph: 1,
       pheromone: 0.5,
@@ -185,7 +185,7 @@ export const ACO_SCENES: Readonly<Record<AcoSceneId, AcoSceneDefinition>> = {
   },
   'update-rule': {
     id: 'update-rule',
-    camera: demoCamera(160),
+    camera: demoCamera(115),
     layers: acoLayers({ graph: 1, pheromone: 1, ants: 0.8, 'best-tour': 0.9 }),
     highlights: [{ id: 'update-rule', layerId: 'pheromone', intensity: 0.8 }],
     revealProgress: 1,

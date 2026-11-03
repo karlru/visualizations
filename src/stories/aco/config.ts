@@ -108,6 +108,13 @@ const FORMAL_PRESENTATION = Object.freeze({
   lockParams: true,
 });
 
+function guidedPlayback(reducedMotionIterations: number) {
+  return Object.freeze({
+    ...GUIDED_PLAYBACK_PRESENTATION,
+    reducedMotionIterations,
+  });
+}
+
 export const ACO_CHAPTERS: readonly ChapterSpec<AcoParams>[] = Object.freeze([
   {
     id: 'the-problem',
@@ -141,7 +148,7 @@ export const ACO_CHAPTERS: readonly ChapterSpec<AcoParams>[] = Object.freeze([
     title: 'One ant, alone',
     scene: 'one-ant',
     sceneOverrides: { params: demoParams(1) },
-    annotations: ['demo-one-ant', 'demo-allowed', 'demo-ant-trail'],
+    annotations: ['demo-one-ant', 'demo-allowed'],
     reducedMotionSteps: 6,
     presentation: SCRIPTED_PRESENTATION,
   },
@@ -152,7 +159,7 @@ export const ACO_CHAPTERS: readonly ChapterSpec<AcoParams>[] = Object.freeze([
     sceneOverrides: { params: demoParams(1) },
     annotations: ['demo-trail'],
     reducedMotionSteps: 4,
-    presentation: GUIDED_PLAYBACK_PRESENTATION,
+    presentation: guidedPlayback(1),
   },
   {
     id: 'forgetting',
@@ -161,16 +168,16 @@ export const ACO_CHAPTERS: readonly ChapterSpec<AcoParams>[] = Object.freeze([
     sceneOverrides: { params: demoParams(1) },
     annotations: ['demo-fade'],
     reducedMotionSteps: 4,
-    presentation: GUIDED_PLAYBACK_PRESENTATION,
+    presentation: guidedPlayback(3),
   },
   {
     id: 'two-ants',
     title: 'A second ant',
     scene: 'two-ants',
-    sceneOverrides: { params: demoParams(2, 0.5) },
+    sceneOverrides: { params: demoParams(2) },
     annotations: ['demo-second-ant'],
     reducedMotionSteps: 4,
-    presentation: GUIDED_PLAYBACK_PRESENTATION,
+    presentation: guidedPlayback(2),
   },
   {
     id: 'emergence',
@@ -179,7 +186,7 @@ export const ACO_CHAPTERS: readonly ChapterSpec<AcoParams>[] = Object.freeze([
     sceneOverrides: { params: demoParams(4) },
     annotations: ['demo-colony', 'demo-match'],
     reducedMotionSteps: 4,
-    presentation: GUIDED_PLAYBACK_PRESENTATION,
+    presentation: guidedPlayback(6),
   },
   {
     id: 'the-probability-rule',

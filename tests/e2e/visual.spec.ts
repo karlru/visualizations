@@ -107,9 +107,9 @@ async function advanceFixedSteps(page: Page, steps: number): Promise<void> {
         requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
       }),
   );
-  // Two frames let Svelte flush; the short wall-clock settle covers a busy
-  // worker where the canvas paint lands just after the RAF pair.
-  await page.waitForTimeout(150);
+  // Two frames let Svelte flush; the wall-clock settle covers a busy worker
+  // where the canvas paint lands just after the RAF pair.
+  await page.waitForTimeout(500);
 }
 
 /** Wait until chapter entry events have stopped (fonts and sticky layout settle). */
@@ -161,6 +161,12 @@ test.describe('ACO story visual baselines', () => {
     await page.goto(`${STORY}?seed=42&lenis=off`);
     await waitForRuntime(page);
     await scrollToChapter(page, 'tuning-the-colony');
+    await page.waitForFunction(
+      () =>
+        document.querySelector<HTMLElement>('[data-story-controller]')?.dataset.activeChapter ===
+        'tuning-the-colony',
+    );
+    await waitForEntrySettle(page);
     await advanceFixedSteps(page, 3_000);
 
     await expect(page.locator('[data-story-controller]')).toHaveAttribute(

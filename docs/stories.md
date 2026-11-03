@@ -308,7 +308,9 @@ The story should use **Ant System** for transparency. It may mention Ant Colony 
   next-city probabilities, including the "other" bucket when it exists.
 - Reduced motion replaces every animated lesson step with a discrete keyframe in
   the same order. Guided chapters without simulation controls keep the
-  keyframe stepper available.
+  keyframe stepper available. Engine-driven trail chapters settle on an authored
+  iteration count so each static keyframe contains a visible trail instead of an
+  empty iteration 0.
 - The lab starts paused at iteration 0 so a keyboard or screen-reader user can
   inspect the map before starting the run.
 

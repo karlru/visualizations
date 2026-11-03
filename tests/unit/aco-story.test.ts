@@ -128,6 +128,7 @@ describe('ACO chapter and scene map', () => {
       expect(chapter.presentation?.metrics, chapter.id).toBe(false);
       expect(chapter.presentation?.pseudocode, chapter.id).toBe(false);
       expect(chapter.presentation?.lockParams, chapter.id).toBe(true);
+      expect(chapter.presentation?.reducedMotionIterations, chapter.id).toBeGreaterThan(0);
     }
 
     for (const chapter of ACO_CHAPTERS.slice(8, 10)) {
@@ -225,7 +226,7 @@ describe('ACO camera moves', () => {
     const demoCamera = cameraOf(sceneOf('five-cities'));
     expect(demoCamera.panX).toBeCloseTo(0.15, 12);
     expect(demoCamera.panY).toBeCloseTo(0.3, 12);
-    expect(demoCamera.zoom).toBe(150);
+    expect(demoCamera.zoom).toBe(115);
 
     const fanCamera = cameraOf(sceneOf('probability-rule'));
     expect(fanCamera.panX).toBeCloseTo(ACO_DEMO_FOCAL_WORLD.x, 12);

@@ -102,6 +102,13 @@ export interface ChapterPresentation {
   readonly chrome?: ChapterChromeMode;
   /** Let this chapter's parameter overrides beat the reader's live choices. */
   readonly lockParams?: boolean;
+  /**
+   * Deterministic engine iterations to apply on chapter entry when motion is
+   * reduced. The reader clock still starts paused; this only settles the static
+   * keyframe on a meaningful state (for example, one ant has deposited a trail)
+   * instead of iteration zero.
+   */
+  readonly reducedMotionIterations?: number;
 }
 
 /**
